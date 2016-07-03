@@ -204,9 +204,8 @@ Please install first the [oddgen][1] extension. Our wrapper package is autodisco
 
 ## Links
 
-- [License: MIT][4]
 - [Download latest version][1]
-- [Issues][5]
+- [Issues][4]
 
 
 ## Credits
@@ -216,9 +215,9 @@ We want to say thank you to Phillip Salvisberg and all other people behind the [
 
 ## Changelog
 
-This project uses [semantic versioning][6].
+This project uses [semantic versioning][5].
 
-Please use for all comments, discussions, feature requests or bug reports the GitHub [issues][5] functionality.
+Please use for all comments, discussions, feature requests or bug reports the GitHub [issues][4] functionality.
 
 
 ### 0.3.0 (2016-07-03)
@@ -243,6 +242,5 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 [1]: https://github.com/OraMUC/table-api-generator/releases/latest
 [2]: https://www.toadworld.com/cfs-file/__key/communityserver-wikis-components-files/00-00-00-00-03/Say-Goodbye-to-Hard_2D00_Coding.pdf
 [3]: https://github.com/OraMUC/table-api-generator/blob/master/sql-developer-integration.png
-[4]: https://github.com/OraMUC/table-api-generator/LICENSE
-[5]: https://github.com/OraMUC/table-api-generator/issues
-[6]: http://semver.org/
+[4]: https://github.com/OraMUC/table-api-generator/issues
+[5]: http://semver.org/
