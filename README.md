@@ -3,7 +3,7 @@ Please do not download directly this code - this is the development version and 
 
 # Table API Generator
 
-*This generator is a standalone PL/SQL package which creates table API's for existing tables. It can be integrated in the Oracle SQL-Developer with an additional wrapper package for the [oddgen][1] extension. The generated API's enables you to easy seperate the data schema and the UI schema for your applications to improve security and also speeding up your development cycles. You can concentrate on business logic instead of wasting time by manual creating boilerplate code for your tables.*
+*This generator is a standalone PL/SQL package which creates table API's for existing tables. It can be integrated in the Oracle SQL-Developer with an additional wrapper package for the [oddgen][0] extension. The generated API's enables you to easy seperate the data schema and the UI schema for your applications to improve security and also speeding up your development cycles. You can concentrate on business logic instead of wasting time by manual creating boilerplate code for your tables.*
 
 > Avoid hard-coding SQL ([Steven Feuerstein][2])
 
@@ -66,7 +66,7 @@ We give our best to produce clean and robust code, but we are NOT responsible, i
 ## How To Use
 
 1. Install the package om_tapigen in your schema, or even better in a central tools schema and grant execute rights to public
-2. Optional install the wrapper package for the SQL Developer integration (don't forget to install the [oddgen][1] extension)
+2. Optional install the wrapper package for the SQL Developer integration (don't forget to install the [oddgen][0] extension)
 3. Create your API's :-)
 
 
@@ -185,7 +185,7 @@ END;
 
 ### SQL Developer
 
-Please install first the [oddgen][1] extension. Our wrapper package is autodiscovered by this extension.
+Please install first the [oddgen][0] extension. Our wrapper package is autodiscovered by this extension.
 
 ![SQL Developer Integration][3]
 
@@ -210,7 +210,7 @@ Please install first the [oddgen][1] extension. Our wrapper package is autodisco
 
 ## Credits
 
-We want to say thank you to Phillip Salvisberg and all other people behind the [oddgen][1] project for this great generic SQL Developer extension. Also big thanks to Steven Feuerstein for his engagement to tell PL/SQL Developers, what a good coding practice is. We hope he find not so much bad practice in our generator, if he ever takes a look at it ;-)
+We want to say thank you to Phillip Salvisberg and all other people behind the [oddgen][0] project for this great generic SQL Developer extension. Also big thanks to Steven Feuerstein for his engagement to tell PL/SQL Developers, what a good coding practice is. We hope he find not so much bad practice in our generator, if he ever takes a look at it ;-)
 
 
 ## Changelog
@@ -238,7 +238,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - André: Idea and first running version
 - Ottmar: Fan of the idea and first usage in a project :-)
 
-
+[0]: https://www.oddgen.org/
 [1]: https://github.com/OraMUC/table-api-generator/releases/latest
 [2]: https://www.toadworld.com/cfs-file/__key/communityserver-wikis-components-files/00-00-00-00-03/Say-Goodbye-to-Hard_2D00_Coding.pdf
 [3]: https://github.com/OraMUC/table-api-generator/blob/master/sql-developer-integration.png
