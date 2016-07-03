@@ -199,7 +199,7 @@ Please install first the [oddgen][0] extension. Our wrapper package is autodisco
 4. View the state of all existing API's
     - `SELECT * FROM TABLE(your_install_schema.om_tapigen.view_existing_apis);`
 5. On model changes recreate all existing API's with the original parameters
-    - `BEGIN tools.om_tapigen.recreate_existing_apis; END;`
+    - `BEGIN your_install_schema.om_tapigen.recreate_existing_apis; END;`
 
 
 ## Links
