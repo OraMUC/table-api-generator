@@ -57,7 +57,7 @@ If you want to check before the very first API compilation if the used object na
 
 ```sql
 SELECT *
-  FROM TABLE(<your_install_schema>.om_tapigen.view_naming_conflicts);
+  FROM TABLE(your_install_schema.om_tapigen.view_naming_conflicts);
 ```
 
 We give our best to produce clean and robust code, but we are NOT responsible, if you loose any code or data by using this API generator. By using it you accept the MIT license as described above. As a best practice test this generator first in your development environment and decide after your tests, if you want to use it in production. If you miss any feature or find a bug, we are happy to hear from you via the GitHub [issues][5] functionality.
@@ -75,7 +75,7 @@ We give our best to produce clean and robust code, but we are NOT responsible, i
 ```sql
 begin
   --> minimal parameter, see also the section "The Parameters"
-  <your_install_schema>.om_tapigen.compile_api (p_table_name => 'EMP');
+  your_install_schema.om_tapigen.compile_api (p_table_name => 'EMP');
 end;
 ```
 
@@ -91,7 +91,7 @@ There is also a pipelined function to view the current status of the API's and t
 
 ```sql
 SELECT *
-  FROM TABLE(<your_install_schema>.om_tapigen.view_existing_apis)
+  FROM TABLE(your_install_schema.om_tapigen.view_existing_apis)
  ORDER BY table_name NULLS FIRST;
 ```
 
@@ -99,7 +99,7 @@ The leading dictionary information is the API package name. It could be, you fou
 
 ```sql
 BEGIN
-  <your_install_schema>.om_tapigen.recreate_existing_apis;
+  your_install_schema.om_tapigen.recreate_existing_apis;
 END;
 ```
 
@@ -139,12 +139,12 @@ Finally a complete PL/SQL example with all default parameter values:
 ```sql
 --> check for possible naming conflicts
 SELECT *
-  FROM TABLE(<your_install_schema>.om_tapigen.view_naming_conflicts);
+  FROM TABLE(your_install_schema.om_tapigen.view_naming_conflicts);
 
 --> initial API generation for your tables
 BEGIN
   FOR i IN (SELECT table_name FROM user_tables /*WHERE...*/) LOOP
-    <your_install_schema>.om_tapigen.compile_api(
+    your_install_schema.om_tapigen.compile_api(
       p_table_name                 => i.table_name,
       p_reuse_existing_api_params  => TRUE,
       p_col_prefix_in_method_names => TRUE,
@@ -156,12 +156,12 @@ END;
 
 --> inspect the results
 SELECT *
-  FROM TABLE(<your_install_schema>.om_tapigen.view_existing_apis)
+  FROM TABLE(your_install_schema.om_tapigen.view_existing_apis)
  ORDER BY table_name NULLS FIRST;
 
 --> recreate the API's after changes in your model
 BEGIN
-  <your_install_schema>.om_tapigen.recreate_existing_apis;
+  your_install_schema.om_tapigen.recreate_existing_apis;
 END;
 ```
 
@@ -172,7 +172,7 @@ DECLARE
   v_clob CLOB;
 BEGIN
   FOR i IN (SELECT table_name FROM user_tables) LOOP
-    v_clob := <your_install_schema>.om_tapigen.get_code(
+    v_clob := your_install_schema.om_tapigen.get_code(
       p_table_name => i.table_name);  
     dbms_xslprocessor.clob2file(
       v_clob,
@@ -193,11 +193,11 @@ Please install first the [oddgen][1] extension. Our wrapper package is autodisco
 ### Recommended Fastest Way To Your API's
 
 1. Check naming conflicts in your schema before the first API compilation
-    - `SELECT * FROM TABLE(<your_install_schema>.om_tapigen.view_naming_conflicts);`
+    - `SELECT * FROM TABLE(your_install_schema.om_tapigen.view_naming_conflicts);`
 2. Use SQL Developer for the first API creation (you can create API's for multiple tables at once - see screenshot above: emp and dept)
 3. Inspect and run the generated code as a script, then save it to your version control system for the deployment
 4. View the state of all existing API's
-    - `SELECT * FROM TABLE(<your_install_schema>.om_tapigen.view_existing_apis);`
+    - `SELECT * FROM TABLE(your_install_schema.om_tapigen.view_existing_apis);`
 5. On model changes recreate all existing API's with the original parameters
     - `BEGIN tools.om_tapigen.recreate_existing_apis; END;`
 
