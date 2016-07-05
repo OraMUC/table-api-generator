@@ -3,7 +3,7 @@ Please do not download directly this code - this is the development version and 
 
 # Table API Generator
 
-*This generator is a standalone PL/SQL package which creates table API's for existing tables. It can be integrated in the Oracle SQL-Developer with an additional wrapper package for the [oddgen][0] extension. The generated API's enables you to easy seperate the data schema and the UI schema for your applications to improve security and also speeding up your development cycles. You can concentrate on business logic instead of wasting time by manual creating boilerplate code for your tables.*
+*This generator is a standalone PL/SQL package which creates table API's for existing tables. It can be integrated in the Oracle SQL-Developer with an additional wrapper package for the [oddgen][0] extension. The effort of generated API's is to reduce your PL/SQL code by calling standard procedures and functions for usual DML operations on tables. So the generated table APIs work as a logical layer between your business logic and the data. And by the way this logical layer enables you to easily seperate the data schema and the UI schema for your applications to improve security by granting only execute privs on table APIs to the application scheme. In addition to that table APIs will speed up your development cycles because developers are able to set the focal point to the business logic instead of wasting time by manual creating boilerplate code for your tables.*
 
 > Avoid hard-coding SQL ([Steven Feuerstein][2])
 
@@ -14,11 +14,11 @@ Please do not download directly this code - this is the development version and 
 - You only need to specify generation options once per table - parameters are saved in the package spec source and can be reused for regeneration
 - Standard CRUD methods (column and row type based) with an additional create or update version
 - Getter and setter for each column
-- A row exists function and per unique constraint a getter function to fetch the primary key by the unique columns
-- Deletion of rows can be disabled
+- A row exists function and per unique constraint a getter function to fetch the primary key by each unique constraint (single or multicolumn)
+- Deletion of rows can be disabled e.g. to avoid violation of referential integrity
 - Optional generic logging (one log entry for each changed column over all API enabled schema tables in one generic log table - very handy to create a record history in the user interface)
-- Checks for real changes and updates only if needed
-- Supports APEX automatic row processing by generation of a view with an instead of trigger, which calls simply the API
+- Checks for real changes during UPDATE operation and updates only if required
+- Supports APEX automatic row processing by generation of a updatable view with an instead of trigger, which calls simply the API and if enabled - the generic logging
 
 
 ## License
@@ -49,11 +49,11 @@ Additionally the generator is creating once in a schema a generic change log tab
 - GENERIC_CHANGE_LOG_PK: The primary key index
 - GENERIC_CHANGE_LOG_IDX: An additional index
 
-The generator is checking by itself, if the corresponding sequence and index names are already in use in the schema. If so, a error is raised.
+The generator is checking by itself, if the corresponding sequence and index names are already in use in the schema. If it is the case, an error is raised.
 
-We think currently about a new parameter to enable or disable the generation of the view and the trigger. Not all of our projects need this and you can use also the API methods on a tabular form directly (but the wizard driven tabular form creation is easier to implement with the DML view).
+We think currently about a new parameter to enable or disable the generation of the view and the trigger. Not all of the projects require updatable DML views and you can also use the API methods on a tabular form directly (but the wizard driven tabular form creation is easier to implement with the DML view).
 
-If you want to check before the very first API compilation if the used object names could be a problem for you, you can use this pipelined function:
+If you want to check if generated objects with their names already exist before the very first API compilation, you can use this pipelined table function:
 
 ```sql
 SELECT *
