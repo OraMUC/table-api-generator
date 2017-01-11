@@ -142,7 +142,7 @@ As you can see, you need no parameters for this procedure - they are taken from 
         - The table generic_change_log and a corresponding sequence generic_change_log_seq is created in the schema during the API creation on the very first API that uses this feature
         - We could long describe this feature - try it out in your development system and decide, if you want to have it or not
         - One last thing: This could NOT replace a historicization, but can deliver things, that would not so easy with a historicization - we use both sometimes together...
-8. p_sequence_name: string, default NULL
+8. p_sequence_name: string, default #TABLE_NAME_26#_SEQ
     - If a sequence name is given here, then the resulting API is taken the ID for the create_row methods and you don't need to create a trigger for your table only for the sequence handling
     - you can use the following substitution strings, the generator is replacing this at runtime: #TABLE_NAME_24#, #TABLE_NAME_26#, #TABLE_NAME_28#, #PK_COLUMN_26#, #PK_COLUMN_28#, #COLUMN_PREFIX#
         - Example 1: #TABLE_NAME_26#_SEQ
