@@ -275,6 +275,6 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 [0]: https://www.oddgen.org/
 [1]: https://github.com/OraMUC/table-api-generator/releases/latest
 [2]: https://www.toadworld.com/cfs-file/__key/communityserver-wikis-components-files/00-00-00-00-03/Say-Goodbye-to-Hard_2D00_Coding.pdf
-[3]: https://github.com/OraMUC/table-api-generator/blob/master/sql-developer-integration.png
+[3]: https://github.com/OraMUC/table-api-generator/blob/v0.4.0-release-candidate/sql-developer-integration.png
 [4]: https://github.com/OraMUC/table-api-generator/issues
 [5]: http://semver.org/
