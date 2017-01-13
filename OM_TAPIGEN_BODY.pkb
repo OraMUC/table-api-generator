@@ -21,6 +21,7 @@ IS
    g_enable_update_of_rows           BOOLEAN;
    g_enable_deletion_of_rows         BOOLEAN;
    g_enable_generic_change_log       BOOLEAN;
+   g_enable_dml_view                 BOOLEAN;
    g_xmltype_column_present          BOOLEAN;
 
    -----------------------------------------------------------------------------
@@ -580,6 +581,23 @@ IS
    END util_get_user_name;
 
    -----------------------------------------------------------------------------
+   -- util_get_normalized_identifier is a private helper function to deliver a
+   -- cleaned normalized identifier. Normalized means, it it free of special
+   -- characters, only "a-z" or "A-Z" or "_" or "0-9" are allowed, so all other
+   -- characters are replaced with null by this function. It is required e.g. to
+   -- cleanup function- or procedure- or parameter-names generated within
+   -- the table API.
+   -----------------------------------------------------------------------------
+   FUNCTION util_get_normalized_identifier(p_identifier VARCHAR2)
+      RETURN VARCHAR2
+   IS
+   BEGIN
+      RETURN REGEXP_REPLACE(srcstr     => p_identifier
+                          , pattern    => '[^a-zA-Z0-9_]'
+                          , replacestr => NULL);
+   END util_get_normalized_identifier;
+
+   -----------------------------------------------------------------------------
    PROCEDURE gen_header
    IS
    BEGIN
@@ -617,6 +635,9 @@ CREATE OR REPLACE PACKAGE #TABLE_NAME_26#_api IS
          || '"
    *   p_enable_generic_change_log="'
          || util_bool_to_string(g_enable_generic_change_log)
+         || '"
+   *   p_enable_dml_view="'
+         || util_bool_to_string(g_enable_dml_view)
          || '"
    *   p_sequence_name="#SEQUENCE_NAME#"/>
    * 
@@ -1422,6 +1443,7 @@ END #TABLE_NAME_24#_ioiud;';
     , p_enable_update_of_rows      IN BOOLEAN
     , p_enable_deletion_of_rows    IN BOOLEAN
     , p_enable_generic_change_log  IN BOOLEAN
+    , p_enable_dml_view            IN BOOLEAN
     , p_sequence_name              IN user_sequences.sequence_name%TYPE)
    IS
       PROCEDURE initialize
@@ -1452,6 +1474,7 @@ END #TABLE_NAME_24#_ioiud;';
             g_enable_update_of_rows      := NULL;
             g_enable_deletion_of_rows    := NULL;
             g_enable_generic_change_log  := NULL;
+            g_enable_dml_view            := NULL;
             g_sequence_name              := NULL;
             g_xmltype_column_present     := NULL;
          END reset_globals;
@@ -1544,6 +1567,18 @@ END #TABLE_NAME_24#_ioiud;';
                         g_params_existing_api.p_enable_generic_change_log)
                   ELSE
                      p_enable_generic_change_log
+               END;
+
+            g_enable_dml_view           :=
+               CASE
+                  WHEN g_reuse_existing_api_params
+                   AND v_api_found
+                   AND g_params_existing_api.p_enable_dml_view IS NOT NULL
+                  THEN
+                     util_string_to_bool(
+                        g_params_existing_api.p_enable_dml_view)
+                  ELSE
+                     p_enable_dml_view
                END;
 
             g_sequence_name             :=
@@ -1780,10 +1815,15 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
          PROCEDURE create_temporary_lobs
          IS
          BEGIN
-            DBMS_LOB.createtemporary(g_tapi_code_blocks.api_spec, TRUE);
-            DBMS_LOB.createtemporary(g_tapi_code_blocks.api_body, TRUE);
-            DBMS_LOB.createtemporary(g_tapi_code_blocks.dml_view, TRUE);
-            DBMS_LOB.createtemporary(g_tapi_code_blocks.dml_view_trigger, TRUE);
+            DBMS_LOB.createtemporary(lob_loc => g_tapi_code_blocks.api_spec
+                                   , cache   => FALSE);
+            DBMS_LOB.createtemporary(lob_loc => g_tapi_code_blocks.api_body
+                                   , cache   => FALSE);
+            DBMS_LOB.createtemporary(lob_loc => g_tapi_code_blocks.dml_view
+                                   , cache   => FALSE);
+            DBMS_LOB.createtemporary(
+               lob_loc => g_tapi_code_blocks.dml_view_trigger
+             , cache   => FALSE);
          END create_temporary_lobs;
 
          --
@@ -1885,8 +1925,19 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                            + 2
                          , 26)
                   END;
+
                g_tab_column_info(i).column_name_28      :=
                   SUBSTR(g_tab_column_info(i).column_name, 1, 28);
+
+               -- normalize column names by replacing
+               -- all special characters with "_"
+               g_tab_column_info(i).column_name_26      :=
+                  util_get_normalized_identifier(
+                     p_identifier => g_tab_column_info(i).column_name_26);
+
+               g_tab_column_info(i).column_name_28      :=
+                  util_get_normalized_identifier(
+                     p_identifier => g_tab_column_info(i).column_name_28);
             END calc_column_short_names;
 
             --
@@ -2278,16 +2329,20 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
           , p_clob_varchar_cache => g_tapi_code_blocks.api_body_varchar_cache
           , p_varchar_to_append  => NULL
           , p_final_call         => TRUE);
-         util_clob_append(
-            p_clob               => g_tapi_code_blocks.dml_view
-          , p_clob_varchar_cache => g_tapi_code_blocks.dml_view_varchar_cache
-          , p_varchar_to_append  => NULL
-          , p_final_call         => TRUE);
-         util_clob_append(
-            p_clob               => g_tapi_code_blocks.dml_view_trigger
-          , p_clob_varchar_cache => g_tapi_code_blocks.dml_view_trigger_varchar_cache
-          , p_varchar_to_append  => NULL
-          , p_final_call         => TRUE);
+
+         IF (g_enable_dml_view)
+         THEN
+            util_clob_append(
+               p_clob               => g_tapi_code_blocks.dml_view
+             , p_clob_varchar_cache => g_tapi_code_blocks.dml_view_varchar_cache
+             , p_varchar_to_append  => NULL
+             , p_final_call         => TRUE);
+            util_clob_append(
+               p_clob               => g_tapi_code_blocks.dml_view_trigger
+             , p_clob_varchar_cache => g_tapi_code_blocks.dml_view_trigger_varchar_cache
+             , p_varchar_to_append  => NULL
+             , p_final_call         => TRUE);
+         END IF;
       END finalize;
    --
    BEGIN
@@ -2342,8 +2397,16 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       gen_read_row_by_uk_fnc;
       gen_getter_functions;
       gen_footer;
-      gen_dml_view;
-      gen_dml_view_trigger;
+
+      --------------------------------------------------------------------------
+      -- DML View and Trigger only if allowed
+      --------------------------------------------------------------------------
+      IF (g_enable_dml_view)
+      THEN
+         gen_dml_view;
+         gen_dml_view_trigger;
+      END IF;
+
       finalize;
    END main_generate;
 
@@ -2398,10 +2461,16 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
              || terminator
              || g_tapi_code_blocks.api_body
              || terminator
-             || g_tapi_code_blocks.dml_view
-             || terminator
-             || g_tapi_code_blocks.dml_view_trigger
-             || terminator;
+             || CASE
+                   WHEN g_enable_dml_view
+                   THEN
+                         g_tapi_code_blocks.dml_view
+                      || terminator
+                      || g_tapi_code_blocks.dml_view_trigger
+                      || terminator
+                   ELSE
+                      NULL
+                END;
    END main_return;
 
    -----------------------------------------------------------------------------
@@ -2415,7 +2484,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     , p_enable_update_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows
     , p_enable_deletion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows
     , p_enable_generic_change_log  IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log
-    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT c_sequence_name)
+    , p_enable_dml_view            IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view
+    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name)
    IS
    BEGIN
       main_generate(p_generator_action           => 'COMPILE_API'
@@ -2426,6 +2496,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   , p_enable_update_of_rows      => p_enable_update_of_rows
                   , p_enable_deletion_of_rows    => p_enable_deletion_of_rows
                   , p_enable_generic_change_log  => p_enable_generic_change_log
+                  , p_enable_dml_view            => p_enable_dml_view
                   , p_sequence_name              => p_sequence_name);
       main_compile;
    END compile_api;
@@ -2441,7 +2512,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     , p_enable_update_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows
     , p_enable_deletion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows
     , p_enable_generic_change_log  IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log
-    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT c_sequence_name)
+    , p_enable_dml_view            IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view
+    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name)
       RETURN CLOB
    IS
    BEGIN
@@ -2453,6 +2525,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   , p_enable_update_of_rows      => p_enable_update_of_rows
                   , p_enable_deletion_of_rows    => p_enable_deletion_of_rows
                   , p_enable_generic_change_log  => p_enable_generic_change_log
+                  , p_enable_dml_view            => p_enable_dml_view
                   , p_sequence_name              => p_sequence_name);
       main_compile;
       RETURN main_return;
@@ -2469,7 +2542,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     , p_enable_update_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows
     , p_enable_deletion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows
     , p_enable_generic_change_log  IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log
-    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT c_sequence_name)
+    , p_enable_dml_view            IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view
+    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name)
       RETURN CLOB
    IS
    BEGIN
@@ -2481,6 +2555,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   , p_enable_update_of_rows      => p_enable_update_of_rows
                   , p_enable_deletion_of_rows    => p_enable_deletion_of_rows
                   , p_enable_generic_change_log  => p_enable_generic_change_log
+                  , p_enable_dml_view            => p_enable_dml_view
                   , p_sequence_name              => p_sequence_name);
       RETURN main_return;
    END get_code;
@@ -2521,6 +2596,39 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
          FETCH g_cur_existing_apis INTO v_row;
 
          EXIT WHEN g_cur_existing_apis%NOTFOUND;
+
+         -----------------------------------------------------------------------
+         -- parameters could be null, if older om_tapigen versions where used
+         -- for creating table APIs, so coalesce ensures parameter validity.
+         -- If existing parameter is null, then default is taken.
+         -----------------------------------------------------------------------
+         v_row.p_reuse_existing_api_params      :=
+            COALESCE(v_row.p_reuse_existing_api_params
+                   , util_bool_to_string(c_reuse_existing_api_params));
+
+         v_row.p_col_prefix_in_method_names      :=
+            COALESCE(v_row.p_col_prefix_in_method_names
+                   , util_bool_to_string(c_col_prefix_in_method_names));
+
+         v_row.p_enable_insertion_of_rows      :=
+            COALESCE(v_row.p_enable_insertion_of_rows
+                   , util_bool_to_string(c_enable_insertion_of_rows));
+
+         v_row.p_enable_update_of_rows      :=
+            COALESCE(v_row.p_enable_update_of_rows
+                   , util_bool_to_string(c_enable_update_of_rows));
+
+         v_row.p_enable_deletion_of_rows      :=
+            COALESCE(v_row.p_enable_deletion_of_rows
+                   , util_bool_to_string(c_enable_deletion_of_rows));
+
+         v_row.p_enable_generic_change_log      :=
+            COALESCE(v_row.p_enable_generic_change_log
+                   , util_bool_to_string(c_enable_generic_change_log));
+
+         v_row.p_enable_dml_view      :=
+            COALESCE(v_row.p_enable_dml_view
+                   , util_bool_to_string(c_enable_dml_view));
 
          IF p_table_name IS NOT NULL
          THEN

@@ -12,6 +12,8 @@ IS
                                             := 'Enable deletion of rows' ;
    c_enable_generic_change_log  CONSTANT param_type
                                             := 'Enable generic change log' ;
+   c_enable_dml_view            CONSTANT param_type
+      := 'Enable DML view as logical layer above database table' ;
    c_sequence_name              CONSTANT param_type
       := 'Sequence name (example: #TABLE_NAME_26#_SEQ)' ;
 
@@ -47,13 +49,14 @@ IS
    IS
       v_params t_param;
    BEGIN
-      v_params(c_reuse_existing_api_params)  := 'true';
-      v_params(c_col_prefix_in_method_names) := 'false';
+      v_params(c_reuse_existing_api_params)  := 'false';
+      v_params(c_col_prefix_in_method_names) := 'true';
       v_params(c_enable_insertion_of_rows)   := 'true';
       v_params(c_enable_update_of_rows)      := 'true';
       v_params(c_enable_deletion_of_rows)    := 'false';
       v_params(c_enable_generic_change_log)  := 'false';
-      v_params(c_sequence_name)              := '#TABLE_NAME_26#_SEQ';
+      v_params(c_enable_dml_view)            := 'false';
+      v_params(c_sequence_name)              := NULL; -- '#TABLE_NAME_26#_SEQ'
       RETURN v_params;
    END get_params;
 
@@ -68,6 +71,7 @@ IS
                         , c_enable_update_of_rows
                         , c_enable_deletion_of_rows
                         , c_enable_generic_change_log
+                        , c_enable_dml_view
                         , c_sequence_name);
    END get_ordered_params;
 
@@ -83,6 +87,7 @@ IS
       v_lov(c_enable_update_of_rows)      := NEW t_string('true', 'false');
       v_lov(c_enable_deletion_of_rows)    := NEW t_string('true', 'false');
       v_lov(c_enable_generic_change_log)  := NEW t_string('true', 'false');
+      v_lov(c_enable_dml_view)            := NEW t_string('true', 'false');
       RETURN v_lov;
    END get_lov;
 
@@ -136,6 +141,8 @@ IS
               , p_enable_generic_change_log  => util_string_to_bool(
                                                   in_params(
                                                      c_enable_generic_change_log))
+              , p_enable_dml_view            => util_string_to_bool(
+                                                  in_params(c_enable_dml_view))
               , p_sequence_name              => in_params(c_sequence_name));
    END generate;
 --------------------------------------------------------------------------------

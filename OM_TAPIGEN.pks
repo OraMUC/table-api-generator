@@ -36,12 +36,13 @@ IS
    c_generator                  CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
    c_generator_version          CONSTANT VARCHAR2(10 CHAR) := '0.4.0';
 
-   c_reuse_existing_api_params  CONSTANT BOOLEAN := TRUE;
+   c_reuse_existing_api_params  CONSTANT BOOLEAN := FALSE;
    c_col_prefix_in_method_names CONSTANT BOOLEAN := TRUE;
    c_enable_insertion_of_rows   CONSTANT BOOLEAN := TRUE;
    c_enable_update_of_rows      CONSTANT BOOLEAN := TRUE;
    c_enable_deletion_of_rows    CONSTANT BOOLEAN := FALSE;
    c_enable_generic_change_log  CONSTANT BOOLEAN := FALSE;
+   c_enable_dml_view            CONSTANT BOOLEAN := FALSE;
    c_sequence_name              CONSTANT VARCHAR2(30 CHAR) := NULL;
 
 
@@ -93,6 +94,7 @@ IS
                     , x.p_enable_update_of_rows
                     , x.p_enable_deletion_of_rows
                     , x.p_enable_generic_change_log
+                    , x.p_enable_dml_view
                     , x.p_sequence_name
                  FROM (  SELECT package_name
                               , xmltype(
@@ -143,6 +145,8 @@ IS
                                     PATH '/options/@p_enable_deletion_of_rows'
                                , p_enable_generic_change_log  VARCHAR2(10 CHAR)
                                     PATH '/options/@p_enable_generic_change_log'
+                               , p_enable_dml_view  VARCHAR2(10 CHAR)
+                                    PATH '/options/@p_enable_dml_view'
                                , p_sequence_name  VARCHAR2(30 CHAR)
                                     PATH '/options/@p_sequence_name' --
                                                                     ) x)
@@ -165,6 +169,7 @@ IS
            , us.p_enable_update_of_rows
            , us.p_enable_deletion_of_rows
            , us.p_enable_generic_change_log
+           , us.p_enable_dml_view
            , us.p_sequence_name
         FROM uo
              LEFT JOIN us ON uo.package_name = us.package_name
@@ -217,7 +222,8 @@ IS
     , p_enable_update_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows
     , p_enable_deletion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows
     , p_enable_generic_change_log  IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log
-    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT c_sequence_name);
+    , p_enable_dml_view            IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view
+    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name);
 
    --------------------------------------------------------------------------------
    FUNCTION compile_api_and_get_code(
@@ -229,7 +235,8 @@ IS
     , p_enable_update_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows
     , p_enable_deletion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows
     , p_enable_generic_change_log  IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log
-    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT c_sequence_name)
+    , p_enable_dml_view            IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view
+    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name)
       RETURN CLOB;
 
    --------------------------------------------------------------------------------
@@ -242,7 +249,8 @@ IS
     , p_enable_update_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows
     , p_enable_deletion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows
     , p_enable_generic_change_log  IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log
-    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT c_sequence_name)
+    , p_enable_dml_view            IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view
+    , p_sequence_name              IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name)
       RETURN CLOB;
 
    --------------------------------------------------------------------------------
