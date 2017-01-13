@@ -19,7 +19,6 @@ Please do not download directly this code - this is the development version and 
 - Delete / Insert / Update of rows can be enabled or disabled e.g. to avoid deletion because of violation of referential integrity
 - Optional generic logging (one log entry for each changed column over all API enabled schema tables in one generic log table - very handy to create a record history in the user interface)
 - Checks for real changes during UPDATE operation and updates only if required
-- Optional DML view above database table e.g. to use APEX wizards to create forms, tabular forms, interactive grid etc AND to ensure that table API is used for DML
 - Supports APEX automatic row processing by generation of an optional updatable view with an instead of trigger, which calls simply the API and if enabled - the generic logging
 
 
