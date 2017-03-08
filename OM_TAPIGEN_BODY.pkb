@@ -2353,7 +2353,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       gen_get_pk_by_unique_cols_fnc;
 
       --------------------------------------------------------------------------
-      -- INSERT procedures / functions only if allowed
+      -- CREATE procedures / functions only if allowed
       --------------------------------------------------------------------------
       IF (g_enable_insertion_of_rows)
       THEN
@@ -2364,24 +2364,19 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END IF;
 
       --------------------------------------------------------------------------
+      -- READ procedures always
+      --------------------------------------------------------------------------
+      gen_read_row_fnc;
+      gen_read_row_prc;
+      gen_read_row_by_uk_fnc;
+
+      --------------------------------------------------------------------------
       -- UPDATE procedures / functions only if allowed
       --------------------------------------------------------------------------
       IF (g_enable_update_of_rows)
       THEN
          gen_update_row_prc;
          gen_update_rowtype_prc;
-         gen_setter_procedures;
-      END IF;
-
-      --------------------------------------------------------------------------
-      -- INSERT or UPDATE procedures / functions only if both is allowed
-      --------------------------------------------------------------------------
-      IF (g_enable_insertion_of_rows AND g_enable_update_of_rows)
-      THEN
-         gen_createorupdate_row_fnc;
-         gen_createorupdate_row_prc;
-         gen_createorupdate_rowtype_fnc;
-         gen_createorupdate_rowtype_prc;
       END IF;
 
       --------------------------------------------------------------------------
@@ -2392,10 +2387,30 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
          gen_delete_row_prc;
       END IF;
 
-      gen_read_row_fnc;
-      gen_read_row_prc;
-      gen_read_row_by_uk_fnc;
+      --------------------------------------------------------------------------
+      -- CREATE or UPDATE procedures / functions only if both is allowed
+      --------------------------------------------------------------------------
+      IF (g_enable_insertion_of_rows AND g_enable_update_of_rows)
+      THEN
+         gen_createorupdate_row_fnc;
+         gen_createorupdate_row_prc;
+         gen_createorupdate_rowtype_fnc;
+         gen_createorupdate_rowtype_prc;
+      END IF;
+
+      --------------------------------------------------------------------------
+      -- GETTER procedures / functions always
+      --------------------------------------------------------------------------
       gen_getter_functions;
+
+      --------------------------------------------------------------------------
+      -- SETTER procedures / functions only if allowed
+      --------------------------------------------------------------------------
+      IF (g_enable_update_of_rows)
+      THEN
+         gen_setter_procedures;
+      END IF;
+
       gen_footer;
 
       --------------------------------------------------------------------------
