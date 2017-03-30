@@ -49,7 +49,7 @@ IS
    IS
       v_params t_param;
    BEGIN
-      v_params(c_reuse_existing_api_params)  := 'false';
+      v_params(c_reuse_existing_api_params)  := 'true';
       v_params(c_col_prefix_in_method_names) := 'true';
       v_params(c_enable_insertion_of_rows)   := 'true';
       v_params(c_enable_update_of_rows)      := 'true';
