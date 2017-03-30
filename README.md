@@ -3,9 +3,9 @@ Please do not download directly this code - this is the development version and 
 
 # Table API Generator
 
-*This generator is a standalone PL/SQL package which creates table API's for existing tables. It can be integrated in the Oracle SQL-Developer with an additional wrapper package for the [oddgen][0] extension. The effort of generated API's is to reduce your PL/SQL code by calling standard procedures and functions for usual DML operations on tables. So the generated table APIs work as a logical layer between your business logic and the data. And by the way this logical layer enables you to easily seperate the data schema and the UI schema for your applications to improve security by granting only execute privs on table APIs to the application scheme. In addition to that table APIs will speed up your development cycles because developers are able to set the focal point to the business logic instead of wasting time by manual creating boilerplate code for your tables.*
+*This generator is a standalone PL/SQL package which creates table API's for existing tables. It can be integrated in the Oracle SQL-Developer with an additional wrapper package for the [oddgen][2] extension. The effort of generated API's is to reduce your PL/SQL code by calling standard procedures and functions for usual DML operations on tables. So the generated table APIs work as a logical layer between your business logic and the data. And by the way this logical layer enables you to easily seperate the data schema and the UI schema for your applications to improve security by granting only execute privs on table APIs to the application scheme. In addition to that table APIs will speed up your development cycles because developers are able to set the focal point to the business logic instead of wasting time by manual creating boilerplate code for your tables.*
 
-> Avoid hard-coding SQL ([Steven Feuerstein][2])
+> Avoid hard-coding SQL ([Steven Feuerstein][3])
 
 
 ## Features
@@ -67,7 +67,7 @@ We give our best to produce clean and robust code, but we are NOT responsible, i
 ## How To Use
 
 1. Install the package om_tapigen in your schema, or even better in a central tools schema and grant execute rights to public
-2. Optional install the wrapper package for the SQL Developer integration (don't forget to install the [oddgen][0] extension)
+2. Optional install the wrapper package for the SQL Developer integration (don't forget to install the [oddgen][2] extension)
 3. Create your API's :-)
 
 
@@ -135,7 +135,7 @@ As you can see, you need no parameters for this procedure - they are taken from 
 6. p_enable_deletion_of_rows: boolean, default false
     - selfexplanatory, isn't it?
     - If true, then a delete_row procedure is generated
-    - If false, then the delete_row procedure is NOT generated 
+    - If false, then the delete_row procedure is NOT generated
 	- If false, then the corresponding DML view(#TABLE_NAME_24#_DML_V) instead of trigger (#TABLE_NAME_24#_IOIUD) raises an exception on a delete attempt
 7. p_enable_generic_change_log: boolean, default false
     - If true, one log entry is created for each changed column over all API enabled schema tables in one generic log table - very handy to create a record history in the user interface
@@ -145,14 +145,14 @@ As you can see, you need no parameters for this procedure - they are taken from 
 8. p_enable_dml_view: boolean, default false
     - If true, an updatable view named #table_name_24#_DML_V is created as logical layer above the database table
 	- If true, a view trigger named #table_name_24#_IOIUD is created to handle DML operations on the view
-    - If false, view and trigger are NOT generated 
+    - If false, view and trigger are NOT generated
 9. p_sequence_name: string, default null
     - If a sequence name is given here, then the resulting API is taken the ID for the create_row methods and you don't need to create a trigger for your table only for the sequence handling
     - you can use the following substitution strings, the generator is replacing this at runtime: #TABLE_NAME_24#, #TABLE_NAME_26#, #TABLE_NAME_28#, #PK_COLUMN_26#, #PK_COLUMN_28#, #COLUMN_PREFIX#
         - Example 1: #TABLE_NAME_26#_SEQ
         - Example 2: SEQ_#PK_COLUMN_26#
         - Example 3: #COLUMN_PREFIX#_SEQ
-		
+
 
 Finally a complete PL/SQL example with all default parameter values:
 
@@ -208,9 +208,9 @@ END;
 
 ### SQL Developer
 
-Please install first the [oddgen][0] extension. Our wrapper package is autodiscovered by this extension.
+Please install first the [oddgen][2] extension. Our wrapper package is autodiscovered by this extension.
 
-![SQL Developer Integration][3]
+![SQL Developer Integration](sql-developer-integration.png)
 
 
 ### Recommended Fastest Way To Your API's
@@ -233,7 +233,7 @@ Please install first the [oddgen][0] extension. Our wrapper package is autodisco
 
 ## Credits
 
-We want to say thank you to Phillip Salvisberg and all other people behind the [oddgen][0] project for this great generic SQL Developer extension. Also big thanks to Steven Feuerstein for his engagement to tell PL/SQL Developers, what a good coding practice is. We hope he find not so much bad practice in our generator, if he ever takes a look at it ;-)
+We want to say thank you to Phillip Salvisberg and all other people behind the [oddgen][2] project for this great generic SQL Developer extension. Also big thanks to Steven Feuerstein for his engagement to tell PL/SQL Developers, what a good coding practice is. We hope he find not so much bad practice in our generator, if he ever takes a look at it ;-)
 
 
 ## Changelog
@@ -242,7 +242,8 @@ This project uses [semantic versioning][5].
 
 Please use for all comments, discussions, feature requests or bug reports the GitHub [issues][4] functionality.
 
-### 0.4.0 (2017-01-10)
+
+### 0.4.0 (2017-03-30)
 
 #### new generated API functions / procedures
 - adding a **row_exists_yn** function that returns 'Y' or 'N', same functionality as the existing **row_exists** function but allows to check a row within SQL context
@@ -260,6 +261,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - added some additional comments on internal procedures and functions
 - renaming internal variables more consistently
 - supporting special column names, by using quotes around column names and validating / converting parameter names
+
 
 ### 0.3.0 (2016-07-03)
 
@@ -279,9 +281,8 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - André: Idea and first running version
 - Ottmar: Fan of the idea and first usage in a project :-)
 
-[0]: https://www.oddgen.org/
 [1]: https://github.com/OraMUC/table-api-generator/releases/latest
-[2]: https://www.toadworld.com/cfs-file/__key/communityserver-wikis-components-files/00-00-00-00-03/Say-Goodbye-to-Hard_2D00_Coding.pdf
-[3]: https://github.com/OraMUC/table-api-generator/blob/master/sql-developer-integration.png
+[2]: https://www.oddgen.org/
+[3]: https://www.toadworld.com/cfs-file/__key/communityserver-wikis-components-files/00-00-00-00-03/Say-Goodbye-to-Hard_2D00_Coding.pdf
 [4]: https://github.com/OraMUC/table-api-generator/issues
 [5]: http://semver.org/
