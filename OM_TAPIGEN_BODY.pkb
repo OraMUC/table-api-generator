@@ -852,11 +852,12 @@ CREATE OR REPLACE PACKAGE BODY #TABLE_NAME_26#_api IS
   FUNCTION create_row( #PARAM_DEFINITION_W_PK# ) 
   RETURN #TABLE_NAME#."#PK_COLUMN#"%TYPE IS
     v_pk #TABLE_NAME#."#PK_COLUMN#"%TYPE;
-  BEGIN'
+  BEGIN
+    v_pk := '
          || CASE
                WHEN g_sequence_name IS NOT NULL THEN '
-    v_pk := COALESCE( p_#PK_COLUMN_28#, #SEQUENCE_NAME#.nextval );'
-               ELSE NULL
+    COALESCE( p_#PK_COLUMN_28#, #SEQUENCE_NAME#.nextval );'
+               ELSE 'p_#PK_COLUMN_28#;'
             END
          || '
     INSERT INTO #TABLE_NAME# ( #COLUMN_LIST_W_PK# )
