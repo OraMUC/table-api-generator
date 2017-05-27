@@ -22,6 +22,11 @@ Please do not download directly this code - this is the development version and 
 - Supports APEX automatic row processing by generation of an optional updatable view with an instead of trigger, which calls simply the API and if enabled - the generic logging
 
 
+## How it looks like
+
+See our generated [example API](example-api.md) on the demo table HR.EMPLOYEES.
+
+
 ## License
 
 The MIT License (MIT)
@@ -168,11 +173,11 @@ BEGIN
       p_table_name                 => i.table_name,
       p_reuse_existing_api_params  => FALSE,
       p_col_prefix_in_method_names => TRUE,
-	  p_enable_insertion_of_rows   => TRUE,
-	  p_enable_update_of_rows      => TRUE,
+      p_enable_insertion_of_rows   => TRUE,
+      p_enable_update_of_rows      => TRUE,
       p_enable_deletion_of_rows    => FALSE,
       p_enable_generic_change_log  => FALSE,
-	  p_enable_dml_view            => FALSE,
+      p_enable_dml_view            => FALSE,
       p_sequence_name              => NULL);  
   END LOOP;
 END;
@@ -241,6 +246,11 @@ We want to say thank you to Phillip Salvisberg and all other people behind the [
 This project uses [semantic versioning][5].
 
 Please use for all comments, discussions, feature requests or bug reports the GitHub [issues][4] functionality.
+
+
+### 0.4.1 (2017-05-27)
+
+- Fixes #5: Parameter with PK is not used to insert
 
 
 ### 0.4.0 (2017-03-30)

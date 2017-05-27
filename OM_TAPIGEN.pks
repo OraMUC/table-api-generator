@@ -34,7 +34,7 @@ IS
    -- public global constants c_*
    -----------------------------------------------------------------------------
    c_generator                  CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-   c_generator_version          CONSTANT VARCHAR2(10 CHAR) := '0.4.0';
+   c_generator_version          CONSTANT VARCHAR2(10 CHAR) := '0.4.1';
 
    c_reuse_existing_api_params  CONSTANT BOOLEAN := TRUE;
    c_col_prefix_in_method_names CONSTANT BOOLEAN := TRUE;
