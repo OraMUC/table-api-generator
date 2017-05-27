@@ -250,7 +250,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 ### 0.4.1 (2017-05-27)
 
-- Fixes #5: Parameter with PK is not used to insert
+- Fixes #5: Parameter with PK is not used to insert - thanks to Jacek Gębal to report this issue
 
 
 ### 0.4.0 (2017-03-30)
