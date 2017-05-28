@@ -8,7 +8,7 @@ This API was generated with the following code - we assume that the om_tapigen i
 BEGIN
     hr.om_tapigen.compile_api(
         p_table_name                   => 'EMPLOYEES',
-        p_reuse_existing_api_params    => false,
+        p_reuse_existing_api_params    => true,
         p_col_prefix_in_method_names   => true,
         p_enable_insertion_of_rows     => true,
         p_enable_update_of_rows        => true,
@@ -71,12 +71,12 @@ create or replace PACKAGE EMPLOYEES_api IS
    *   docs under github.com/OraMUC/table-api-generator ;-)
    * <options
    *   generator="OM_TAPIGEN"
-   *   generator_version="0.4.0"
+   *   generator_version="0.4.1"
    *   generator_action="COMPILE_API"
-   *   generated_at="2017-05-27 18:55:16"
-   *   generated_by="OTTMAR"
+   *   generated_at="2017-05-27 20:56:42"
+   *   generated_by="OGOBRECHT"
    *   p_table_name="EMPLOYEES"
-   *   p_reuse_existing_api_params="FALSE"
+   *   p_reuse_existing_api_params="TRUE"
    *   p_col_prefix_in_method_names="TRUE"
    *   p_enable_insertion_of_rows="TRUE"
    *   p_enable_update_of_rows="TRUE"
