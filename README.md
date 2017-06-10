@@ -1,3 +1,38 @@
+
+# Table API Generator - Development Branch 0.5 - Current Status
+
+## Done
+
+- New Branch `0.5`
+- New parameter `p_api_name varchar2 default null` to control API name
+  - Extended substitutions for the SQL Developer multi API generation like `#TABLE_NAME_17#` or better `#TABLE_NAME_4_20#` also for the parameter `p_sequence_name`
+  - Additional Info:
+    - `#TABLE_NAME_17#` is treated as substr(1, 17)
+    - `#TABLE_NAME_4_20#` is treated as substr(4, 20)
+    - Negative positions also possible like `#TABLE_NAME_-20_20#` (length can NOT be ommitted because of use case with one number and backward compatibility, we had only `#TABLE_NAME_26#`, `#TABLE_NAME_28#`...)
+- New method `read_a_row` without any parameter to read the first record from the table (one cursor fetch)
+- New parameter `enable_getter_and_setter boolean default true`
+- New parameter `enable_parameter_prefixes boolean default true`
+- New parameter `return_row_instead_of_pk boolean default false`
+
+## Work In Progress
+
+
+## To Do
+
+- New method `create_a_row` with default parameters
+  - If new parameter `p_column_defaults xmltype default null` is null then the table column defaults are used, otherwise the provided custom defaults
+  - XMLTYPE because we need to save this parameter in the API spec for parameterless recreation and also this gives us the possibility to define some dynamic content like in the example below (the XML is very simple and since JSON is commonly used these days this xml should not be a problem for a developer - a helper function to convert a ref_curser into this xml would be nice)
+  - Additional reason is the SQL Developer integration - there we have only a reduced set of input types
+- When using `p_col_prefix_in_method_names => false` then do NOT throw an exception when no unique column prefix is found for a table? To be discussed
+- Align oddgen wrapper package for SQL Developer integration
+- Update documentation
+- Create tests with Travis and SonarQube
+- Something else?
+- ...
+
+---
+
 Please do not download directly this code - this is the development version and can be unstable. You can find the [latest stable version here][1].
 
 
