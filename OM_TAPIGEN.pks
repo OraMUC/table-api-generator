@@ -31,22 +31,23 @@ IS
    -----------------------------------------------------------------------------
    -- public global constants c_*
    -----------------------------------------------------------------------------
-   c_generator                    CONSTANT VARCHAR2 (10 CHAR) := 'OM_TAPIGEN';
-   c_generator_version            CONSTANT VARCHAR2 (10 CHAR) := '0.5.0';
+   c_generator                     CONSTANT VARCHAR2 (10 CHAR) := 'OM_TAPIGEN';
+   c_generator_version             CONSTANT VARCHAR2 (10 CHAR) := '0.5.0';
 
-   c_reuse_existing_api_params    CONSTANT BOOLEAN := TRUE;
-   c_col_prefix_in_method_names   CONSTANT BOOLEAN := TRUE;
-   c_enable_insertion_of_rows     CONSTANT BOOLEAN := TRUE;
-   c_enable_update_of_rows        CONSTANT BOOLEAN := TRUE;
-   c_enable_deletion_of_rows      CONSTANT BOOLEAN := FALSE;
-   c_enable_generic_change_log    CONSTANT BOOLEAN := FALSE;
-   c_enable_dml_view              CONSTANT BOOLEAN := FALSE;
-   c_sequence_name                CONSTANT VARCHAR2 (1 CHAR) := NULL;
-   c_api_name                     CONSTANT VARCHAR2 (1 CHAR) := NULL;
-   c_enable_getter_and_setter     CONSTANT BOOLEAN := TRUE;
-   c_enable_parameter_prefixes    CONSTANT BOOLEAN := TRUE;
-   c_return_row_instead_of_pk     CONSTANT BOOLEAN := FALSE;
-   c_column_defaults              CONSTANT XMLTYPE := NULL;
+   c_reuse_existing_api_params     CONSTANT BOOLEAN := TRUE;
+   c_col_prefix_in_method_names    CONSTANT BOOLEAN := TRUE;
+   c_enable_insertion_of_rows      CONSTANT BOOLEAN := TRUE;
+   c_enable_update_of_rows         CONSTANT BOOLEAN := TRUE;
+   c_enable_deletion_of_rows       CONSTANT BOOLEAN := FALSE;
+   c_enable_generic_change_log     CONSTANT BOOLEAN := FALSE;
+   c_enable_dml_view               CONSTANT BOOLEAN := FALSE;
+   c_sequence_name                 CONSTANT VARCHAR2 (1 CHAR) := NULL;
+   c_api_name                      CONSTANT VARCHAR2 (1 CHAR) := NULL;
+   c_enable_getter_and_setter      CONSTANT BOOLEAN := TRUE;
+   c_enable_proc_with_out_params   CONSTANT BOOLEAN := TRUE;
+   c_enable_parameter_prefixes     CONSTANT BOOLEAN := TRUE;
+   c_return_row_instead_of_pk      CONSTANT BOOLEAN := FALSE;
+   c_column_defaults               CONSTANT XMLTYPE := NULL;
 
    -----------------------------------------------------------------------------
    -- public global cursors g_cur_* and global collections g_tab_*
@@ -83,89 +84,92 @@ IS
                             AND specs.object_type || ' BODY' =
                                    bodys.object_type),
            us
-           AS (                         SELECT x.generator,
-                                               x.generator_version,
-                                               x.generator_action,
-                                               TO_DATE (x.generated_at, 'yyyy-mm-dd hh24:mi:ss')
-                                                  AS generated_at,
-                                               x.generated_by,
-                                               t.package_name,
-                                               x.p_table_name,
-                                               x.p_reuse_existing_api_params,
-                                               x.p_col_prefix_in_method_names,
-                                               x.p_enable_insertion_of_rows,
-                                               x.p_enable_update_of_rows,
-                                               x.p_enable_deletion_of_rows,
-                                               x.p_enable_generic_change_log,
-                                               x.p_enable_dml_view,
-                                               x.p_sequence_name,
-                                               x.p_api_name,
-                                               x.p_enable_getter_and_setter,
-                                               x.p_enable_parameter_prefixes,
-                                               x.p_return_row_instead_of_pk
-                                          FROM (  SELECT package_name,
-                                                         xmltype (
-                                                            NVL (
-                                                               REGEXP_SUBSTR (
-                                                                  REPLACE (source_code, '*', NULL),
-                                                                  '<options.*>',
-                                                                  1,
-                                                                  1,
-                                                                  'ni'),
-                                                               '<no_data_found/>'))
-                                                            AS options
-                                                    FROM (SELECT NAME AS package_name,
-                                                                 LISTAGG (text, ' ')
-                                                                    WITHIN GROUP (ORDER BY NAME, line)
-                                                                    OVER (PARTITION BY NAME)
-                                                                    AS source_code
-                                                            FROM user_source
-                                                           WHERE     TYPE = 'PACKAGE'
-                                                                 AND NAME LIKE '%\_API' ESCAPE '\'
-                                                                 AND line BETWEEN 5 AND 30)
-                                                GROUP BY package_name, source_code) t,
-                                               XMLTABLE (
-                                                  'for $i in /options return $i'
-                                                  PASSING options
-                                                  COLUMNS                   --
-                                                         generator                       VARCHAR2 (30 CHAR)
-                                                                                            PATH '/options/@generator',
-                                                          generator_version              VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@generator_version',
-                                                          generator_action               VARCHAR2 (30 CHAR)
-                                                                                            PATH '/options/@generator_action',
-                                                          generated_at                   VARCHAR2 (30 CHAR)
-                                                                                            PATH '/options/@generated_at',
-                                                          generated_by                   VARCHAR2 (120 CHAR)
-                                                                                            PATH '/options/@generated_by',
-                                                          p_table_name                   VARCHAR2 (30 CHAR)
-                                                                                            PATH '/options/@p_table_name',
-                                                          p_reuse_existing_api_params    VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_reuse_existing_api_params',
-                                                          p_col_prefix_in_method_names   VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_col_prefix_in_method_names',
-                                                          p_enable_insertion_of_rows     VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_enable_insertion_of_rows',
-                                                          p_enable_update_of_rows        VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_enable_update_of_rows',
-                                                          p_enable_deletion_of_rows      VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_enable_deletion_of_rows',
-                                                          p_enable_generic_change_log    VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_enable_generic_change_log',
-                                                          p_enable_dml_view              VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_enable_dml_view',
-                                                          p_sequence_name                VARCHAR2 (128 CHAR)
-                                                                                            PATH '/options/@p_sequence_name' --
-                                                                                                                            ,
-                                                          p_api_name                     VARCHAR2 (128 CHAR)
-                                                                                            PATH '/options/@p_api_name',
-                                                          p_enable_getter_and_setter     VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_enable_getter_and_setter',
-                                                          p_enable_parameter_prefixes    VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_enable_parameter_prefixes',
-                                                          p_return_row_instead_of_pk     VARCHAR2 (10 CHAR)
-                                                                                            PATH '/options/@p_return_row_instead_of_pk' --
-                                                                                                                                       ) x)
+           AS (                          SELECT x.generator,
+                                                x.generator_version,
+                                                x.generator_action,
+                                                TO_DATE (x.generated_at, 'yyyy-mm-dd hh24:mi:ss')
+                                                   AS generated_at,
+                                                x.generated_by,
+                                                t.package_name,
+                                                x.p_table_name,
+                                                x.p_reuse_existing_api_params,
+                                                x.p_col_prefix_in_method_names,
+                                                x.p_enable_insertion_of_rows,
+                                                x.p_enable_update_of_rows,
+                                                x.p_enable_deletion_of_rows,
+                                                x.p_enable_generic_change_log,
+                                                x.p_enable_dml_view,
+                                                x.p_sequence_name,
+                                                x.p_api_name,
+                                                x.p_enable_getter_and_setter,
+                                                x.p_enable_proc_with_out_params,
+                                                x.p_enable_parameter_prefixes,
+                                                x.p_return_row_instead_of_pk,
+                                                x.p_column_defaults
+                                           FROM (  SELECT package_name,
+                                                          xmltype (
+                                                             NVL (
+                                                                REGEXP_SUBSTR (
+                                                                   REPLACE (source_code, '*', NULL),
+                                                                   '<options.*>',
+                                                                   1,
+                                                                   1,
+                                                                   'ni'),
+                                                                '<no_data_found/>'))
+                                                             AS options
+                                                     FROM (SELECT NAME AS package_name,
+                                                                  LISTAGG (text, ' ')
+                                                                     WITHIN GROUP (ORDER BY NAME, line)
+                                                                     OVER (PARTITION BY NAME)
+                                                                     AS source_code
+                                                             FROM user_source
+                                                            WHERE     TYPE = 'PACKAGE'
+                                                                  AND NAME LIKE '%\_API' ESCAPE '\'
+                                                                  AND line BETWEEN 5 AND 30)
+                                                 GROUP BY package_name, source_code) t,
+                                                XMLTABLE (
+                                                   'for $i in /options return $i'
+                                                   PASSING options
+                                                   COLUMNS generator                       VARCHAR2 (30 CHAR)
+                                                                                              PATH '/options/@generator',
+                                                           generator_version               VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@generator_version',
+                                                           generator_action                VARCHAR2 (30 CHAR)
+                                                                                              PATH '/options/@generator_action',
+                                                           generated_at                    VARCHAR2 (30 CHAR)
+                                                                                              PATH '/options/@generated_at',
+                                                           generated_by                    VARCHAR2 (120 CHAR)
+                                                                                              PATH '/options/@generated_by',
+                                                           p_table_name                    VARCHAR2 (30 CHAR)
+                                                                                              PATH '/options/@p_table_name',
+                                                           p_reuse_existing_api_params     VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_reuse_existing_api_params',
+                                                           p_col_prefix_in_method_names    VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_col_prefix_in_method_names',
+                                                           p_enable_insertion_of_rows      VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_insertion_of_rows',
+                                                           p_enable_update_of_rows         VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_update_of_rows',
+                                                           p_enable_deletion_of_rows       VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_deletion_of_rows',
+                                                           p_enable_generic_change_log     VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_generic_change_log',
+                                                           p_enable_dml_view               VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_dml_view',
+                                                           p_sequence_name                 VARCHAR2 (128 CHAR)
+                                                                                              PATH '/options/@p_sequence_name',
+                                                           p_api_name                      VARCHAR2 (128 CHAR)
+                                                                                              PATH '/options/@p_api_name',
+                                                           p_enable_getter_and_setter      VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_getter_and_setter',
+                                                           p_enable_proc_with_out_params   VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_proc_with_out_params',
+                                                           p_enable_parameter_prefixes     VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_enable_parameter_prefixes',
+                                                           p_return_row_instead_of_pk      VARCHAR2 (10 CHAR)
+                                                                                              PATH '/options/@p_return_row_instead_of_pk',
+                                                           p_column_defaults               VARCHAR2 (30 CHAR)
+                                                                                              PATH '/options/@p_column_defaults') x)
       SELECT NULL AS errors,
              ut.table_name,
              uo.package_name,
@@ -189,8 +193,10 @@ IS
              us.p_sequence_name,
              us.p_api_name,
              us.p_enable_getter_and_setter,
+             us.p_enable_proc_with_out_params,
              us.p_enable_parameter_prefixes,
-             us.p_return_row_instead_of_pk
+             us.p_return_row_instead_of_pk,
+             us.p_column_defaults
         FROM uo
              LEFT JOIN us ON uo.package_name = us.package_name
              LEFT JOIN ut ON us.p_table_name = ut.table_name
@@ -237,55 +243,58 @@ IS
 
    --------------------------------------------------------------------------------
    PROCEDURE compile_api (
-      p_table_name                   IN user_tables.table_name%TYPE,
-      p_reuse_existing_api_params    IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --if true, the following params are ignored, if API package are already existing and params are extractable from spec source
-      p_col_prefix_in_method_names   IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-      p_enable_insertion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-      p_enable_update_of_rows        IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-      p_enable_deletion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-      p_enable_generic_change_log    IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-      p_enable_dml_view              IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-      p_sequence_name                IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-      p_api_name                     IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-      p_enable_getter_and_setter     IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-      p_enable_parameter_prefixes    IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-      p_return_row_instead_of_pk     IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-      p_column_defaults              IN XMLTYPE DEFAULT om_tapigen.c_column_defaults);
+      p_table_name                    IN user_tables.table_name%TYPE,
+      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --if true, the following params are ignored, if API package are already existing and params are extractable from spec source
+      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+      p_enable_insertion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
+      p_enable_update_of_rows         IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
+      p_enable_deletion_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
+      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+      p_sequence_name                 IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
+      p_api_name                      IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+      p_enable_parameter_prefixes     IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+      p_return_row_instead_of_pk      IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+      p_column_defaults               IN XMLTYPE DEFAULT om_tapigen.c_column_defaults);
 
    --------------------------------------------------------------------------------
    FUNCTION compile_api_and_get_code (
-      p_table_name                   IN user_tables.table_name%TYPE,
-      p_reuse_existing_api_params    IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --if true, the following params are ignored, if API package are already existing and params are extractable from spec source
-      p_col_prefix_in_method_names   IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-      p_enable_insertion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-      p_enable_update_of_rows        IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-      p_enable_deletion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-      p_enable_generic_change_log    IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-      p_enable_dml_view              IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-      p_sequence_name                IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-      p_api_name                     IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-      p_enable_getter_and_setter     IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-      p_enable_parameter_prefixes    IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-      p_return_row_instead_of_pk     IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-      p_column_defaults              IN XMLTYPE DEFAULT om_tapigen.c_column_defaults)
+      p_table_name                    IN user_tables.table_name%TYPE,
+      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --if true, the following params are ignored, if API package are already existing and params are extractable from spec source
+      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+      p_enable_insertion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
+      p_enable_update_of_rows         IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
+      p_enable_deletion_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
+      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+      p_sequence_name                 IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
+      p_api_name                      IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+      p_enable_parameter_prefixes     IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+      p_return_row_instead_of_pk      IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+      p_column_defaults               IN XMLTYPE DEFAULT om_tapigen.c_column_defaults)
       RETURN CLOB;
 
    --------------------------------------------------------------------------------
    FUNCTION get_code (
-      p_table_name                   IN user_tables.table_name%TYPE,
-      p_reuse_existing_api_params    IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --if true, the following params are ignored, if API package are already existing and params are extractable from spec source
-      p_col_prefix_in_method_names   IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-      p_enable_insertion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-      p_enable_update_of_rows        IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-      p_enable_deletion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-      p_enable_generic_change_log    IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-      p_enable_dml_view              IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-      p_sequence_name                IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-      p_api_name                     IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-      p_enable_getter_and_setter     IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-      p_enable_parameter_prefixes    IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-      p_return_row_instead_of_pk     IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-      p_column_defaults              IN XMLTYPE DEFAULT om_tapigen.c_column_defaults)
+      p_table_name                    IN user_tables.table_name%TYPE,
+      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --if true, the following params are ignored, if API package are already existing and params are extractable from spec source
+      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+      p_enable_insertion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
+      p_enable_update_of_rows         IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
+      p_enable_deletion_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
+      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+      p_sequence_name                 IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
+      p_api_name                      IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+      p_enable_parameter_prefixes     IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+      p_return_row_instead_of_pk      IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+      p_column_defaults               IN XMLTYPE DEFAULT om_tapigen.c_column_defaults)
       RETURN CLOB;
 
    --------------------------------------------------------------------------------
@@ -301,7 +310,45 @@ IS
    FUNCTION view_naming_conflicts
       RETURN t_tab_naming_conflicts
       PIPELINED;
---------------------------------------------------------------------------------
 
+   --------------------------------------------------------------------------------
+   -- Working with long columns: http://www.oracle-developer.net/display.php?id=430
+   -- The following helper function is needed to read a column data default:
+   FUNCTION util_get_column_data_default (p_table_name    IN VARCHAR2,
+                                          p_column_name   IN VARCHAR2)
+      RETURN VARCHAR2;
+
+   --------------------------------------------------------------------------------
+   -- Working with long columns: http://www.oracle-developer.net/display.php?id=430
+   -- The following helper function is needed to read a constraint search condition:
+   -- (not needed in 12cR1 and above, there we have a column search_condition_vc in user_constraints)
+   FUNCTION util_get_cons_search_condition (p_constraint_name IN VARCHAR2)
+      RETURN VARCHAR2;
+
+   --------------------------------------------------------------------------------
+   -- A helper function for util_get_custom_col_defaults which reads a random row
+   -- from a table and converts (transpose) the data so that it is joinable to
+   -- user_tab_columns whith the help of the xmltable function. See also the
+   -- source of util_get_custom_col_defaults for a usage example.
+   -- SELECT XMLSERIALIZE (DOCUMENT om_tapigen.util_table_row_to_xml ('EMPLOYEES') INDENT) FROM DUAL;
+   -- SELECT x.column_name,
+   --        x.data_random_row
+   --   FROM XMLTABLE ('/rowset/row' PASSING om_tapigen.util_table_row_to_xml ('EMPLOYEES') COLUMNS
+   --           column_name     VARCHAR2  (128) PATH './col',
+   --           data_random_row VARCHAR2 (4000) PATH './val') x;
+   FUNCTION util_table_row_to_xml (p_table_name VARCHAR2)
+      RETURN XMLTYPE;
+
+   --------------------------------------------------------------------------------
+   -- A standalone function to get hopefully useful custom column defaults. This
+   -- is always work in progress, because it is impossible to create logic,
+   -- that meets the requirements of all possible use cases. You can grab this
+   -- code as base for your own implementation ;-)
+   -- If you want to check the output in a readable format then try this:
+   -- SELECT XMLSERIALIZE (DOCUMENT om_tapigen.util_get_custom_col_defaults ('EMPLOYEES') INDENT) FROM DUAL;
+   -- Yes, it is slow because of heavy use of the dictionary. If you have a better idea, please let us know...
+   FUNCTION util_get_custom_col_defaults (p_table_name VARCHAR2)
+      RETURN XMLTYPE;
+--------------------------------------------------------------------------------
 END om_tapigen;
 /

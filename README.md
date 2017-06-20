@@ -14,16 +14,59 @@
 - New parameter `enable_getter_and_setter boolean default true`
 - New parameter `enable_parameter_prefixes boolean default true`
 - New parameter `return_row_instead_of_pk boolean default false`
+- New parameter `enable_proc_with_out_params boolean default true`: these procedures are created mainly for APEX to directly bind page items to the API without any other code - since not anyone is using APEX this can now be disabled
+- New method `create_a_row` with default parameters
+  - If new parameter `p_column_defaults xmltype default null` is null then the table column defaults are used, otherwise the provided custom defaults
+  - XMLTYPE because we need to save this parameter in the API spec for parameterless recreation and also this gives us the possibility to define some dynamic content like in the example below (the XML is very simple and since JSON is commonly used these days this xml should not be a problem for a developer
+  - Additional reason is the SQL Developer integration - there we have only a reduced set of input types
+  - Two new helper functions to retrieve automatically useful defaults:
+    - om_tapigen.util_get_custom_col_defaults
+    - om_tapigen.util_table_row_to_xml
+    - The second one is used in the first one and the first one is a incomplete first implementation which could be used as a template for own business needs - please see also the spec and body for implementatione details; For the table EMPLOYEES the result works fine - see usage example below;
+
+```xml
+<defaults>
+  <item><col>LAST_NAME</col><val>'Atkinson'</val></item>
+  ...
+</defaults>
+```
+
+```sql
+-- usage of the helper om_tapigen.util_get_custom_col_defaults:
+BEGIN
+   om_tapigen.compile_api (
+      p_table_name                    => 'EMPLOYEES',
+      p_reuse_existing_api_params     => true,
+      p_col_prefix_in_method_names    => TRUE,
+      p_enable_insertion_of_rows      => TRUE,
+      p_enable_update_of_rows         => TRUE,
+      p_enable_deletion_of_rows       => FALSE,
+      p_enable_generic_change_log     => TRUE,
+      p_enable_dml_view               => TRUE,
+      p_sequence_name                 => 'EMPLOYEES_SEQ',
+      p_api_name                      => 'EMPLOYEES_API',
+      p_enable_getter_and_setter      => FALSE,
+      p_enable_proc_with_out_params   => FALSE,
+      P_enable_parameter_prefixes     => FALSE,
+      p_return_row_instead_of_pk      => TRUE,
+      p_column_defaults               => om_tapigen.util_get_custom_col_defaults ('EMPLOYEES'));
+END;
+/
+
+-- inspect the result of the helper
+SELECT XMLSERIALIZE (
+          DOCUMENT OM_TAPIGEN.UTIL_GET_CUSTOM_COL_DEFAULTS (
+                      P_TABLE_NAME   => 'CAT_FEE_TYPES')
+          INDENT)
+  FROM DUAL;
+```
+
 
 ## Work In Progress
 
 
 ## To Do
 
-- New method `create_a_row` with default parameters
-  - If new parameter `p_column_defaults xmltype default null` is null then the table column defaults are used, otherwise the provided custom defaults
-  - XMLTYPE because we need to save this parameter in the API spec for parameterless recreation and also this gives us the possibility to define some dynamic content like in the example below (the XML is very simple and since JSON is commonly used these days this xml should not be a problem for a developer - a helper function to convert a ref_curser into this xml would be nice)
-  - Additional reason is the SQL Developer integration - there we have only a reduced set of input types
 - When using `p_col_prefix_in_method_names => false` then do NOT throw an exception when no unique column prefix is found for a table? To be discussed
 - Align oddgen wrapper package for SQL Developer integration
 - Update documentation
