@@ -36,7 +36,7 @@
 BEGIN
    om_tapigen.compile_api (
       p_table_name                    => 'EMPLOYEES',
-      p_reuse_existing_api_params     => true,
+      p_reuse_existing_api_params     => FALSE,
       p_col_prefix_in_method_names    => TRUE,
       p_enable_insertion_of_rows      => TRUE,
       p_enable_update_of_rows         => TRUE,
