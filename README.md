@@ -55,8 +55,7 @@ END;
 
 -- inspect the result of the helper
 SELECT XMLSERIALIZE (
-          DOCUMENT OM_TAPIGEN.UTIL_GET_CUSTOM_COL_DEFAULTS (
-                      P_TABLE_NAME   => 'CAT_FEE_TYPES')
+          DOCUMENT OM_TAPIGEN.UTIL_GET_CUSTOM_COL_DEFAULTS ('EMPLOYEES')
           INDENT)
   FROM DUAL;
 ```
