@@ -3114,7 +3114,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                p_first_name IN employees.first_name%TYPE DEFAULT get_a_row()."FIRST_NAME",
                p_last_name IN employees.last_name%TYPE DEFAULT get_a_row()."LAST_NAME",
                ... */
-
                g_tab_substitutions_array ('#PARAM_DEF_W_PK_AND_DEFAULTS#') :=
                      g_tab_substitutions_array (
                         '#PARAM_DEF_W_PK_AND_DEFAULTS#')
@@ -3130,9 +3129,17 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   || g_table_name
                   || '."'
                   || g_tab_column_info (i).column_name
-                  || '"%TYPE DEFAULT get_a_row()."'
-                  || g_tab_column_info (i).column_name
-                  || '"';
+                  || '"%TYPE'
+                  || CASE
+                        WHEN (g_tab_column_info (i).column_name =
+                                 g_tab_substitutions_array ('#PK_COLUMN#'))
+                        THEN
+                           ' DEFAULT NULL'
+                        ELSE
+                              ' DEFAULT get_a_row()."'
+                           || g_tab_column_info (i).column_name
+                           || '"'
+                     END;
             END param_def_w_pk_and_defaults;
 
             --
