@@ -12,11 +12,14 @@ IS
                                                := CHR (13) || CHR (10) || CHR (10) ;
    c_column_defaults_present_msg   CONSTANT VARCHAR2 (30)
       := 'SEE_END_OF_API_PACKAGE_SPEC' ;
+   c_spec_options_min_line         CONSTANT NUMBER := 5;
+   c_spec_options_max_line         CONSTANT NUMBER := 35;
 
    -----------------------------------------------------------------------------
    -- private global variables g_*
    -----------------------------------------------------------------------------
    g_table_name                             user_tables.table_name%TYPE;
+   g_multi_column_pk_present                BOOLEAN;
    g_pk_column                              USER_TAB_COLUMNS.COLUMN_NAME%TYPE;
    g_column_prefix                          USER_TAB_COLUMNS.COLUMN_NAME%TYPE;
    g_reuse_existing_api_params              BOOLEAN;
@@ -33,6 +36,8 @@ IS
    g_enable_parameter_prefixes              BOOLEAN;
    g_return_row_instead_of_pk               BOOLEAN;
    g_column_defaults                        XMLTYPE;
+   g_column_defaults_serialized             VARCHAR2 (32767 CHAR);
+   g_owner                                  ALL_USERS.username%TYPE;
 
    g_xmltype_column_present                 BOOLEAN;
 
@@ -88,27 +93,16 @@ IS
       dml_view_trigger_varchar_cache   VARCHAR2 (32767 CHAR)
    );
 
-   g_tab_column_info                        t_tab_column_info;
-   g_tab_unique_constraint_info             t_tab_unique_constraint_info;
-   g_tab_unique_cons_column_info            t_tab_unique_cons_column_info;
-   g_tab_substitutions_array                t_tab_substitutions_array;
-   g_tapi_code_blocks                       t_tapi_code_blocks;
-   g_params_existing_api                    g_cur_existing_apis%ROWTYPE;
+   g_columns                                t_tab_column_info;
+   g_unique_constraints                     t_tab_unique_constraint_info;
+   g_unique_cons_columns                    t_tab_unique_cons_column_info;
+   g_substitutions                          t_tab_substitutions_array;
+   g_code_blocks                            t_tapi_code_blocks;
+   g_params_existing_api                    g_row_existing_apis;
 
    -----------------------------------------------------------------------------
    -- private global cursors g_cur_*
    -----------------------------------------------------------------------------
-   CURSOR g_cur_table_exists
-   IS
-      SELECT table_name
-        FROM user_tables
-       WHERE table_name = g_table_name;
-
-   CURSOR g_cur_sequence_exists
-   IS
-      SELECT sequence_name
-        FROM user_sequences
-       WHERE sequence_name = g_sequence_name;
 
    CURSOR g_cur_columns
    IS
@@ -120,6 +114,7 @@ IS
                   WHEN data_default IS NOT NULL
                   THEN
                      (SELECT util_get_column_data_default (
+                                p_owner         => g_owner,
                                 P_TABLE_NAME    => table_name,
                                 P_COLUMN_NAME   => column_name)
                         FROM DUAL)
@@ -127,31 +122,39 @@ IS
                      NULL
                END
                   AS data_default
-          FROM user_tab_cols
-         WHERE table_name = g_table_name AND hidden_column = 'NO'
+          FROM all_tab_cols
+         WHERE     owner = g_owner
+               AND table_name = g_table_name
+               AND hidden_column = 'NO'
       ORDER BY column_id;
 
    CURSOR g_cur_unique_constraints
    IS
         SELECT constraint_name
-          FROM user_constraints
-         WHERE table_name = g_table_name AND constraint_type = 'U'
+          FROM all_constraints
+         WHERE     owner = g_owner
+               AND table_name = g_table_name
+               AND constraint_type = 'U'
       ORDER BY constraint_name;
 
    CURSOR g_cur_unique_cons_columns
    IS
-        SELECT ucc.constraint_name,
-               ucc.column_name AS column_name,
+        SELECT acc.constraint_name,
+               acc.column_name AS column_name,
                NULL AS column_name_28,
-               utc.data_type
-          FROM user_constraints uc
-               JOIN user_cons_columns ucc
-                  ON uc.constraint_name = ucc.constraint_name
-               JOIN user_tab_columns utc
-                  ON     ucc.table_name = utc.table_name
-                     AND ucc.column_name = utc.column_name
-         WHERE uc.table_name = g_table_name AND uc.constraint_type = 'U'
-      ORDER BY uc.constraint_name, ucc.position;
+               atc.data_type
+          FROM all_constraints ac
+               JOIN all_cons_columns acc
+                  ON     ac.owner = acc.owner
+                     AND ac.constraint_name = acc.constraint_name
+               JOIN all_tab_columns atc
+                  ON     acc.owner = atc.owner
+                     AND acc.table_name = atc.table_name
+                     AND acc.column_name = atc.column_name
+         WHERE     ac.owner = g_owner
+               AND ac.table_name = g_table_name
+               AND ac.constraint_type = 'U'
+      ORDER BY ac.constraint_name, acc.position;
 
    -----------------------------------------------------------------------------
    -- util_clob_append is a private helper procedure to append a varchar2 value
@@ -215,9 +218,7 @@ IS
       -- finds the first position of a substitution string like #TABLE_NAME#
       BEGIN
          v_match_pos :=
-            REGEXP_INSTR (g_tapi_code_blocks.template,
-                          v_pattern,
-                          v_start_pos);
+            REGEXP_INSTR (g_code_blocks.template, v_pattern, v_start_pos);
       END get_match_pos;
 
       PROCEDURE code_append (p_code_snippet VARCHAR2)
@@ -225,29 +226,28 @@ IS
       BEGIN
          IF p_scope = 'API SPEC'
          THEN
-            util_clob_append (g_tapi_code_blocks.api_spec,
-                              g_tapi_code_blocks.api_spec_varchar_cache,
+            util_clob_append (g_code_blocks.api_spec,
+                              g_code_blocks.api_spec_varchar_cache,
                               p_code_snippet);
          ELSIF p_scope = 'API BODY'
          THEN
-            util_clob_append (g_tapi_code_blocks.api_body,
-                              g_tapi_code_blocks.api_body_varchar_cache,
+            util_clob_append (g_code_blocks.api_body,
+                              g_code_blocks.api_body_varchar_cache,
                               p_code_snippet);
          ELSIF p_scope = 'VIEW'
          THEN
-            util_clob_append (g_tapi_code_blocks.dml_view,
-                              g_tapi_code_blocks.dml_view_varchar_cache,
+            util_clob_append (g_code_blocks.dml_view,
+                              g_code_blocks.dml_view_varchar_cache,
                               p_code_snippet);
          ELSIF p_scope = 'TRIGGER'
          THEN
-            util_clob_append (
-               g_tapi_code_blocks.dml_view_trigger,
-               g_tapi_code_blocks.dml_view_trigger_varchar_cache,
-               p_code_snippet);
+            util_clob_append (g_code_blocks.dml_view_trigger,
+                              g_code_blocks.dml_view_trigger_varchar_cache,
+                              p_code_snippet);
          END IF;
       END code_append;
    BEGIN
-      v_tpl_len := LENGTH (g_tapi_code_blocks.template);
+      v_tpl_len := LENGTH (g_code_blocks.template);
       get_match_pos;
 
       WHILE v_start_pos < v_tpl_len
@@ -257,24 +257,22 @@ IS
          IF v_match_pos > 0
          THEN
             v_match_len :=
-                 INSTR (g_tapi_code_blocks.template,
+                 INSTR (g_code_blocks.template,
                         '#',
                         v_match_pos,
                         2)
                - v_match_pos;
             v_match :=
-               SUBSTR (g_tapi_code_blocks.template,
-                       v_match_pos,
-                       v_match_len + 1);
+               SUBSTR (g_code_blocks.template, v_match_pos, v_match_len + 1);
             -- (1) process text before the match
             code_append (
-               SUBSTR (g_tapi_code_blocks.template,
+               SUBSTR (g_code_blocks.template,
                        v_start_pos,
                        v_match_pos - v_start_pos));
 
             -- (2) process the match
             BEGIN
-               code_append (g_tab_substitutions_array (v_match)); -- this could be a problem, if not initialized
+               code_append (g_substitutions (v_match)); -- this could be a problem, if not initialized
                v_start_pos := v_match_pos + v_match_len + 1;
             EXCEPTION
                WHEN NO_DATA_FOUND
@@ -287,7 +285,7 @@ IS
             END;
          ELSE
             -- (3) process the rest of the text
-            code_append (SUBSTR (g_tapi_code_blocks.template, v_start_pos));
+            code_append (SUBSTR (g_code_blocks.template, v_start_pos));
             v_start_pos := v_tpl_len;
          END IF;
       END LOOP;
@@ -334,13 +332,14 @@ IS
       FOR i
          IN (WITH cons
                   AS (SELECT constraint_name
-                        FROM user_constraints
-                       WHERE     table_name = p_table_name
+                        FROM all_constraints
+                       WHERE     owner = g_owner
+                             AND table_name = p_table_name
                              AND constraint_type = p_key_type),
                   cols
                   AS (SELECT constraint_name, column_name, position
-                        FROM user_cons_columns
-                       WHERE table_name = p_table_name)
+                        FROM all_cons_columns
+                       WHERE owner = g_owner AND table_name = p_table_name)
                SELECT column_name
                  FROM cons
                       JOIN cols ON cons.constraint_name = cols.constraint_name
@@ -377,8 +376,10 @@ IS
                              INSTR (column_name, '_') - 1
                        END)
                        AS prefix
-               FROM user_tab_cols
-              WHERE table_name = p_table_name AND hidden_column = 'NO')
+               FROM all_tab_cols
+              WHERE     owner = g_owner
+                    AND table_name = p_table_name
+                    AND hidden_column = 'NO')
       LOOP
          v_count := v_count + 1;
 
@@ -504,7 +505,7 @@ IS
    -- varchar2 representation of an attribute in dependency of its datatype.
    -----------------------------------------------------------------------------
    FUNCTION util_get_vc2_4000_operation (
-      p_data_type        IN user_tab_cols.data_type%TYPE,
+      p_data_type        IN all_tab_cols.data_type%TYPE,
       p_attribute_name   IN VARCHAR2)
       RETURN VARCHAR2
    IS
@@ -524,7 +525,7 @@ IS
             THEN
                   ' to_char('
                || p_attribute_name
-               || q'[, 'yyyy.mm.dd hh24:mi:ss.ffffff')]'
+               || q'[, 'yyyy.mm.dd hh24:mi:ss.ff')]'
             WHEN p_data_type = 'BLOB'
             THEN
                q'['Data type "BLOB" is not supported for generic change log']'
@@ -593,9 +594,9 @@ IS
    -- is taken, otherwise the current connected operation system user.
    -----------------------------------------------------------------------------
    FUNCTION util_get_user_name
-      RETURN user_users.username%TYPE
+      RETURN all_users.username%TYPE
    IS
-      v_return   user_users.username%TYPE;
+      v_return   all_users.username%TYPE;
    BEGIN
       v_return :=
          UPPER (
@@ -626,9 +627,9 @@ IS
    FUNCTION util_get_substituted_name (p_name_template VARCHAR2)
       RETURN VARCHAR2
    IS
-      v_return           user_objects.object_name%TYPE;
-      v_base_name        user_objects.object_name%TYPE;
-      v_replace_string   user_objects.object_name%TYPE;
+      v_return           all_objects.object_name%TYPE;
+      v_base_name        all_objects.object_name%TYPE;
+      v_replace_string   all_objects.object_name%TYPE;
       v_position         PLS_INTEGER;
       v_length           PLS_INTEGER;
    BEGIN
@@ -725,13 +726,15 @@ IS
    BEGIN
       FOR i
          IN (SELECT text
-               FROM user_source
-              WHERE     name = p_api_name
+               FROM all_source
+              WHERE     owner = g_owner
+                    AND name = p_api_name
                     AND TYPE = 'PACKAGE'
                     AND line >=
                            (SELECT MIN (line) AS line
-                              FROM user_source
-                             WHERE     name = p_api_name
+                              FROM all_source
+                             WHERE     owner = g_owner
+                                   AND name = p_api_name
                                    AND TYPE = 'PACKAGE'
                                    AND INSTR (TEXT, v_xml_begin) > 0))
       LOOP
@@ -739,12 +742,14 @@ IS
          EXIT WHEN INSTR (i.text, v_xml_end) > 0;
       END LOOP;
 
-      RETURN xmltype (v_return);
+      RETURN CASE WHEN v_return IS NULL THEN NULL ELSE xmltype (v_return) END;
    END util_get_spec_column_defaults;
 
    -----------------------------------------------------------------------------
-   FUNCTION util_get_column_data_default (p_table_name    IN VARCHAR2,
-                                          p_column_name   IN VARCHAR2)
+   FUNCTION util_get_column_data_default (
+      p_table_name    IN VARCHAR2,
+      p_column_name   IN VARCHAR2,
+      p_owner            VARCHAR2 DEFAULT USER)
       RETURN VARCHAR2
    AS
       v_return   LONG;
@@ -752,8 +757,10 @@ IS
       CURSOR c_utc
       IS
          SELECT data_default
-           FROM user_tab_columns
-          WHERE table_name = p_table_name AND column_name = p_column_name;
+           FROM all_tab_columns
+          WHERE     owner = p_owner
+                AND table_name = p_table_name
+                AND column_name = p_column_name;
    BEGIN
       OPEN c_utc;
 
@@ -765,7 +772,9 @@ IS
    END;
 
    --------------------------------------------------------------------------------
-   FUNCTION util_get_cons_search_condition (p_constraint_name IN VARCHAR2)
+   FUNCTION util_get_cons_search_condition (
+      p_constraint_name   IN VARCHAR2,
+      p_owner             IN VARCHAR2 DEFAULT USER)
       RETURN VARCHAR2
    AS
       v_return   LONG;
@@ -773,8 +782,8 @@ IS
       CURSOR c_search_condition
       IS
          SELECT search_condition
-           FROM user_constraints
-          WHERE constraint_name = p_constraint_name;
+           FROM all_constraints
+          WHERE owner = p_owner AND constraint_name = p_constraint_name;
    BEGIN
       OPEN c_search_condition;
 
@@ -786,7 +795,8 @@ IS
    END;
 
    --------------------------------------------------------------------------------
-   FUNCTION util_table_row_to_xml (p_table_name VARCHAR2)
+   FUNCTION util_table_row_to_xml (p_table_name    VARCHAR2,
+                                   p_owner         VARCHAR2 DEFAULT USER)
       RETURN XMLTYPE
    IS
       v_return   XMLTYPE;
@@ -800,15 +810,15 @@ IS
   CURSOR v_cur IS SELECT * FROM '
          || p_table_name
          || ';
-BEGIN 
+BEGIN
   OPEN v_cur;
   FETCH v_cur INTO v_row;
   CLOSE v_cur;
   WITH t AS (';
 
       FOR i IN (  SELECT column_name, data_type
-                    FROM user_tab_columns
-                   WHERE table_name = p_table_name
+                    FROM all_tab_columns
+                   WHERE owner = p_owner AND table_name = p_table_name
                 ORDER BY column_id)
       LOOP
          v_code :=
@@ -820,10 +830,10 @@ BEGIN
             || i.column_name
             || '" IS NOT NULL THEN '
             || CASE
-                  WHEN i.data_type IN ('NUMBER', 'INTEGER')
+                  WHEN i.data_type IN ('NUMBER', 'INTEGER', 'FLOAT')
                   THEN
                      q'[ to_char(v_row."]' || i.column_name || q'[") ]'
-                  WHEN i.data_type IN ('VARCHAR2', 'CHAR')
+                  WHEN i.data_type LIKE '%CHAR%'
                   THEN
                         q'[ q'{'}' || v_row."]'
                      || i.column_name
@@ -833,6 +843,20 @@ BEGIN
                         q'[ q'{to_date('}' || to_char(v_row."]'
                      || i.column_name
                      || q'[",'yyyy-mm-dd hh24:mi:ss') || q'{','yyyy-mm-dd hh24:mi:ss')}' ]'
+                  WHEN i.data_type LIKE 'TIMESTAMP%'
+                  THEN
+                        q'[ q'{to_timestamp('}' || to_char(v_row."]'
+                     || i.column_name
+                     || q'[",'yyyy-mm-dd hh24:mi:ss.ff') || q'{','yyyy.mm.dd hh24:mi:ss.ff')}' ]'
+                  WHEN i.data_type = 'CLOB'
+                  THEN
+                     q'[ q'{to_clob('Dummy clob for API method get_a_row.')}' ]'
+                  WHEN i.data_type = 'BLOB'
+                  THEN
+                     q'[ q'{to_blob(utl_raw.cast_to_raw('Dummy blob for API method get_a_row.'))}' ]'
+                  WHEN i.data_type = 'XMLTYPE'
+                  THEN
+                     q'[ q'{XMLTYPE('<dummy>Dummy XML for API method get_a_row.</dummy>')}' ]'
                   ELSE
                      q'[ q'{'unsupported data type'}' ]'
                END
@@ -855,7 +879,9 @@ END;]';
    END;
 
    -----------------------------------------------------------------------------
-   FUNCTION util_get_custom_col_defaults (p_table_name VARCHAR2)
+   FUNCTION util_get_custom_col_defaults (
+      p_table_name    VARCHAR2,
+      p_owner         VARCHAR2 DEFAULT USER)
       RETURN XMLTYPE
    IS
       v_return   XMLTYPE;
@@ -873,7 +899,8 @@ WITH cons
                    WHEN search_condition IS NOT NULL
                    THEN
                       (SELECT om_tapigen.util_get_cons_search_condition (
-                                 constraint_name)
+                                 p_owner             => :owner,
+                                 p_constraint_name   => constraint_name)
                          FROM DUAL)
                 END
                    AS search_condition,
@@ -881,22 +908,22 @@ WITH cons
                 r_constraint_name,
                 delete_rule,
                 STATUS
-           FROM user_constraints
-          WHERE TABLE_NAME = :table_name),
+           FROM all_constraints
+          WHERE owner = :owner AND TABLE_NAME = :table_name),
      con_cols
      AS (SELECT owner,
                 constraint_name,
                 TABLE_NAME,
                 column_name,
                 POSITION
-           FROM user_cons_columns
-          WHERE    constraint_name IN (SELECT constraint_name FROM cons)
+           FROM all_cons_columns
+          WHERE        owner = :owner
+                   AND constraint_name IN (SELECT constraint_name FROM cons)
                 OR constraint_name IN (SELECT r_constraint_name
                                          FROM cons
                                         WHERE r_constraint_name IS NOT NULL)),
      con_nn
-     AS (        --> because of primary keys and not null check constraints we
-         --> have to select distinct here
+     AS ( --> because of primary keys and not null check constraints we have to select distinct here
          SELECT DISTINCT table_name, column_name, 'N' AS nullable_table_level
            FROM con_cols
           WHERE constraint_name IN (SELECT constraint_name
@@ -942,7 +969,9 @@ WITH cons
      AS (         SELECT x.column_name, x.data_random_row
                     FROM XMLTABLE (
                             '/rowset/row'
-                            PASSING OM_TAPIGEN.util_table_row_to_xml ( :table_name)
+                            PASSING OM_TAPIGEN.util_table_row_to_xml (
+                                       p_table_name   => :table_name,
+                                       p_owner        => :owner)
                             COLUMNS column_name VARCHAR2 (128) PATH './col',
                                     data_random_row VARCHAR2 (4000) PATH './val') x),
      tab_cols
@@ -958,8 +987,9 @@ WITH cons
                      WHEN data_default IS NOT NULL
                      THEN
                         (SELECT om_tapigen.util_get_column_data_default (
-                                   t.table_name,
-                                   t.column_name)
+                                   p_owner         => :owner,
+                                   p_table_name    => t.table_name,
+                                   p_column_name   => t.column_name)
                            FROM DUAL)
                   END
                      AS data_default,
@@ -972,7 +1002,7 @@ WITH cons
                   f.fk_owner,
                   f.fk_table_name,
                   f.fk_column_name
-             FROM user_tab_columns T
+             FROM all_tab_columns T
                   LEFT JOIN con_nn n
                      ON     t.table_name = n.table_name
                         AND t.column_name = n.column_name
@@ -986,8 +1016,8 @@ WITH cons
                      ON     t.table_name = f.table_name
                         AND t.column_name = f.column_name
                   LEFT JOIN tab_data d ON t.column_name = d.column_name
-            WHERE t.table_name = :table_name
-         ORDER BY COLUMN_ID)                         --SELECT * FROM tab_cols;
+            WHERE T.OWNER = :owner AND t.table_name = :table_name
+         ORDER BY COLUMN_ID)                        -- SELECT * FROM tab_cols;
                             ,
      result
      AS (SELECT column_name,
@@ -1003,17 +1033,32 @@ WITH cons
                             data_random_row
                          ELSE
                             CASE
+                               WHEN data_type IN ('NUMBER',
+                                                  'INTEGER',
+                                                  'FLOAT')
+                               THEN
+                                  q'{to_char(systimestamp,'yyyymmddhh24missff')}'
                                WHEN data_type LIKE '%CHAR%'
                                THEN
                                      'SUBSTR (SYS_GUID (), 1, '
                                   || char_length
                                   || ')'
+                               WHEN data_type = 'CLOB'
+                               THEN
+                                  q'{to_clob('Dummy clob for API method get_a_row: ' || sys_guid())}'
+                               WHEN data_type = 'BLOB'
+                               THEN
+                                  q'{to_blob(utl_raw.cast_to_raw('Dummy clob for API method get_a_row: ' || sys_guid()))}'
+                               WHEN data_type = 'XMLTYPE'
+                               THEN
+                                  q'{XMLTYPE('<dummy>Dummy XML for API method get_a_row: ' || sys_guid() || '</dummy>')}'
+                               ELSE
+                                  NULL
                             END
                       END
                 END
                    AS data_default
-           FROM tab_cols
-          WHERE nullable_column_level = 'N' OR nullable_table_level = 'N') --select * from defaults;
+           FROM tab_cols)                              --select * from result;
 SELECT XMLELEMENT (
           "defaults",
           XMLAGG (
@@ -1022,9 +1067,17 @@ SELECT XMLELEMENT (
                          XMLELEMENT ("val", data_default))))
   FROM result
  WHERE data_default IS NOT NULL
-       ]'
+        ]'
          INTO v_return
-         USING p_table_name, p_table_name, p_table_name;
+         USING p_owner,
+               p_owner,
+               p_table_name,
+               p_owner,
+               p_table_name,
+               p_owner,
+               p_owner,
+               p_owner,
+               p_table_name;
 
       --SELECT XMLSERIALIZE (
       --          DOCUMENT XMLELEMENT (
@@ -1045,65 +1098,66 @@ SELECT XMLELEMENT (
    PROCEDURE gen_header
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
-CREATE OR REPLACE PACKAGE #API_NAME# IS 
-  /** 
-   * This is the API for the table #TABLE_NAME#. 
+      g_code_blocks.template :=
+         '
+CREATE OR REPLACE PACKAGE "#OWNER#"."#API_NAME#" IS
+  /**
+   * This is the API for the table "#TABLE_NAME#".
    *
-   * GENERATION OPTIONS 
-   * - must be in the lines 5-30 to be reusable by the generator
+   * GENERATION OPTIONS
+   * - must be in the lines #SPEC_OPTIONS_MIN_LINE#-#SPEC_OPTIONS_MAX_LINE# to be reusable by the generator
    * - DO NOT TOUCH THIS until you know what you do - read the
    *   docs under github.com/OraMUC/table-api-generator ;-)
-   * <options 
+   * <options
    *   generator="#GENERATOR#"
    *   generator_version="#GENERATOR_VERSION#"
    *   generator_action="#GENERATOR_ACTION#"
    *   generated_at="#GENERATED_AT#"
    *   generated_by="#GENERATED_BY#"
+   *   p_owner="#OWNER#"
    *   p_table_name="#TABLE_NAME#"
    *   p_reuse_existing_api_params="#REUSE_EXISTING_API_PARAMS#"
-   *   p_col_prefix_in_method_names="#COL_PREFIX_IN_METHOD_NAMES#"
    *   p_enable_insertion_of_rows="#ENABLE_INSERTION_OF_ROWS#"
    *   p_enable_update_of_rows="#ENABLE_UPDATE_OF_ROWS#"
    *   p_enable_deletion_of_rows="#ENABLE_DELETION_OF_ROWS#"
-   *   p_enable_generic_change_log="#ENABLE_GENERIC_CHANGE_LOG#"
-   *   p_enable_dml_view="#ENABLE_DML_VIEW#"
-   *   p_sequence_name="#SEQUENCE_NAME#"
-   *   p_api_name="#API_NAME#"
-   *   p_enable_getter_and_setter="#ENABLE_GETTER_AND_SETTER#"
-   *   p_enable_proc_with_out_params="#ENABLE_PROC_WITH_OUT_PARAMS#"
    *   p_enable_parameter_prefixes="#ENABLE_PARAMETER_PREFIXES#"
+   *   p_enable_proc_with_out_params="#ENABLE_PROC_WITH_OUT_PARAMS#"
+   *   p_enable_getter_and_setter="#ENABLE_GETTER_AND_SETTER#"
+   *   p_col_prefix_in_method_names="#COL_PREFIX_IN_METHOD_NAMES#"
    *   p_return_row_instead_of_pk="#RETURN_ROW_INSTEAD_OF_PK#"
-   *   p_column_defaults="#COLUMN_DEFAULTS#" />
-   * 
-   * This API provides DML functionality that can be easily called from APEX.   
-   * Target of the table API is to encapsulate the table DML source code for  
-   * security (UI schema needs only the execute right for the API and the 
-   * read/write right for the #TABLE_NAME_24#_DML_V, tables can be hidden in 
-   * extra data schema) and easy readability of the business logic (all DML is  
-   * then written in the same style). For APEX automatic row processing like 
-   * tabular forms you can optionally use the #TABLE_NAME_24#_DML_V, which has 
+   *   p_enable_dml_view="#ENABLE_DML_VIEW#"
+   *   p_enable_generic_change_log="#ENABLE_GENERIC_CHANGE_LOG#"
+   *   p_api_name="#API_NAME#"
+   *   p_sequence_name="#SEQUENCE_NAME#"
+   *   p_column_defaults="#COLUMN_DEFAULTS#"/>
+   *
+   * This API provides DML functionality that can be easily called from APEX.
+   * Target of the table API is to encapsulate the table DML source code for
+   * security (UI schema needs only the execute right for the API and the
+   * read/write right for the #TABLE_NAME_24#_DML_V, tables can be hidden in
+   * extra data schema) and easy readability of the business logic (all DML is
+   * then written in the same style). For APEX automatic row processing like
+   * tabular forms you can optionally use the #TABLE_NAME_24#_DML_V, which has
    * an instead of trigger who is also calling the #TABLE_NAME_26#_API.
    */
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-            ' 
-CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
+      g_code_blocks.template :=
+            '
+CREATE OR REPLACE PACKAGE BODY "#OWNER#"."#API_NAME#" IS
   ----------------------------------------'
          || CASE
                WHEN g_xmltype_column_present
                THEN
-                  q'[ 
-  FUNCTION util_xml_compare( p_doc1 XMLTYPE, p_doc2 XMLTYPE )   
-  RETURN NUMBER IS   
+                  q'[
+  FUNCTION util_xml_compare( p_doc1 XMLTYPE, p_doc2 XMLTYPE )
+  RETURN NUMBER IS
     v_return NUMBER;
-  BEGIN     
-    SELECT CASE WHEN XMLEXISTS( 'declare default element namespace "http://xmlns.oracle.com/xdb/xdiff.xsd"; /xdiff/*' PASSING XMLDIFF( p_doc1, p_doc2 ) ) THEN 1 ELSE 0 END 
-      INTO v_return       
-      FROM DUAL;   
+  BEGIN
+    SELECT CASE WHEN XMLEXISTS( 'declare default element namespace "http://xmlns.oracle.com/xdb/xdiff.xsd"; /xdiff/*' PASSING XMLDIFF( p_doc1, p_doc2 ) ) THEN 1 ELSE 0 END
+      INTO v_return
+      FROM DUAL;
     RETURN v_return;
   END util_xml_compare;
   ----------------------------------------]'
@@ -1143,17 +1197,17 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_row_exists_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION row_exists( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
   RETURN BOOLEAN;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION row_exists( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
-  RETURN BOOLEAN 
+  RETURN BOOLEAN
   IS
     v_return BOOLEAN := FALSE;
   BEGIN
@@ -1170,20 +1224,20 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_row_exists_yn_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION row_exists_yn( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
   RETURN VARCHAR2;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION row_exists_yn( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
-  RETURN VARCHAR2 
+  RETURN VARCHAR2
   IS
   BEGIN
-    RETURN case when row_exists( #PK_COLUMN_PARAMETER# => #PK_COLUMN_PARAMETER# ) 
+    RETURN case when row_exists( #PK_COLUMN_PARAMETER# => #PK_COLUMN_PARAMETER# )
              then ''Y''
              else ''N''
            end;
@@ -1196,83 +1250,76 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_get_pk_by_unique_cols_fnc
    IS
    BEGIN
-      IF g_tab_unique_constraint_info.COUNT > 0
+      IF g_unique_constraints.COUNT > 0
       THEN
-         FOR i IN g_tab_unique_constraint_info.FIRST ..
-                  g_tab_unique_constraint_info.LAST
+         FOR i IN g_unique_constraints.FIRST .. g_unique_constraints.LAST
          LOOP
-            g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#') := NULL;
-            g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_UNIQUE#') := NULL;
+            g_substitutions ('#PARAM_LIST_UNIQUE#') := NULL;
+            g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#') := NULL;
 
-            FOR j IN g_tab_unique_cons_column_info.FIRST ..
-                     g_tab_unique_cons_column_info.LAST
+            FOR j IN g_unique_cons_columns.FIRST ..
+                     g_unique_cons_columns.LAST
             LOOP
-               IF g_tab_unique_cons_column_info (j).constraint_name =
-                     g_tab_unique_constraint_info (i).constraint_name
+               IF g_unique_cons_columns (j).constraint_name =
+                     g_unique_constraints (i).constraint_name
                THEN
-                  g_tab_unique_cons_column_info (j).parameter_name :=
+                  g_unique_cons_columns (j).parameter_name :=
                      CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
                               'p_'
-                           || SUBSTR (
-                                 g_tab_unique_cons_column_info (j).column_name,
-                                 1,
-                                 28)
+                           || SUBSTR (g_unique_cons_columns (j).column_name,
+                                      1,
+                                      28)
                         ELSE
-                           g_tab_unique_cons_column_info (j).column_name
+                           g_unique_cons_columns (j).column_name
                      END;
-                  g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#') :=
-                        g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#')
+                  g_substitutions ('#PARAM_LIST_UNIQUE#') :=
+                        g_substitutions ('#PARAM_LIST_UNIQUE#')
                      || c_list_delimiter
                      || CASE
                            WHEN g_enable_parameter_prefixes
                            THEN
-                              g_tab_unique_cons_column_info (j).parameter_name
+                              g_unique_cons_columns (j).parameter_name
                            ELSE
-                              g_tab_unique_cons_column_info (j).parameter_name
+                              g_unique_cons_columns (j).parameter_name
                         END
                      || ' '
                      || g_table_name
                      || '."'
-                     || g_tab_unique_cons_column_info (j).column_name
+                     || g_unique_cons_columns (j).column_name
                      || '"%TYPE';
-                  g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
-                        g_tab_substitutions_array (
-                           '#COLUMN_COMPARE_LIST_UNIQUE#')
+                  g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
+                        g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#')
                      || '         AND '
                      || util_get_attribute_compare (
-                           p_data_type           => g_tab_unique_cons_column_info (j).data_type,
+                           p_data_type           => g_unique_cons_columns (j).data_type,
                            p_first_attribute     =>    '"'
-                                                    || g_tab_unique_cons_column_info (
-                                                          j).column_name
+                                                    || g_unique_cons_columns (j).column_name
                                                     || '"',
-                           p_second_attribute    => g_tab_unique_cons_column_info (
-                                                      j).parameter_name,
+                           p_second_attribute    => g_unique_cons_columns (j).parameter_name,
                            p_compare_operation   => '=')
                      || c_crlf;
                END IF;
             END LOOP;
 
-            g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#') :=
-               LTRIM (g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#'),
+            g_substitutions ('#PARAM_LIST_UNIQUE#') :=
+               LTRIM (g_substitutions ('#PARAM_LIST_UNIQUE#'),
                       c_list_delimiter);
-            g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
+            g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
                RTRIM (
-                  LTRIM (
-                     g_tab_substitutions_array (
-                        '#COLUMN_COMPARE_LIST_UNIQUE#'),
-                     '         AND '),
+                  LTRIM (g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#'),
+                         '         AND '),
                   c_crlf);
-            g_tapi_code_blocks.template :=
-               ' 
+            g_code_blocks.template :=
+               '
   FUNCTION get_pk_by_unique_cols( #PARAM_LIST_UNIQUE# )
   RETURN #TABLE_NAME#."#PK_COLUMN#"%TYPE;
   ----------------------------------------';
             util_template_replace ('API SPEC');
             ----------------------------------------
-            g_tapi_code_blocks.template :=
-               ' 
+            g_code_blocks.template :=
+               '
   FUNCTION get_pk_by_unique_cols( #PARAM_LIST_UNIQUE# )
   RETURN #TABLE_NAME#."#PK_COLUMN#"%TYPE IS
     v_pk #TABLE_NAME#."#PK_COLUMN#"%TYPE;
@@ -1295,15 +1342,13 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_get_a_row_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template := '
   FUNCTION get_a_row
   RETURN #TABLE_NAME#%ROWTYPE;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template := '
   FUNCTION get_a_row
   RETURN #TABLE_NAME#%ROWTYPE IS
     v_row #TABLE_NAME#%ROWTYPE;
@@ -1319,16 +1364,16 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_create_row_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION create_row( #PARAM_DEFINITION_W_PK# )
   RETURN #RETURN_TYPE#;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-            ' 
-  FUNCTION create_row( #PARAM_DEFINITION_W_PK# ) 
+      g_code_blocks.template :=
+            '
+  FUNCTION create_row( #PARAM_DEFINITION_W_PK# )
   RETURN #RETURN_TYPE# IS
     v_return #RETURN_TYPE#;
   BEGIN
@@ -1343,7 +1388,8 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
          || '
     INSERT INTO #TABLE_NAME# ( #COLUMN_LIST_W_PK# )
       VALUES ( #RETURN_TYPE_PK_COLUMN#, #PARAM_LIST_WO_PK# )
-      RETURN #RETURN_VALUE# INTO v_return;'
+      RETURN #RETURN_VALUE#
+        INTO v_return;'
          || CASE
                WHEN g_enable_generic_change_log
                THEN
@@ -1356,7 +1402,7 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
                ELSE
                   NULL
             END
-         || ' 
+         || '
     RETURN v_return;
   END create_row;
   ----------------------------------------';
@@ -1367,13 +1413,13 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_create_row_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
+      g_code_blocks.template :=
          '
   PROCEDURE create_row( #PARAM_DEFINITION_W_PK# );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
+      g_code_blocks.template :=
          '
   PROCEDURE create_row( #PARAM_DEFINITION_W_PK# )
   IS
@@ -1389,16 +1435,16 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_create_rowtype_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION create_row( p_row IN #TABLE_NAME#%ROWTYPE )
   RETURN #RETURN_TYPE#;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
-  FUNCTION create_row( p_row IN #TABLE_NAME#%ROWTYPE ) 
+      g_code_blocks.template :=
+         '
+  FUNCTION create_row( p_row IN #TABLE_NAME#%ROWTYPE )
   RETURN #RETURN_TYPE# IS
     v_return #RETURN_TYPE#;
   BEGIN
@@ -1413,14 +1459,14 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_create_rowtype_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE create_row( p_row IN #TABLE_NAME#%ROWTYPE );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE create_row( p_row IN #TABLE_NAME#%ROWTYPE )
   IS
     v_return #RETURN_TYPE#;
@@ -1435,16 +1481,16 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_create_a_row_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION create_a_row( #PARAM_DEF_W_PK_AND_DEFAULTS# )
   RETURN #RETURN_TYPE#;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
-  FUNCTION create_a_row( #PARAM_DEF_W_PK_AND_DEFAULTS# ) 
+      g_code_blocks.template :=
+         '
+  FUNCTION create_a_row( #PARAM_DEF_W_PK_AND_DEFAULTS# )
   RETURN #RETURN_TYPE# IS
     v_return #RETURN_TYPE#;
   BEGIN
@@ -1459,15 +1505,15 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_create_a_row_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE create_a_row( #PARAM_DEF_W_PK_AND_DEFAULTS# );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
-  PROCEDURE create_a_row( #PARAM_DEF_W_PK_AND_DEFAULTS# ) 
+      g_code_blocks.template :=
+         '
+  PROCEDURE create_a_row( #PARAM_DEF_W_PK_AND_DEFAULTS# )
   IS
     v_return #RETURN_TYPE#;
   BEGIN
@@ -1481,15 +1527,15 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_createorupdate_row_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION create_or_update_row( #PARAM_DEFINITION_W_PK# )
   RETURN #RETURN_TYPE#;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION create_or_update_row( #PARAM_DEFINITION_W_PK# )
   RETURN #RETURN_TYPE# IS
     v_return #RETURN_TYPE#;
@@ -1514,14 +1560,14 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_createorupdate_row_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE create_or_update_row( #PARAM_DEFINITION_W_PK# );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE create_or_update_row( #PARAM_DEFINITION_W_PK# )
   IS
     v_return #RETURN_TYPE#;
@@ -1536,15 +1582,15 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_createorupdate_rowtype_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION create_or_update_row( p_row IN #TABLE_NAME#%ROWTYPE )
   RETURN #RETURN_TYPE#;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION create_or_update_row( p_row IN #TABLE_NAME#%ROWTYPE )
   RETURN #RETURN_TYPE# IS
     v_return #RETURN_TYPE#;
@@ -1560,14 +1606,14 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_createorupdate_rowtype_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE create_or_update_row( p_row IN #TABLE_NAME#%ROWTYPE );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE create_or_update_row( p_row IN #TABLE_NAME#%ROWTYPE )
   IS
     v_return #RETURN_TYPE#;
@@ -1582,15 +1628,15 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_read_row_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION read_row( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
   RETURN #TABLE_NAME#%ROWTYPE;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   FUNCTION read_row( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
   RETURN #TABLE_NAME#%ROWTYPE IS
     CURSOR cur_row_by_pk( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE ) IS
@@ -1610,20 +1656,20 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_read_row_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE read_row( #PARAM_IO_DEFINITION_W_PK# );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE read_row( #PARAM_IO_DEFINITION_W_PK# )
   IS
     v_row #TABLE_NAME#%ROWTYPE;
   BEGIN
     v_row := read_row ( #PK_COLUMN_PARAMETER# => #PK_COLUMN_PARAMETER# );
-    IF v_row."#PK_COLUMN#" IS NOT NULL THEN 
+    IF v_row."#PK_COLUMN#" IS NOT NULL THEN
       #SET_ROWTYPE_COL_TO_PARAM_WO_PK#
     END IF;
   END read_row;
@@ -1635,91 +1681,82 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_read_row_by_uk_fnc
    IS
    BEGIN
-      IF g_tab_unique_constraint_info.COUNT > 0
+      IF g_unique_constraints.COUNT > 0
       THEN
-         FOR i IN g_tab_unique_constraint_info.FIRST ..
-                  g_tab_unique_constraint_info.LAST
+         FOR i IN g_unique_constraints.FIRST .. g_unique_constraints.LAST
          LOOP
-            g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#') := NULL;
-            g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_UNIQUE#') := NULL;
-            g_tab_substitutions_array ('#PARAM_CALLING_LIST_UNIQUE#') := NULL;
+            g_substitutions ('#PARAM_LIST_UNIQUE#') := NULL;
+            g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#') := NULL;
+            g_substitutions ('#PARAM_CALLING_LIST_UNIQUE#') := NULL;
 
-            FOR j IN g_tab_unique_cons_column_info.FIRST ..
-                     g_tab_unique_cons_column_info.LAST
+            FOR j IN g_unique_cons_columns.FIRST ..
+                     g_unique_cons_columns.LAST
             LOOP
-               IF g_tab_unique_cons_column_info (j).constraint_name =
-                     g_tab_unique_constraint_info (i).constraint_name
+               IF g_unique_cons_columns (j).constraint_name =
+                     g_unique_constraints (i).constraint_name
                THEN
-                  g_tab_unique_cons_column_info (j).parameter_name :=
+                  g_unique_cons_columns (j).parameter_name :=
                      CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
                               'p_'
-                           || SUBSTR (
-                                 g_tab_unique_cons_column_info (j).column_name,
-                                 1,
-                                 28)
+                           || SUBSTR (g_unique_cons_columns (j).column_name,
+                                      1,
+                                      28)
                         ELSE
-                           g_tab_unique_cons_column_info (j).column_name
+                           g_unique_cons_columns (j).column_name
                      END;
-                  g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#') :=
-                        g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#')
+                  g_substitutions ('#PARAM_LIST_UNIQUE#') :=
+                        g_substitutions ('#PARAM_LIST_UNIQUE#')
                      || c_list_delimiter
-                     || g_tab_unique_cons_column_info (j).parameter_name
+                     || g_unique_cons_columns (j).parameter_name
                      || ' '
                      || g_table_name
                      || '."'
-                     || g_tab_unique_cons_column_info (j).column_name
+                     || g_unique_cons_columns (j).column_name
                      || '"%TYPE';
-                  g_tab_substitutions_array ('#PARAM_CALLING_LIST_UNIQUE#') :=
-                        g_tab_substitutions_array (
-                           '#PARAM_CALLING_LIST_UNIQUE#')
+                  g_substitutions ('#PARAM_CALLING_LIST_UNIQUE#') :=
+                        g_substitutions ('#PARAM_CALLING_LIST_UNIQUE#')
                      || c_list_delimiter
-                     || g_tab_unique_cons_column_info (j).parameter_name
+                     || g_unique_cons_columns (j).parameter_name
                      || ' => '
-                     || g_tab_unique_cons_column_info (j).parameter_name;
-                  g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
-                        g_tab_substitutions_array (
-                           '#COLUMN_COMPARE_LIST_UNIQUE#')
+                     || g_unique_cons_columns (j).parameter_name;
+                  g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
+                        g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#')
                      || '         AND '
                      || util_get_attribute_compare (
-                           p_data_type           => g_tab_unique_cons_column_info (j).data_type,
+                           p_data_type           => g_unique_cons_columns (j).data_type,
                            p_first_attribute     =>    '"'
-                                                    || g_tab_unique_cons_column_info (
-                                                          j).column_name
+                                                    || g_unique_cons_columns (j).column_name
                                                     || '"',
-                           p_second_attribute    => g_tab_unique_cons_column_info (
-                                                      j).parameter_name,
+                           p_second_attribute    => g_unique_cons_columns (j).parameter_name,
                            p_compare_operation   => '=')
                      || c_crlf;
                END IF;
             END LOOP;
 
-            g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#') :=
-               LTRIM (g_tab_substitutions_array ('#PARAM_LIST_UNIQUE#'),
+            g_substitutions ('#PARAM_LIST_UNIQUE#') :=
+               LTRIM (g_substitutions ('#PARAM_LIST_UNIQUE#'),
                       c_list_delimiter);
 
-            g_tab_substitutions_array ('#PARAM_CALLING_LIST_UNIQUE#') :=
-               LTRIM (
-                  g_tab_substitutions_array ('#PARAM_CALLING_LIST_UNIQUE#'),
-                  c_list_delimiter);
+            g_substitutions ('#PARAM_CALLING_LIST_UNIQUE#') :=
+               LTRIM (g_substitutions ('#PARAM_CALLING_LIST_UNIQUE#'),
+                      c_list_delimiter);
 
-            g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
+            g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#') :=
                RTRIM (
-                  LTRIM (
-                     g_tab_substitutions_array (
-                        '#COLUMN_COMPARE_LIST_UNIQUE#'),
-                     '         AND '),
+                  LTRIM (g_substitutions ('#COLUMN_COMPARE_LIST_UNIQUE#'),
+                         '         AND '),
                   c_crlf);
-            g_tapi_code_blocks.template :=
-               ' 
+            g_code_blocks.template :=
+               '
   FUNCTION read_row( #PARAM_LIST_UNIQUE# )
   RETURN #TABLE_NAME#%ROWTYPE;
   ----------------------------------------';
             util_template_replace ('API SPEC');
             ----------------------------------------
-            g_tapi_code_blocks.template :=
-               ' 
+            g_code_blocks.template :=
+               '
   FUNCTION read_row( #PARAM_LIST_UNIQUE# )
   RETURN #TABLE_NAME#%ROWTYPE IS
     v_pk #TABLE_NAME#."#PK_COLUMN#"%TYPE;
@@ -1737,15 +1774,13 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_read_a_row_fnc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template := '
   FUNCTION read_a_row
   RETURN #TABLE_NAME#%ROWTYPE;
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template := '
   FUNCTION read_a_row
   RETURN #TABLE_NAME#%ROWTYPE IS
     CURSOR cur_row IS
@@ -1765,14 +1800,14 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_update_row_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE update_row( #PARAM_DEFINITION_W_PK# );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-            ' 
+      g_code_blocks.template :=
+            '
   PROCEDURE update_row( #PARAM_DEFINITION_W_PK# )
   IS
     v_row   #TABLE_NAME#%ROWTYPE;'
@@ -1805,14 +1840,14 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_update_rowtype_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE update_row( p_row IN #TABLE_NAME#%ROWTYPE );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE update_row( p_row IN #TABLE_NAME#%ROWTYPE )
   IS
   BEGIN
@@ -1826,14 +1861,14 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_delete_row_prc
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
   PROCEDURE delete_row( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE );
   ----------------------------------------';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template :=
-            ' 
+      g_code_blocks.template :=
+            '
   PROCEDURE delete_row( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
   IS
   BEGIN
@@ -1860,24 +1895,22 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_getter_functions
    IS
    BEGIN
-      FOR i IN g_tab_column_info.FIRST .. g_tab_column_info.LAST
+      FOR i IN g_columns.FIRST .. g_columns.LAST
       LOOP
-         IF (g_tab_column_info (i).column_name <>
-                g_tab_substitutions_array ('#PK_COLUMN#'))
+         IF (g_columns (i).column_name <> g_substitutions ('#PK_COLUMN#'))
          THEN
-            g_tab_substitutions_array ('#I_COLUMN_NAME#') :=
-               g_tab_column_info (i).column_name;
-            g_tab_substitutions_array ('#I_COLUMN_NAME_26#') :=
-               g_tab_column_info (i).column_name_26;
-            g_tapi_code_blocks.template :=
-               ' 
+            g_substitutions ('#I_COLUMN_NAME#') := g_columns (i).column_name;
+            g_substitutions ('#I_COLUMN_NAME_26#') :=
+               g_columns (i).column_name_26;
+            g_code_blocks.template :=
+               '
   FUNCTION get_#I_COLUMN_NAME_26#( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
   RETURN #TABLE_NAME#."#I_COLUMN_NAME#"%TYPE;
   ----------------------------------------';
             util_template_replace ('API SPEC');
             ----------------------------------------
-            g_tapi_code_blocks.template :=
-               ' 
+            g_code_blocks.template :=
+               '
   FUNCTION get_#I_COLUMN_NAME_26#( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE )
   RETURN #TABLE_NAME#."#I_COLUMN_NAME#"%TYPE IS
     v_row    #TABLE_NAME#%ROWTYPE;
@@ -1895,51 +1928,48 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_setter_procedures
    IS
    BEGIN
-      FOR i IN g_tab_column_info.FIRST .. g_tab_column_info.LAST
+      FOR i IN g_columns.FIRST .. g_columns.LAST
       LOOP
-         IF (g_tab_column_info (i).column_name <>
-                g_tab_substitutions_array ('#PK_COLUMN#'))
+         IF (g_columns (i).column_name <> g_substitutions ('#PK_COLUMN#'))
          THEN
-            g_tab_substitutions_array ('#I_COLUMN_NAME#') :=
-               g_tab_column_info (i).column_name;
-            g_tab_substitutions_array ('#I_COLUMN_NAME_26#') :=
-               g_tab_column_info (i).column_name_26;
-            g_tab_substitutions_array ('#I_PARAMETER_NAME#') :=
+            g_substitutions ('#I_COLUMN_NAME#') := g_columns (i).column_name;
+            g_substitutions ('#I_COLUMN_NAME_26#') :=
+               g_columns (i).column_name_26;
+            g_substitutions ('#I_PARAMETER_NAME#') :=
                CASE
                   WHEN g_enable_parameter_prefixes
                   THEN
-                     'p_' || g_tab_column_info (i).column_name_28
+                     'p_' || g_columns (i).column_name_28
                   ELSE
-                     g_tab_column_info (i).column_name
+                     g_columns (i).column_name
                END;
-            g_tab_substitutions_array ('#I_COLUMN_COMPARE#') :=
+            g_substitutions ('#I_COLUMN_COMPARE#') :=
                util_get_attribute_compare (
-                  p_data_type           => g_tab_column_info (i).data_type,
+                  p_data_type           => g_columns (i).data_type,
                   p_first_attribute     =>    'v_row."'
-                                           || g_tab_column_info (i).column_name
+                                           || g_columns (i).column_name
                                            || '"',
-                  p_second_attribute    => g_tab_substitutions_array (
+                  p_second_attribute    => g_substitutions (
                                              '#I_PARAMETER_NAME#'),
                   p_compare_operation   => '<>');
-            g_tab_substitutions_array ('#I_OLD_VALUE#') :=
+            g_substitutions ('#I_OLD_VALUE#') :=
                util_get_vc2_4000_operation (
-                  p_data_type        => g_tab_column_info (i).data_type,
+                  p_data_type        => g_columns (i).data_type,
                   p_attribute_name   =>    'v_row."'
-                                        || g_tab_column_info (i).column_name
+                                        || g_columns (i).column_name
                                         || '"');
-            g_tab_substitutions_array ('#I_NEW_VALUE#') :=
+            g_substitutions ('#I_NEW_VALUE#') :=
                util_get_vc2_4000_operation (
-                  p_data_type        => g_tab_column_info (i).data_type,
-                  p_attribute_name   => g_tab_substitutions_array (
-                                          '#I_PARAMETER_NAME#'));
-            g_tapi_code_blocks.template :=
-               ' 
+                  p_data_type        => g_columns (i).data_type,
+                  p_attribute_name   => g_substitutions ('#I_PARAMETER_NAME#'));
+            g_code_blocks.template :=
+               '
   PROCEDURE set_#I_COLUMN_NAME_26#( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE, #I_PARAMETER_NAME# IN #TABLE_NAME#."#I_COLUMN_NAME#"%TYPE );
   ----------------------------------------';
             util_template_replace ('API SPEC');
             ----------------------------------------
-            g_tapi_code_blocks.template :=
-                  ' 
+            g_code_blocks.template :=
+                  '
   PROCEDURE set_#I_COLUMN_NAME_26#( #PK_COLUMN_PARAMETER# IN #TABLE_NAME#."#PK_COLUMN#"%TYPE, #I_PARAMETER_NAME# IN #TABLE_NAME#."#I_COLUMN_NAME#"%TYPE )
   IS
     v_row #TABLE_NAME#%ROWTYPE;
@@ -1977,9 +2007,9 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
    PROCEDURE gen_footer
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
+      g_code_blocks.template :=
             CASE
-               WHEN g_column_defaults IS NOT NULL
+               WHEN g_column_defaults_serialized IS NOT NULL
                THEN
                      c_crlf
                   || '  /**'
@@ -1987,7 +2017,7 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
                   || q'[   * Custom column defaults (&lt; = < | &gt; = > | &quot; = " | &apos; = ' | &amp; = & ):]'
                   || c_crlf
                   || '   * '
-                  || util_serialize_xml (g_column_defaults)
+                  || g_column_defaults_serialized
                   || c_crlf
                   || '   */'
                ELSE
@@ -1997,7 +2027,7 @@ CREATE OR REPLACE PACKAGE BODY #API_NAME# IS
 END #API_NAME#; ';
       util_template_replace ('API SPEC');
       ----------------------------------------
-      g_tapi_code_blocks.template := ' 
+      g_code_blocks.template := '
 END #API_NAME#; ';
       util_template_replace ('API BODY');
    END gen_footer;
@@ -2006,8 +2036,8 @@ END #API_NAME#; ';
    PROCEDURE gen_dml_view
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-         ' 
+      g_code_blocks.template :=
+         '
 CREATE OR REPLACE VIEW #TABLE_NAME_24#_dml_v AS
 SELECT #COLUMN_LIST_W_PK#
 FROM #TABLE_NAME#';
@@ -2018,14 +2048,14 @@ FROM #TABLE_NAME#';
    PROCEDURE gen_dml_view_trigger
    IS
    BEGIN
-      g_tapi_code_blocks.template :=
-            ' 
+      g_code_blocks.template :=
+            '
 CREATE OR REPLACE TRIGGER #TABLE_NAME_24#_ioiud
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON #TABLE_NAME_24#_dml_v
   FOR EACH ROW
 BEGIN
-  IF INSERTING THEN 
+  IF INSERTING THEN
     '
          || CASE
                WHEN g_enable_insertion_of_rows
@@ -2034,8 +2064,8 @@ BEGIN
                ELSE
                   'raise_application_error (-20000, ''Insertion of a row is not allowed.'');'
             END
-         || '    
-  ELSIF UPDATING THEN 
+         || '
+  ELSIF UPDATING THEN
     '
          || CASE
                WHEN g_enable_update_of_rows
@@ -2044,7 +2074,7 @@ BEGIN
                ELSE
                   'raise_application_error (-20000, ''Update of a row is not allowed.'');'
             END
-         || '    
+         || '
   ELSIF DELETING THEN
     '
          || CASE
@@ -2054,7 +2084,7 @@ BEGIN
                ELSE
                   'raise_application_error (-20000, ''Deletion of a row is not allowed.'');'
             END
-         || '    
+         || '
   END IF;
 END #TABLE_NAME_24#_ioiud;';
       util_template_replace ('TRIGGER');
@@ -2063,26 +2093,25 @@ END #TABLE_NAME_24#_ioiud;';
    -----------------------------------------------------------------------------
    PROCEDURE main_generate (
       p_generator_action              IN VARCHAR2,
-      p_table_name                    IN user_tables.table_name%TYPE,
+      p_table_name                    IN all_objects.object_name%TYPE,
+      p_owner                         IN all_users.username%TYPE,
       p_reuse_existing_api_params     IN BOOLEAN,
-      p_col_prefix_in_method_names    IN BOOLEAN,
       p_enable_insertion_of_rows      IN BOOLEAN,
       p_enable_update_of_rows         IN BOOLEAN,
       p_enable_deletion_of_rows       IN BOOLEAN,
-      p_enable_generic_change_log     IN BOOLEAN,
-      p_enable_dml_view               IN BOOLEAN,
-      p_sequence_name                 IN user_sequences.sequence_name%TYPE,
-      p_api_name                      IN user_objects.object_name%TYPE,
-      p_enable_getter_and_setter      IN BOOLEAN,
-      p_enable_proc_with_out_params   IN BOOLEAN,
       p_enable_parameter_prefixes     IN BOOLEAN,
+      p_enable_proc_with_out_params   IN BOOLEAN,
+      p_enable_getter_and_setter      IN BOOLEAN,
+      p_col_prefix_in_method_names    IN BOOLEAN,
       p_return_row_instead_of_pk      IN BOOLEAN,
+      p_enable_dml_view               IN BOOLEAN,
+      p_enable_generic_change_log     IN BOOLEAN,
+      p_api_name                      IN all_objects.object_name%TYPE,
+      p_sequence_name                 IN all_objects.object_name%TYPE,
       p_column_defaults               IN XMLTYPE)
    IS
       PROCEDURE initialize
       IS
-         v_object_exists   user_objects.object_name%TYPE;
-
          --
          PROCEDURE reset_globals
          IS
@@ -2090,34 +2119,37 @@ END #TABLE_NAME_24#_ioiud;';
             --------------------------------------------------------------------
             -- globl collections and records
             --------------------------------------------------------------------
-            g_tab_column_info.delete;
-            g_tab_substitutions_array.delete;
-            g_tab_unique_constraint_info.delete;
-            g_tab_unique_cons_column_info.delete;
-            g_tapi_code_blocks := NULL;
+            g_columns.delete;
+            g_substitutions.delete;
+            g_unique_constraints.delete;
+            g_unique_cons_columns.delete;
+            g_code_blocks := NULL;
             g_params_existing_api := NULL;
 
             --------------------------------------------------------------------
             -- global variables
             --------------------------------------------------------------------
+            g_owner := NULL;
             g_table_name := NULL;
             g_pk_column := NULL;
             g_column_prefix := NULL;
             --
             g_reuse_existing_api_params := NULL;
-            g_col_prefix_in_method_names := NULL;
             g_enable_insertion_of_rows := NULL;
             g_enable_update_of_rows := NULL;
             g_enable_deletion_of_rows := NULL;
-            g_enable_generic_change_log := NULL;
-            g_enable_dml_view := NULL;
-            g_sequence_name := NULL;
-            g_api_name := NULL;
-            g_enable_getter_and_setter := NULL;
-            g_enable_proc_with_out_params := NULL;
             g_enable_parameter_prefixes := NULL;
+            g_enable_proc_with_out_params := NULL;
+            g_enable_getter_and_setter := NULL;
+            g_col_prefix_in_method_names := NULL;
             g_return_row_instead_of_pk := NULL;
+            g_enable_dml_view := NULL;
+            g_enable_generic_change_log := NULL;
+            g_api_name := NULL;
+            g_sequence_name := NULL;
             g_column_defaults := NULL;
+            g_column_defaults_serialized := NULL;
+            --
             g_xmltype_column_present := NULL;
          END reset_globals;
 
@@ -2129,16 +2161,21 @@ END #TABLE_NAME_24#_ioiud;';
             --
             PROCEDURE check_if_table_exists
             IS
+               v_object_name   all_objects.object_name%TYPE;
+
+               CURSOR v_cur
+               IS
+                  SELECT table_name
+                    FROM all_tables
+                   WHERE owner = g_owner AND table_name = g_table_name;
             BEGIN
-               v_object_exists := NULL;
+               OPEN v_cur;
 
-               OPEN g_cur_table_exists;
+               FETCH v_cur INTO v_object_name;
 
-               FETCH g_cur_table_exists INTO v_object_exists;
+               CLOSE v_cur;
 
-               CLOSE g_cur_table_exists;
-
-               IF (v_object_exists IS NULL)
+               IF (v_object_name IS NULL)
                THEN
                   raise_application_error (
                      c_generator_error_number,
@@ -2149,18 +2186,24 @@ END #TABLE_NAME_24#_ioiud;';
             --
             PROCEDURE check_if_sequence_exists
             IS
+               v_object_name   all_objects.object_name%TYPE;
+
+               CURSOR v_cur
+               IS
+                  SELECT sequence_name
+                    FROM all_sequences
+                   WHERE     sequence_owner = g_owner
+                         AND sequence_name = g_sequence_name;
             BEGIN
                IF g_sequence_name IS NOT NULL
                THEN
-                  v_object_exists := NULL;
+                  OPEN v_cur;
 
-                  OPEN g_cur_sequence_exists;
+                  FETCH v_cur INTO v_object_name;
 
-                  FETCH g_cur_sequence_exists INTO v_object_exists;
+                  CLOSE v_cur;
 
-                  CLOSE g_cur_sequence_exists;
-
-                  IF (v_object_exists IS NULL)
+                  IF (v_object_name IS NULL)
                   THEN
                      raise_application_error (
                         c_generator_error_number,
@@ -2171,23 +2214,65 @@ END #TABLE_NAME_24#_ioiud;';
                END IF;
             END check_if_sequence_exists;
 
+            PROCEDURE check_if_api_name_exists
+            IS
+               v_object_type   all_objects.object_type%TYPE;
+
+               CURSOR v_cur
+               IS
+                  SELECT object_type
+                    FROM ALL_OBJECTS
+                   WHERE     owner = g_owner
+                         AND object_name = g_api_name
+                         AND object_type NOT IN ('PACKAGE', 'PACKAGE BODY');
+            BEGIN
+               IF g_api_name IS NOT NULL
+               THEN
+                  OPEN v_cur;
+
+                  FETCH v_cur INTO v_object_type;
+
+                  CLOSE v_cur;
+
+                  IF (v_object_type IS NOT NULL)
+                  THEN
+                     raise_application_error (
+                        c_generator_error_number,
+                           'API name "'
+                        || g_api_name
+                        || '" does already exist as an object type "'
+                        || v_object_type
+                        || '". Please provide a different API name.');
+                  END IF;
+               END IF;
+            END check_if_api_name_exists;
+
+
+
             PROCEDURE fetch_existing_api_params
             IS
+               CURSOR v_cur
+               IS
+                  SELECT *
+                    FROM TABLE (
+                            view_existing_apis (
+                               P_TABLE_NAME   => g_table_name,
+                               P_OWNER        => g_owner));
             BEGIN
                v_api_found := FALSE;
 
                IF g_reuse_existing_api_params
                THEN
-                  OPEN g_cur_existing_apis (g_table_name);
+                  OPEN v_cur;
 
-                  FETCH g_cur_existing_apis INTO g_params_existing_api;
+                  FETCH v_cur INTO g_params_existing_api;
 
-                  IF g_cur_existing_apis%FOUND
+                  IF v_cur%FOUND
                   THEN
                      v_api_found := TRUE;
                   END IF;
 
-                  CLOSE g_cur_existing_apis;
+                  CLOSE v_cur;
                END IF;
             END fetch_existing_api_params;
 
@@ -2213,17 +2298,20 @@ END #TABLE_NAME_24#_ioiud;';
             BEGIN
                IF g_enable_generic_change_log
                THEN
-                  FOR i IN (SELECT 'GENERIC_CHANGE_LOG' FROM DUAL
-                            MINUS
-                            SELECT table_name
-                              FROM user_tables
-                             WHERE table_name = 'GENERIC_CHANGE_LOG')
+                  FOR i
+                     IN (SELECT 'GENERIC_CHANGE_LOG' FROM DUAL
+                         MINUS
+                         SELECT table_name
+                           FROM all_tables
+                          WHERE     owner = g_owner
+                                AND table_name = 'GENERIC_CHANGE_LOG')
                   LOOP
                      -- check constraint
                      SELECT COUNT (*)
                        INTO v_count
-                       FROM user_objects
-                      WHERE object_name = 'GENERIC_CHANGE_LOG_PK';
+                       FROM all_objects
+                      WHERE     owner = g_owner
+                            AND object_name = 'GENERIC_CHANGE_LOG_PK';
 
                      IF v_count > 0
                      THEN
@@ -2235,8 +2323,9 @@ END #TABLE_NAME_24#_ioiud;';
                      -- check sequence
                      SELECT COUNT (*)
                        INTO v_count
-                       FROM user_objects
-                      WHERE object_name = 'GENERIC_CHANGE_LOG_SEQ';
+                       FROM all_objects
+                      WHERE     owner = g_owner
+                            AND object_name = 'GENERIC_CHANGE_LOG_SEQ';
 
                      IF v_count > 0
                      THEN
@@ -2248,8 +2337,9 @@ END #TABLE_NAME_24#_ioiud;';
                      -- check index
                      SELECT COUNT (*)
                        INTO v_count
-                       FROM user_objects
-                      WHERE object_name = 'GENERIC_CHANGE_LOG_IDX';
+                       FROM all_objects
+                      WHERE     owner = g_owner
+                            AND object_name = 'GENERIC_CHANGE_LOG_IDX';
 
                      IF v_count > 0
                      THEN
@@ -2320,6 +2410,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
          --
          BEGIN
             -- process table name dependend globals
+            g_owner := p_owner;
             g_table_name := p_table_name;
             check_if_table_exists;
             g_pk_column := util_get_table_key (p_table_name => g_table_name);
@@ -2331,7 +2422,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             fetch_existing_api_params;
 
             -- process rest of parameters
-
             g_sequence_name :=
                CASE
                   WHEN g_reuse_existing_api_params AND v_api_found
@@ -2359,6 +2449,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                      util_get_substituted_name (
                         NVL (p_api_name, '#TABLE_NAME_26#_API'))
                END;
+            check_if_api_name_exists;
 
             g_col_prefix_in_method_names :=
                CASE
@@ -2507,6 +2598,15 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   ELSE
                      p_column_defaults
                END;
+            g_column_defaults_serialized :=
+               util_serialize_xml (g_column_defaults);
+
+            -- check for empty XML element
+            IF g_column_defaults_serialized = '<defaults/>'
+            THEN
+               g_column_defaults := NULL;
+               g_column_defaults_serialized := NULL;
+            END IF;
          END process_parameters;
 
          --
@@ -2514,54 +2614,56 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
          IS
          BEGIN
             -- meta data
-            g_tab_substitutions_array ('#GENERATOR#') := c_generator;
-            g_tab_substitutions_array ('#GENERATOR_VERSION#') :=
-               c_generator_version;
-            g_tab_substitutions_array ('#GENERATOR_ACTION#') :=
-               p_generator_action;
-            g_tab_substitutions_array ('#GENERATED_AT#') :=
+            g_substitutions ('#GENERATOR#') := c_generator;
+            g_substitutions ('#GENERATOR_VERSION#') := c_generator_version;
+            g_substitutions ('#GENERATOR_ACTION#') := p_generator_action;
+            g_substitutions ('#GENERATED_AT#') :=
                TO_CHAR (SYSDATE, 'yyyy-mm-dd hh24:mi:ss');
-            g_tab_substitutions_array ('#GENERATED_BY#') := util_get_user_name;
+            g_substitutions ('#GENERATED_BY#') := util_get_user_name;
+            g_substitutions ('#SPEC_OPTIONS_MIN_LINE#') :=
+               c_SPEC_OPTIONS_MIN_LINE;
+            g_substitutions ('#SPEC_OPTIONS_MAX_LINE#') :=
+               c_SPEC_OPTIONS_MAX_LINE;
+
 
             -- table data
-            g_tab_substitutions_array ('#TABLE_NAME#') := g_table_name;
-            g_tab_substitutions_array ('#TABLE_NAME_24#') :=
+            g_substitutions ('#OWNER#') := g_owner;
+            g_substitutions ('#TABLE_NAME#') := g_table_name;
+            g_substitutions ('#TABLE_NAME_24#') :=
                SUBSTR (g_table_name, 1, 24);
-            g_tab_substitutions_array ('#TABLE_NAME_26#') :=
+            g_substitutions ('#TABLE_NAME_26#') :=
                SUBSTR (g_table_name, 1, 26);
-            g_tab_substitutions_array ('#TABLE_NAME_28#') :=
+            g_substitutions ('#TABLE_NAME_28#') :=
                SUBSTR (g_table_name, 1, 28);
-            g_tab_substitutions_array ('#PK_COLUMN#') := g_pk_column;
-            g_tab_substitutions_array ('#PK_COLUMN_26#') :=
-               SUBSTR (g_pk_column, 1, 26);
-            g_tab_substitutions_array ('#PK_COLUMN_28#') :=
-               SUBSTR (g_pk_column, 1, 28);
-            g_tab_substitutions_array ('#COLUMN_PREFIX#') := g_column_prefix;
+            g_substitutions ('#PK_COLUMN#') := g_pk_column;
+            g_substitutions ('#PK_COLUMN_26#') := SUBSTR (g_pk_column, 1, 26);
+            g_substitutions ('#PK_COLUMN_28#') := SUBSTR (g_pk_column, 1, 28);
+            g_substitutions ('#COLUMN_PREFIX#') := g_column_prefix;
 
             -- dependend on table data
-            g_tab_substitutions_array ('#REUSE_EXISTING_API_PARAMS#') :=
+            g_substitutions ('#REUSE_EXISTING_API_PARAMS#') :=
                util_bool_to_string (g_reuse_existing_api_params);
-            g_tab_substitutions_array ('#COL_PREFIX_IN_METHOD_NAMES#') :=
+            g_substitutions ('#COL_PREFIX_IN_METHOD_NAMES#') :=
                util_bool_to_string (g_col_prefix_in_method_names);
-            g_tab_substitutions_array ('#ENABLE_INSERTION_OF_ROWS#') :=
+            g_substitutions ('#ENABLE_INSERTION_OF_ROWS#') :=
                util_bool_to_string (g_enable_insertion_of_rows);
-            g_tab_substitutions_array ('#ENABLE_UPDATE_OF_ROWS#') :=
+            g_substitutions ('#ENABLE_UPDATE_OF_ROWS#') :=
                util_bool_to_string (g_enable_update_of_rows);
-            g_tab_substitutions_array ('#ENABLE_DELETION_OF_ROWS#') :=
+            g_substitutions ('#ENABLE_DELETION_OF_ROWS#') :=
                util_bool_to_string (g_enable_deletion_of_rows);
-            g_tab_substitutions_array ('#ENABLE_GENERIC_CHANGE_LOG#') :=
+            g_substitutions ('#ENABLE_GENERIC_CHANGE_LOG#') :=
                util_bool_to_string (g_enable_generic_change_log);
-            g_tab_substitutions_array ('#ENABLE_DML_VIEW#') :=
+            g_substitutions ('#ENABLE_DML_VIEW#') :=
                util_bool_to_string (g_enable_dml_view);
-            g_tab_substitutions_array ('#ENABLE_GETTER_AND_SETTER#') :=
+            g_substitutions ('#ENABLE_GETTER_AND_SETTER#') :=
                util_bool_to_string (g_enable_getter_and_setter);
-            g_tab_substitutions_array ('#ENABLE_PROC_WITH_OUT_PARAMS#') :=
+            g_substitutions ('#ENABLE_PROC_WITH_OUT_PARAMS#') :=
                util_bool_to_string (g_enable_proc_with_out_params);
-            g_tab_substitutions_array ('#ENABLE_PARAMETER_PREFIXES#') :=
+            g_substitutions ('#ENABLE_PARAMETER_PREFIXES#') :=
                util_bool_to_string (g_enable_parameter_prefixes);
-            g_tab_substitutions_array ('#RETURN_ROW_INSTEAD_OF_PK#') :=
+            g_substitutions ('#RETURN_ROW_INSTEAD_OF_PK#') :=
                util_bool_to_string (g_return_row_instead_of_pk);
-            g_tab_substitutions_array ('#COLUMN_DEFAULTS#') :=
+            g_substitutions ('#COLUMN_DEFAULTS#') :=
                CASE
                   WHEN g_column_defaults IS NOT NULL
                   THEN
@@ -2573,20 +2675,20 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                      NULL
                END;
 
-            g_tab_substitutions_array ('#SEQUENCE_NAME#') := g_sequence_name;
+            g_substitutions ('#SEQUENCE_NAME#') := g_sequence_name;
 
-            g_tab_substitutions_array ('#API_NAME#') := g_api_name;
+            g_substitutions ('#API_NAME#') := g_api_name;
 
-            g_tab_substitutions_array ('#PK_COLUMN_PARAMETER#') :=
+            g_substitutions ('#PK_COLUMN_PARAMETER#') :=
                CASE
                   WHEN g_enable_parameter_prefixes
                   THEN
-                     'p_' || g_tab_substitutions_array ('#PK_COLUMN_28#')
+                     'p_' || g_substitutions ('#PK_COLUMN_28#')
                   ELSE
-                     g_tab_substitutions_array ('#PK_COLUMN#')
+                     g_substitutions ('#PK_COLUMN#')
                END;
 
-            g_tab_substitutions_array ('#RETURN_TYPE#') :=
+            g_substitutions ('#RETURN_TYPE#') :=
                CASE
                   WHEN g_return_row_instead_of_pk
                   THEN
@@ -2594,22 +2696,20 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   ELSE
                         g_table_name
                      || '."'
-                     || g_tab_substitutions_array ('#PK_COLUMN#')
+                     || g_substitutions ('#PK_COLUMN#')
                      || '"%TYPE'
                END;
 
-            g_tab_substitutions_array ('#RETURN_TYPE_PK_COLUMN#') :=
+            g_substitutions ('#RETURN_TYPE_PK_COLUMN#') :=
                   'v_return'
                || CASE
                      WHEN g_return_row_instead_of_pk
                      THEN
-                           '."'
-                        || g_tab_substitutions_array ('#PK_COLUMN#')
-                        || '"'
+                        '."' || g_substitutions ('#PK_COLUMN#') || '"'
                      ELSE
                         NULL
                   END;
-         -- For g_tab_substitutions_array ('#RETURN_VALUE#') see procedure
+         -- For g_substitutions ('#RETURN_VALUE#') see procedure
          -- set_substitutions_literal_base, as it is dependend on #COLUMN_LIST_W_PK#
 
          END set_substitutions_literal_base;
@@ -2620,17 +2720,14 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
          PROCEDURE create_temporary_lobs
          IS
          BEGIN
+            DBMS_LOB.createtemporary (lob_loc   => g_code_blocks.api_spec,
+                                      cache     => FALSE);
+            DBMS_LOB.createtemporary (lob_loc   => g_code_blocks.api_body,
+                                      cache     => FALSE);
+            DBMS_LOB.createtemporary (lob_loc   => g_code_blocks.dml_view,
+                                      cache     => FALSE);
             DBMS_LOB.createtemporary (
-               lob_loc   => g_tapi_code_blocks.api_spec,
-               cache     => FALSE);
-            DBMS_LOB.createtemporary (
-               lob_loc   => g_tapi_code_blocks.api_body,
-               cache     => FALSE);
-            DBMS_LOB.createtemporary (
-               lob_loc   => g_tapi_code_blocks.dml_view,
-               cache     => FALSE);
-            DBMS_LOB.createtemporary (
-               lob_loc   => g_tapi_code_blocks.dml_view_trigger,
+               lob_loc   => g_code_blocks.dml_view_trigger,
                cache     => FALSE);
          END create_temporary_lobs;
 
@@ -2642,27 +2739,20 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             BEGIN
                -- initialize some array key before concatenating in loop
                -- first action in loop is read and this fails, if array key is not existing
-               g_tab_substitutions_array ('#COLUMN_LIST_W_PK#') := NULL;
-               g_tab_substitutions_array ('#MAP_NEW_TO_PARAM_W_PK#') := NULL;
-               g_tab_substitutions_array ('#MAP_PARAM_TO_PARAM_W_PK#') := NULL;
-               g_tab_substitutions_array ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#') :=
-                  NULL;
-               g_tab_substitutions_array ('#PARAM_DEFINITION_W_PK#') := NULL;
-               g_tab_substitutions_array ('#PARAM_DEFINITION_W_PK#') := NULL;
-               g_tab_substitutions_array ('#PARAM_IO_DEFINITION_W_PK#') :=
-                  NULL;
-               g_tab_substitutions_array ('#PARAM_LIST_WO_PK#') := NULL;
-               g_tab_substitutions_array ('#SET_PARAM_TO_COLUMN_WO_PK#') :=
-                  NULL;
-               g_tab_substitutions_array ('#SET_ROWTYPE_COL_TO_PARAM_WO_PK#') :=
-                  NULL;
-               g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_WO_PK#') :=
-                  NULL;
-               g_tab_substitutions_array ('#PARAM_CALLING_LIST_UNIQUE#') :=
-                  NULL;
-               g_tab_substitutions_array ('#COLUMN_DEFAULTS_LIST#') := NULL;
-               g_tab_substitutions_array ('#PARAM_DEF_W_PK_AND_DEFAULTS#') :=
-                  NULL;
+               g_substitutions ('#COLUMN_LIST_W_PK#') := NULL;
+               g_substitutions ('#MAP_NEW_TO_PARAM_W_PK#') := NULL;
+               g_substitutions ('#MAP_PARAM_TO_PARAM_W_PK#') := NULL;
+               g_substitutions ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#') := NULL;
+               g_substitutions ('#PARAM_DEFINITION_W_PK#') := NULL;
+               g_substitutions ('#PARAM_DEFINITION_W_PK#') := NULL;
+               g_substitutions ('#PARAM_IO_DEFINITION_W_PK#') := NULL;
+               g_substitutions ('#PARAM_LIST_WO_PK#') := NULL;
+               g_substitutions ('#SET_PARAM_TO_COLUMN_WO_PK#') := NULL;
+               g_substitutions ('#SET_ROWTYPE_COL_TO_PARAM_WO_PK#') := NULL;
+               g_substitutions ('#COLUMN_COMPARE_LIST_WO_PK#') := NULL;
+               g_substitutions ('#PARAM_CALLING_LIST_UNIQUE#') := NULL;
+               g_substitutions ('#COLUMN_DEFAULTS_LIST#') := NULL;
+               g_substitutions ('#PARAM_DEF_W_PK_AND_DEFAULTS#') := NULL;
             END init_substitutions;
 
             --
@@ -2672,7 +2762,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                OPEN g_cur_columns;
 
                FETCH g_cur_columns
-                  BULK COLLECT INTO g_tab_column_info
+                  BULK COLLECT INTO g_columns
                   LIMIT c_bulk_collect_limit;
 
                CLOSE g_cur_columns;
@@ -2685,7 +2775,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                OPEN g_cur_unique_constraints;
 
                FETCH g_cur_unique_constraints
-                  BULK COLLECT INTO g_tab_unique_constraint_info
+                  BULK COLLECT INTO g_unique_constraints
                   LIMIT c_bulk_collect_limit;
 
                CLOSE g_cur_unique_constraints;
@@ -2698,7 +2788,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                OPEN g_cur_unique_cons_columns;
 
                FETCH g_cur_unique_cons_columns
-                  BULK COLLECT INTO g_tab_unique_cons_column_info
+                  BULK COLLECT INTO g_unique_cons_columns
                   LIMIT c_bulk_collect_limit;
 
                CLOSE g_cur_unique_cons_columns;
@@ -2710,7 +2800,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             BEGIN
                -- check, if we have a xmltype column present in our list
                -- if so, we have to provide a XML compare function
-               IF g_tab_column_info (i).data_type = 'XMLTYPE'
+               IF g_columns (i).data_type = 'XMLTYPE'
                THEN
                   g_xmltype_column_present := TRUE;
                END IF;
@@ -2720,32 +2810,30 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             PROCEDURE calc_column_short_names (i PLS_INTEGER)
             IS
             BEGIN
-               g_tab_column_info (i).column_name_26 :=
+               g_columns (i).column_name_26 :=
                   CASE
                      WHEN g_col_prefix_in_method_names
                      THEN
-                        SUBSTR (g_tab_column_info (i).column_name, 1, 26)
+                        SUBSTR (g_columns (i).column_name, 1, 26)
                      ELSE
                         SUBSTR (
-                           g_tab_column_info (i).column_name,
-                             LENGTH (
-                                g_tab_substitutions_array ('#COLUMN_PREFIX#'))
-                           + 2,
+                           g_columns (i).column_name,
+                           LENGTH (g_substitutions ('#COLUMN_PREFIX#')) + 2,
                            26)
                   END;
 
-               g_tab_column_info (i).column_name_28 :=
-                  SUBSTR (g_tab_column_info (i).column_name, 1, 28);
+               g_columns (i).column_name_28 :=
+                  SUBSTR (g_columns (i).column_name, 1, 28);
 
                -- normalize column names by replacing
                -- all special characters with "_"
-               g_tab_column_info (i).column_name_26 :=
+               g_columns (i).column_name_26 :=
                   util_get_normalized_identifier (
-                     p_identifier   => g_tab_column_info (i).column_name_26);
+                     p_identifier   => g_columns (i).column_name_26);
 
-               g_tab_column_info (i).column_name_28 :=
+               g_columns (i).column_name_28 :=
                   util_get_normalized_identifier (
-                     p_identifier   => g_tab_column_info (i).column_name_28);
+                     p_identifier   => g_columns (i).column_name_28);
             END calc_column_short_names;
 
             --
@@ -2759,11 +2847,11 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                , col2
                , col3
                , ... */
-               g_tab_substitutions_array ('#COLUMN_LIST_W_PK#') :=
-                     g_tab_substitutions_array ('#COLUMN_LIST_W_PK#')
+               g_substitutions ('#COLUMN_LIST_W_PK#') :=
+                     g_substitutions ('#COLUMN_LIST_W_PK#')
                   || c_list_delimiter
                   || '"'
-                  || g_tab_column_info (i).column_name
+                  || g_columns (i).column_name
                   || '"';
             END column_list_w_pk;
 
@@ -2777,18 +2865,18 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                , p_col2 => :new.col2
                , p_col3 => :new.col3
                , ... */
-               g_tab_substitutions_array ('#MAP_NEW_TO_PARAM_W_PK#') :=
-                     g_tab_substitutions_array ('#MAP_NEW_TO_PARAM_W_PK#')
+               g_substitutions ('#MAP_NEW_TO_PARAM_W_PK#') :=
+                     g_substitutions ('#MAP_NEW_TO_PARAM_W_PK#')
                   || c_list_delimiter
                   || CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
-                           'p_' || g_tab_column_info (i).column_name_28
+                           'p_' || g_columns (i).column_name_28
                         ELSE
-                           g_tab_column_info (i).column_name
+                           g_columns (i).column_name
                      END
                   || ' => :new."'
-                  || g_tab_column_info (i).column_name
+                  || g_columns (i).column_name
                   || '"';
             END map_new_to_param_w_pk;
 
@@ -2802,23 +2890,23 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                , p_col2 => p_col2
                , p_col3 => p_col3
                , ... */
-               g_tab_substitutions_array ('#MAP_PARAM_TO_PARAM_W_PK#') :=
-                     g_tab_substitutions_array ('#MAP_PARAM_TO_PARAM_W_PK#')
+               g_substitutions ('#MAP_PARAM_TO_PARAM_W_PK#') :=
+                     g_substitutions ('#MAP_PARAM_TO_PARAM_W_PK#')
                   || c_list_delimiter
                   || CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
-                           'p_' || g_tab_column_info (i).column_name_28
+                           'p_' || g_columns (i).column_name_28
                         ELSE
-                           g_tab_column_info (i).column_name
+                           g_columns (i).column_name
                      END
                   || ' => '
                   || CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
-                           'p_' || g_tab_column_info (i).column_name_28
+                           'p_' || g_columns (i).column_name_28
                         ELSE
-                           g_tab_column_info (i).column_name
+                           g_columns (i).column_name
                      END;
             END map_param_to_param_w_pk;
 
@@ -2832,19 +2920,18 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                , p_col2 => p_row.col2
                , p_col3 => p_row.col3
                , ... */
-               g_tab_substitutions_array ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#') :=
-                     g_tab_substitutions_array (
-                        '#MAP_ROWTYPE_COL_TO_PARAM_W_PK#')
+               g_substitutions ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#') :=
+                     g_substitutions ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#')
                   || c_list_delimiter
                   || CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
-                           'p_' || g_tab_column_info (i).column_name_28
+                           'p_' || g_columns (i).column_name_28
                         ELSE
-                           g_tab_column_info (i).column_name
+                           g_columns (i).column_name
                      END
                   || ' => p_row."'
-                  || g_tab_column_info (i).column_name
+                  || g_columns (i).column_name
                   || '"';
             END map_rowtype_col_to_param_w_pk;
 
@@ -2858,24 +2945,24 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                , p_col2 IN table.col2%TYPE
                , p_col3 IN table.col3%TYPE
                , ... */
-               g_tab_substitutions_array ('#PARAM_DEFINITION_W_PK#') :=
-                     g_tab_substitutions_array ('#PARAM_DEFINITION_W_PK#')
+               g_substitutions ('#PARAM_DEFINITION_W_PK#') :=
+                     g_substitutions ('#PARAM_DEFINITION_W_PK#')
                   || c_list_delimiter
                   || CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
-                           'p_' || g_tab_column_info (i).column_name_28
+                           'p_' || g_columns (i).column_name_28
                         ELSE
-                           g_tab_column_info (i).column_name
+                           g_columns (i).column_name
                      END
                   || ' IN '
                   || g_table_name
                   || '."'
-                  || g_tab_column_info (i).column_name
+                  || g_columns (i).column_name
                   || '"%TYPE'
                   || CASE
-                        WHEN (g_tab_column_info (i).column_name =
-                                 g_tab_substitutions_array ('#PK_COLUMN#'))
+                        WHEN (g_columns (i).column_name =
+                                 g_substitutions ('#PK_COLUMN#'))
                         THEN
                            ' DEFAULT NULL'
                         ELSE
@@ -2893,19 +2980,19 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                , p_col2 IN OUT NOCOPY table.col2%TYPE
                , p_col3 IN OUT NOCOPY table.col3%TYPE
                , ... */
-               g_tab_substitutions_array ('#PARAM_IO_DEFINITION_W_PK#') :=
-                     g_tab_substitutions_array ('#PARAM_IO_DEFINITION_W_PK#')
+               g_substitutions ('#PARAM_IO_DEFINITION_W_PK#') :=
+                     g_substitutions ('#PARAM_IO_DEFINITION_W_PK#')
                   || c_list_delimiter
                   || CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
-                           'p_' || g_tab_column_info (i).column_name_28
+                           'p_' || g_columns (i).column_name_28
                         ELSE
-                           g_tab_column_info (i).column_name
+                           g_columns (i).column_name
                      END
                   || CASE
-                        WHEN g_tab_column_info (i).column_name =
-                                g_tab_substitutions_array ('#PK_COLUMN#')
+                        WHEN g_columns (i).column_name =
+                                g_substitutions ('#PK_COLUMN#')
                         THEN
                            ' IN '
                         ELSE
@@ -2913,7 +3000,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                      END
                   || g_table_name
                   || '."'
-                  || g_tab_column_info (i).column_name
+                  || g_columns (i).column_name
                   || '"%TYPE';
             END param_io_definition_w_pk;
 
@@ -2927,18 +3014,18 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                , p_col3
                , p_col4
                , ... */
-               IF (g_tab_column_info (i).column_name <>
-                      g_tab_substitutions_array ('#PK_COLUMN#'))
+               IF (g_columns (i).column_name <>
+                      g_substitutions ('#PK_COLUMN#'))
                THEN
-                  g_tab_substitutions_array ('#PARAM_LIST_WO_PK#') :=
-                        g_tab_substitutions_array ('#PARAM_LIST_WO_PK#')
+                  g_substitutions ('#PARAM_LIST_WO_PK#') :=
+                        g_substitutions ('#PARAM_LIST_WO_PK#')
                      || c_list_delimiter
                      || CASE
                            WHEN g_enable_parameter_prefixes
                            THEN
-                              'p_' || g_tab_column_info (i).column_name_28
+                              'p_' || g_columns (i).column_name_28
                            ELSE
-                              g_tab_column_info (i).column_name
+                              g_columns (i).column_name
                         END;
                END IF;
             END param_list_wo_pk;
@@ -2952,23 +3039,22 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                e.g. test_number   = p_test_number
                , test_varchar2 = p_test_varchar2
                , ... */
-               IF (g_tab_column_info (i).column_name <>
-                      g_tab_substitutions_array ('#PK_COLUMN#'))
+               IF (g_columns (i).column_name <>
+                      g_substitutions ('#PK_COLUMN#'))
                THEN
-                  g_tab_substitutions_array ('#SET_PARAM_TO_COLUMN_WO_PK#') :=
-                        g_tab_substitutions_array (
-                           '#SET_PARAM_TO_COLUMN_WO_PK#')
+                  g_substitutions ('#SET_PARAM_TO_COLUMN_WO_PK#') :=
+                        g_substitutions ('#SET_PARAM_TO_COLUMN_WO_PK#')
                      || c_list_delimiter
                      || '"'
-                     || g_tab_column_info (i).column_name
+                     || g_columns (i).column_name
                      || '"'
                      || ' = '
                      || CASE
                            WHEN g_enable_parameter_prefixes
                            THEN
-                              'p_' || g_tab_column_info (i).column_name_28
+                              'p_' || g_columns (i).column_name_28
                            ELSE
-                              g_tab_column_info (i).column_name
+                              g_columns (i).column_name
                         END;
                END IF;
             END set_param_to_column_wo_pk;
@@ -2983,22 +3069,20 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                p_test_number   := v_row.test_number;
                p_test_varchar2 := v_row.test_varchar2;
                , ... */
-               IF (g_tab_column_info (i).column_name <>
-                      g_tab_substitutions_array ('#PK_COLUMN#'))
+               IF (g_columns (i).column_name <>
+                      g_substitutions ('#PK_COLUMN#'))
                THEN
-                  g_tab_substitutions_array (
-                     '#SET_ROWTYPE_COL_TO_PARAM_WO_PK#') :=
-                        g_tab_substitutions_array (
-                           '#SET_ROWTYPE_COL_TO_PARAM_WO_PK#')
+                  g_substitutions ('#SET_ROWTYPE_COL_TO_PARAM_WO_PK#') :=
+                        g_substitutions ('#SET_ROWTYPE_COL_TO_PARAM_WO_PK#')
                      || CASE
                            WHEN g_enable_parameter_prefixes
                            THEN
-                              'p_' || g_tab_column_info (i).column_name_28
+                              'p_' || g_columns (i).column_name_28
                            ELSE
-                              g_tab_column_info (i).column_name
+                              g_columns (i).column_name
                         END
                      || ' := v_row."'
-                     || g_tab_column_info (i).column_name
+                     || g_columns (i).column_name
                      || '"; ';
                END IF;
             END set_rowtype_col_to_param_wo_pk;
@@ -3031,65 +3115,61 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                  v_count := v_count + 1;
                END IF;
                    ... */
-               IF (g_tab_column_info (i).column_name <>
-                      g_tab_substitutions_array ('#PK_COLUMN#'))
+               IF (g_columns (i).column_name <>
+                      g_substitutions ('#PK_COLUMN#'))
                THEN
-                  g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_WO_PK#') :=
-                        g_tab_substitutions_array (
-                           '#COLUMN_COMPARE_LIST_WO_PK#')
+                  g_substitutions ('#COLUMN_COMPARE_LIST_WO_PK#') :=
+                        g_substitutions ('#COLUMN_COMPARE_LIST_WO_PK#')
                      || CASE
                            WHEN g_enable_generic_change_log THEN '      IF '
                            ELSE '      OR '
                         END
                      || util_get_attribute_compare (
-                           p_data_type           => g_tab_column_info (i).data_type,
+                           p_data_type           => g_columns (i).data_type,
                            p_first_attribute     =>    'v_row."'
-                                                    || g_tab_column_info (i).column_name
+                                                    || g_columns (i).column_name
                                                     || '"',
                            p_second_attribute    => CASE
                                                       WHEN g_enable_parameter_prefixes
                                                       THEN
                                                             'p_'
-                                                         || g_tab_column_info (
-                                                               i).column_name_28
+                                                         || g_columns (i).column_name_28
                                                       ELSE
-                                                         g_tab_column_info (i).column_name
+                                                         g_columns (i).column_name
                                                    END,
                            p_compare_operation   => '<>')
                      || CASE
                            WHEN g_enable_generic_change_log
                            THEN
-                                 ' THEN 
+                                 ' THEN
       v_count := v_count + 1;
       create_change_log_entry( p_table     => '''
                               || g_table_name
                               || '''
                              , p_column    => '''
-                              || g_tab_column_info (i).column_name
+                              || g_columns (i).column_name
                               || '''
                              , p_pk_id     => v_row."'
-                              || g_tab_substitutions_array ('#PK_COLUMN#')
+                              || g_substitutions ('#PK_COLUMN#')
                               || '"
                              , p_old_value => '
                               || util_get_vc2_4000_operation (
-                                    p_data_type        => g_tab_column_info (i).data_type,
+                                    p_data_type        => g_columns (i).data_type,
                                     p_attribute_name   =>    'v_row."'
-                                                          || g_tab_column_info (
-                                                                i).column_name
+                                                          || g_columns (i).column_name
                                                           || '"')
                               || '
                              , p_new_value => '
                               || util_get_vc2_4000_operation (
-                                    p_data_type        => g_tab_column_info (i).data_type,
+                                    p_data_type        => g_columns (i).data_type,
                                     p_attribute_name   => CASE
                                                             WHEN g_enable_parameter_prefixes
                                                             THEN
                                                                   'p_'
-                                                               || g_tab_column_info (
+                                                               || g_columns (
                                                                      i).column_name_28
                                                             ELSE
-                                                               g_tab_column_info (
-                                                                  i).column_name
+                                                               g_columns (i).column_name
                                                          END)
                               || ' );
       END IF;'
@@ -3114,30 +3194,29 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                p_first_name IN employees.first_name%TYPE DEFAULT get_a_row()."FIRST_NAME",
                p_last_name IN employees.last_name%TYPE DEFAULT get_a_row()."LAST_NAME",
                ... */
-               g_tab_substitutions_array ('#PARAM_DEF_W_PK_AND_DEFAULTS#') :=
-                     g_tab_substitutions_array (
-                        '#PARAM_DEF_W_PK_AND_DEFAULTS#')
+               g_substitutions ('#PARAM_DEF_W_PK_AND_DEFAULTS#') :=
+                     g_substitutions ('#PARAM_DEF_W_PK_AND_DEFAULTS#')
                   || c_list_delimiter
                   || CASE
                         WHEN g_enable_parameter_prefixes
                         THEN
-                           'p_' || g_tab_column_info (i).column_name_28
+                           'p_' || g_columns (i).column_name_28
                         ELSE
-                           g_tab_column_info (i).column_name
+                           g_columns (i).column_name
                      END
                   || ' IN '
                   || g_table_name
                   || '."'
-                  || g_tab_column_info (i).column_name
+                  || g_columns (i).column_name
                   || '"%TYPE'
                   || CASE
-                        WHEN (g_tab_column_info (i).column_name =
-                                 g_tab_substitutions_array ('#PK_COLUMN#'))
+                        WHEN (g_columns (i).column_name =
+                                 g_substitutions ('#PK_COLUMN#'))
                         THEN
                            ' DEFAULT NULL'
                         ELSE
                               ' DEFAULT get_a_row()."'
-                           || g_tab_column_info (i).column_name
+                           || g_columns (i).column_name
                            || '"'
                      END;
             END param_def_w_pk_and_defaults;
@@ -3157,17 +3236,16 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                IF g_column_defaults IS NULL
                THEN
                   -- normal list processing
-                  FOR i IN g_tab_column_info.FIRST .. g_tab_column_info.LAST
+                  FOR i IN g_columns.FIRST .. g_columns.LAST
                   LOOP
-                     IF g_tab_column_info (i).data_default IS NOT NULL
+                     IF g_columns (i).data_default IS NOT NULL
                      THEN
-                        g_tab_substitutions_array ('#COLUMN_DEFAULTS_LIST#') :=
-                              g_tab_substitutions_array (
-                                 '#COLUMN_DEFAULTS_LIST#')
+                        g_substitutions ('#COLUMN_DEFAULTS_LIST#') :=
+                              g_substitutions ('#COLUMN_DEFAULTS_LIST#')
                            || '    v_row."'
-                           || g_tab_column_info (i).column_name
+                           || g_columns (i).column_name
                            || '" := '
-                           || g_tab_column_info (i).data_default
+                           || g_columns (i).data_default
                            || ';'
                            || c_crlf;
                      END IF;
@@ -3186,9 +3264,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   LOOP
                      IF i.data_default IS NOT NULL
                      THEN
-                        g_tab_substitutions_array ('#COLUMN_DEFAULTS_LIST#') :=
-                              g_tab_substitutions_array (
-                                 '#COLUMN_DEFAULTS_LIST#')
+                        g_substitutions ('#COLUMN_DEFAULTS_LIST#') :=
+                              g_substitutions ('#COLUMN_DEFAULTS_LIST#')
                            || '    v_row."'
                            || i.column_name
                            || '" := '
@@ -3205,51 +3282,40 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             IS
             BEGIN
                -- cut off the first and/or last delimiter
-               g_tab_substitutions_array ('#SET_PARAM_TO_COLUMN_WO_PK#') :=
-                  LTRIM (
-                     g_tab_substitutions_array (
-                        '#SET_PARAM_TO_COLUMN_WO_PK#'),
-                     c_list_delimiter);
-               g_tab_substitutions_array ('#COLUMN_LIST_W_PK#') :=
-                  LTRIM (g_tab_substitutions_array ('#COLUMN_LIST_W_PK#'),
+               g_substitutions ('#SET_PARAM_TO_COLUMN_WO_PK#') :=
+                  LTRIM (g_substitutions ('#SET_PARAM_TO_COLUMN_WO_PK#'),
                          c_list_delimiter);
-               g_tab_substitutions_array ('#MAP_NEW_TO_PARAM_W_PK#') :=
-                  LTRIM (
-                     g_tab_substitutions_array ('#MAP_NEW_TO_PARAM_W_PK#'),
-                     c_list_delimiter);
-               g_tab_substitutions_array ('#MAP_PARAM_TO_PARAM_W_PK#') :=
-                  LTRIM (
-                     g_tab_substitutions_array ('#MAP_PARAM_TO_PARAM_W_PK#'),
-                     c_list_delimiter);
-               g_tab_substitutions_array ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#') :=
-                  LTRIM (
-                     g_tab_substitutions_array (
-                        '#MAP_ROWTYPE_COL_TO_PARAM_W_PK#'),
-                     c_list_delimiter);
-               g_tab_substitutions_array ('#PARAM_DEFINITION_W_PK#') :=
-                  LTRIM (
-                     g_tab_substitutions_array ('#PARAM_DEFINITION_W_PK#'),
-                     c_list_delimiter);
-               g_tab_substitutions_array ('#PARAM_IO_DEFINITION_W_PK#') :=
-                  LTRIM (
-                     g_tab_substitutions_array ('#PARAM_IO_DEFINITION_W_PK#'),
-                     c_list_delimiter);
-               g_tab_substitutions_array ('#PARAM_LIST_WO_PK#') :=
-                  LTRIM (g_tab_substitutions_array ('#PARAM_LIST_WO_PK#'),
+               g_substitutions ('#COLUMN_LIST_W_PK#') :=
+                  LTRIM (g_substitutions ('#COLUMN_LIST_W_PK#'),
                          c_list_delimiter);
-               g_tab_substitutions_array ('#PARAM_DEF_W_PK_AND_DEFAULTS#') :=
-                  LTRIM (
-                     g_tab_substitutions_array (
-                        '#PARAM_DEF_W_PK_AND_DEFAULTS#'),
-                     c_list_delimiter);
+               g_substitutions ('#MAP_NEW_TO_PARAM_W_PK#') :=
+                  LTRIM (g_substitutions ('#MAP_NEW_TO_PARAM_W_PK#'),
+                         c_list_delimiter);
+               g_substitutions ('#MAP_PARAM_TO_PARAM_W_PK#') :=
+                  LTRIM (g_substitutions ('#MAP_PARAM_TO_PARAM_W_PK#'),
+                         c_list_delimiter);
+               g_substitutions ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#') :=
+                  LTRIM (g_substitutions ('#MAP_ROWTYPE_COL_TO_PARAM_W_PK#'),
+                         c_list_delimiter);
+               g_substitutions ('#PARAM_DEFINITION_W_PK#') :=
+                  LTRIM (g_substitutions ('#PARAM_DEFINITION_W_PK#'),
+                         c_list_delimiter);
+               g_substitutions ('#PARAM_IO_DEFINITION_W_PK#') :=
+                  LTRIM (g_substitutions ('#PARAM_IO_DEFINITION_W_PK#'),
+                         c_list_delimiter);
+               g_substitutions ('#PARAM_LIST_WO_PK#') :=
+                  LTRIM (g_substitutions ('#PARAM_LIST_WO_PK#'),
+                         c_list_delimiter);
+               g_substitutions ('#PARAM_DEF_W_PK_AND_DEFAULTS#') :=
+                  LTRIM (g_substitutions ('#PARAM_DEF_W_PK_AND_DEFAULTS#'),
+                         c_list_delimiter);
 
                -- this has to be enhanced
-               g_tab_substitutions_array ('#COLUMN_COMPARE_LIST_WO_PK#') :=
+               g_substitutions ('#COLUMN_COMPARE_LIST_WO_PK#') :=
                      LTRIM (
                         LTRIM (
                            RTRIM (
-                              g_tab_substitutions_array (
-                                 '#COLUMN_COMPARE_LIST_WO_PK#'),
+                              g_substitutions ('#COLUMN_COMPARE_LIST_WO_PK#'),
                               c_crlf),
                            '      IF '),
                         '      OR ')
@@ -3261,17 +3327,13 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                            NULL
                      END;
 
-               g_tab_substitutions_array ('#COLUMN_DEFAULTS_LIST#') :=
+               g_substitutions ('#COLUMN_DEFAULTS_LIST#') :=
                   CASE
-                     WHEN g_tab_substitutions_array (
-                             '#COLUMN_DEFAULTS_LIST#')
-                             IS NULL
+                     WHEN g_substitutions ('#COLUMN_DEFAULTS_LIST#') IS NULL
                      THEN
                         'NULL; -- no defaults defined'
                      ELSE
-                        LTRIM (
-                           g_tab_substitutions_array (
-                              '#COLUMN_DEFAULTS_LIST#'))
+                        LTRIM (g_substitutions ('#COLUMN_DEFAULTS_LIST#'))
                   END;
             END cut_off_first_last_delimiter;
          BEGIN
@@ -3280,7 +3342,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             fetch_unique_constraints;
             fetch_unique_cons_columns;
 
-            FOR i IN g_tab_column_info.FIRST .. g_tab_column_info.LAST
+            FOR i IN g_columns.FIRST .. g_columns.LAST
             LOOP
                check_if_column_is_xml_type (i);
                calc_column_short_names (i);
@@ -3303,13 +3365,13 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
             -- this substitution depends on column list with pk and should
             -- normally located in set_substitutions_literal_base
-            g_tab_substitutions_array ('#RETURN_VALUE#') :=
+            g_substitutions ('#RETURN_VALUE#') :=
                CASE
                   WHEN g_return_row_instead_of_pk
                   THEN
-                     g_tab_substitutions_array ('#COLUMN_LIST_W_PK#')
+                     g_substitutions ('#COLUMN_LIST_W_PK#')
                   ELSE
-                     '"' || g_tab_substitutions_array ('#PK_COLUMN#') || '"'
+                     '"' || g_substitutions ('#PK_COLUMN#') || '"'
                END;
          END set_substitutions_collect_base;
       --
@@ -3327,26 +3389,26 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       BEGIN
          -- finalize CLOB varchar caches
          util_clob_append (
-            p_clob                 => g_tapi_code_blocks.api_spec,
-            p_clob_varchar_cache   => g_tapi_code_blocks.api_spec_varchar_cache,
+            p_clob                 => g_code_blocks.api_spec,
+            p_clob_varchar_cache   => g_code_blocks.api_spec_varchar_cache,
             p_varchar_to_append    => NULL,
             p_final_call           => TRUE);
          util_clob_append (
-            p_clob                 => g_tapi_code_blocks.api_body,
-            p_clob_varchar_cache   => g_tapi_code_blocks.api_body_varchar_cache,
+            p_clob                 => g_code_blocks.api_body,
+            p_clob_varchar_cache   => g_code_blocks.api_body_varchar_cache,
             p_varchar_to_append    => NULL,
             p_final_call           => TRUE);
 
          IF (g_enable_dml_view)
          THEN
             util_clob_append (
-               p_clob                 => g_tapi_code_blocks.dml_view,
-               p_clob_varchar_cache   => g_tapi_code_blocks.dml_view_varchar_cache,
+               p_clob                 => g_code_blocks.dml_view,
+               p_clob_varchar_cache   => g_code_blocks.dml_view_varchar_cache,
                p_varchar_to_append    => NULL,
                p_final_call           => TRUE);
             util_clob_append (
-               p_clob                 => g_tapi_code_blocks.dml_view_trigger,
-               p_clob_varchar_cache   => g_tapi_code_blocks.dml_view_trigger_varchar_cache,
+               p_clob                 => g_code_blocks.dml_view_trigger,
+               p_clob_varchar_cache   => g_code_blocks.dml_view_trigger_varchar_cache,
                p_varchar_to_append    => NULL,
                p_final_call           => TRUE);
          END IF;
@@ -3450,7 +3512,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
    BEGIN
       -- compile package spec
       BEGIN
-         util_execute_sql (g_tapi_code_blocks.api_spec);
+         util_execute_sql (g_code_blocks.api_spec);
       EXCEPTION
          WHEN OTHERS
          THEN
@@ -3459,7 +3521,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
       -- compile package body
       BEGIN
-         util_execute_sql (g_tapi_code_blocks.api_body);
+         util_execute_sql (g_code_blocks.api_body);
       EXCEPTION
          WHEN OTHERS
          THEN
@@ -3468,7 +3530,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
       -- compile DML view
       BEGIN
-         util_execute_sql (g_tapi_code_blocks.dml_view);
+         util_execute_sql (g_code_blocks.dml_view);
       EXCEPTION
          WHEN OTHERS
          THEN
@@ -3477,7 +3539,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
       -- compile DML view trigger
       BEGIN
-         util_execute_sql (g_tapi_code_blocks.dml_view_trigger);
+         util_execute_sql (g_code_blocks.dml_view_trigger);
       EXCEPTION
          WHEN OTHERS
          THEN
@@ -3491,16 +3553,16 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
    IS
       terminator   VARCHAR2 (10 CHAR) := c_crlf || '/' || c_crlflf;
    BEGIN
-      RETURN    g_tapi_code_blocks.api_spec
+      RETURN    g_code_blocks.api_spec
              || terminator
-             || g_tapi_code_blocks.api_body
+             || g_code_blocks.api_body
              || terminator
              || CASE
                    WHEN g_enable_dml_view
                    THEN
-                         g_tapi_code_blocks.dml_view
+                         g_code_blocks.dml_view
                       || terminator
-                      || g_tapi_code_blocks.dml_view_trigger
+                      || g_code_blocks.dml_view_trigger
                       || terminator
                    ELSE
                       NULL
@@ -3509,60 +3571,64 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
    -----------------------------------------------------------------------------
    PROCEDURE compile_api (
-      p_table_name                    IN user_tables.table_name%TYPE,
-      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, -- if true, the following params are ignored, if API package are already
-      -- existing and params are extractable from spec source line 1
-      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+      p_table_name                    IN all_objects.object_name%TYPE,
+      p_owner                         IN all_users.username%TYPE DEFAULT USER,
+      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+      --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
       p_enable_insertion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
       p_enable_update_of_rows         IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
       p_enable_deletion_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-      p_sequence_name                 IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-      p_api_name                      IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
       p_enable_parameter_prefixes     IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
       p_return_row_instead_of_pk      IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+      p_api_name                      IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+      p_sequence_name                 IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
       p_column_defaults               IN XMLTYPE DEFAULT om_tapigen.c_column_defaults)
    IS
    BEGIN
       main_generate (
          p_generator_action              => 'COMPILE_API',
          p_table_name                    => p_table_name,
+         p_owner                         => p_owner,
          p_reuse_existing_api_params     => p_reuse_existing_api_params,
-         p_col_prefix_in_method_names    => p_col_prefix_in_method_names,
          p_enable_insertion_of_rows      => p_enable_insertion_of_rows,
          p_enable_update_of_rows         => p_enable_update_of_rows,
          p_enable_deletion_of_rows       => p_enable_deletion_of_rows,
-         p_enable_generic_change_log     => p_enable_generic_change_log,
-         p_enable_dml_view               => p_enable_dml_view,
-         p_sequence_name                 => p_sequence_name,
-         p_api_name                      => p_api_name,
-         p_enable_getter_and_setter      => p_enable_getter_and_setter,
-         p_enable_proc_with_out_params   => p_enable_proc_with_out_params,
          p_enable_parameter_prefixes     => p_enable_parameter_prefixes,
+         p_enable_proc_with_out_params   => p_enable_proc_with_out_params,
+         p_enable_getter_and_setter      => p_enable_getter_and_setter,
+         p_col_prefix_in_method_names    => p_col_prefix_in_method_names,
          p_return_row_instead_of_pk      => p_return_row_instead_of_pk,
+         p_enable_dml_view               => p_enable_dml_view,
+         p_enable_generic_change_log     => p_enable_generic_change_log,
+         p_api_name                      => p_api_name,
+         p_sequence_name                 => p_sequence_name,
          p_column_defaults               => p_column_defaults);
       main_compile;
    END compile_api;
 
    -----------------------------------------------------------------------------
    FUNCTION compile_api_and_get_code (
-      p_table_name                    IN user_tables.table_name%TYPE,
-      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, -- if true, the following params are ignored, if API package are already existing and params are extractable from spec
-      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+      p_table_name                    IN all_objects.object_name%TYPE,
+      p_owner                         IN all_users.username%TYPE DEFAULT USER,
+      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+      --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
       p_enable_insertion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
       p_enable_update_of_rows         IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
       p_enable_deletion_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-      p_sequence_name                 IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-      p_api_name                      IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
       p_enable_parameter_prefixes     IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
       p_return_row_instead_of_pk      IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+      p_api_name                      IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+      p_sequence_name                 IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
       p_column_defaults               IN XMLTYPE DEFAULT om_tapigen.c_column_defaults)
       RETURN CLOB
    IS
@@ -3570,19 +3636,20 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       main_generate (
          p_generator_action              => 'COMPILE_API_AND_GET_CODE',
          p_table_name                    => p_table_name,
+         p_owner                         => p_owner,
          p_reuse_existing_api_params     => p_reuse_existing_api_params,
-         p_col_prefix_in_method_names    => p_col_prefix_in_method_names,
          p_enable_insertion_of_rows      => p_enable_insertion_of_rows,
          p_enable_update_of_rows         => p_enable_update_of_rows,
          p_enable_deletion_of_rows       => p_enable_deletion_of_rows,
-         p_enable_generic_change_log     => p_enable_generic_change_log,
-         p_enable_dml_view               => p_enable_dml_view,
-         p_sequence_name                 => p_sequence_name,
-         p_api_name                      => p_api_name,
-         p_enable_getter_and_setter      => p_enable_getter_and_setter,
-         p_enable_proc_with_out_params   => p_enable_proc_with_out_params,
          p_enable_parameter_prefixes     => p_enable_parameter_prefixes,
+         p_enable_proc_with_out_params   => p_enable_proc_with_out_params,
+         p_enable_getter_and_setter      => p_enable_getter_and_setter,
+         p_col_prefix_in_method_names    => p_col_prefix_in_method_names,
          p_return_row_instead_of_pk      => p_return_row_instead_of_pk,
+         p_enable_dml_view               => p_enable_dml_view,
+         p_enable_generic_change_log     => p_enable_generic_change_log,
+         p_api_name                      => p_api_name,
+         p_sequence_name                 => p_sequence_name,
          p_column_defaults               => p_column_defaults);
       main_compile;
       RETURN main_return;
@@ -3590,21 +3657,22 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
    -----------------------------------------------------------------------------
    FUNCTION get_code (
-      p_table_name                    IN user_tables.table_name%TYPE,
-      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, -- if true, the following params are ignored, if API package are already
-      -- existing and params are extractable from spec source line 1
-      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+      p_table_name                    IN all_objects.object_name%TYPE,
+      p_owner                         IN all_users.username%TYPE DEFAULT USER,
+      p_reuse_existing_api_params     IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+      --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
       p_enable_insertion_of_rows      IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
       p_enable_update_of_rows         IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
       p_enable_deletion_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-      p_sequence_name                 IN user_sequences.sequence_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-      p_api_name                      IN user_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
       p_enable_parameter_prefixes     IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+      p_enable_proc_with_out_params   IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+      p_enable_getter_and_setter      IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+      p_col_prefix_in_method_names    IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
       p_return_row_instead_of_pk      IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+      p_enable_dml_view               IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+      p_enable_generic_change_log     IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+      p_api_name                      IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+      p_sequence_name                 IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
       p_column_defaults               IN XMLTYPE DEFAULT om_tapigen.c_column_defaults)
       RETURN CLOB
    IS
@@ -3612,142 +3680,353 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       main_generate (
          p_generator_action              => 'GET_CODE',
          p_table_name                    => p_table_name,
+         p_owner                         => p_owner,
          p_reuse_existing_api_params     => p_reuse_existing_api_params,
-         p_col_prefix_in_method_names    => p_col_prefix_in_method_names,
          p_enable_insertion_of_rows      => p_enable_insertion_of_rows,
          p_enable_update_of_rows         => p_enable_update_of_rows,
          p_enable_deletion_of_rows       => p_enable_deletion_of_rows,
-         p_enable_generic_change_log     => p_enable_generic_change_log,
-         p_enable_dml_view               => p_enable_dml_view,
-         p_sequence_name                 => p_sequence_name,
-         p_api_name                      => p_api_name,
-         p_enable_getter_and_setter      => p_enable_getter_and_setter,
-         p_enable_proc_with_out_params   => p_enable_proc_with_out_params,
          p_enable_parameter_prefixes     => p_enable_parameter_prefixes,
+         p_enable_proc_with_out_params   => p_enable_proc_with_out_params,
+         p_enable_getter_and_setter      => p_enable_getter_and_setter,
+         p_col_prefix_in_method_names    => p_col_prefix_in_method_names,
          p_return_row_instead_of_pk      => p_return_row_instead_of_pk,
+         p_enable_dml_view               => p_enable_dml_view,
+         p_enable_generic_change_log     => p_enable_generic_change_log,
+         p_api_name                      => p_api_name,
+         p_sequence_name                 => p_sequence_name,
          p_column_defaults               => p_column_defaults);
       RETURN main_return;
    END get_code;
 
    -----------------------------------------------------------------------------
-   PROCEDURE recreate_existing_apis
+   PROCEDURE recreate_existing_apis (
+      p_owner   IN all_users.username%TYPE DEFAULT USER)
    IS
-      v_apis   t_tab_existing_apis;
+      v_apis   g_tab_existing_apis;
+
+      CURSOR v_cur
+      IS
+         SELECT * FROM TABLE (view_existing_apis (P_OWNER => p_owner));
    BEGIN
-      OPEN g_cur_existing_apis (NULL);
+      OPEN v_cur;
 
-      FETCH g_cur_existing_apis
-         BULK COLLECT INTO v_apis
-         LIMIT c_bulk_collect_limit;
+      FETCH v_cur BULK COLLECT INTO v_apis LIMIT c_bulk_collect_limit;
 
-      CLOSE g_cur_existing_apis;
+      CLOSE v_cur;
 
       IF v_apis.COUNT > 0
       THEN
          FOR i IN v_apis.FIRST .. v_apis.LAST
          LOOP
-            compile_api (v_apis (i).p_table_name);
+            compile_api (p_table_name   => v_apis (i).table_name,
+                         p_owner        => v_apis (i).owner);
          END LOOP;
       END IF;
    END;
 
    -----------------------------------------------------------------------------
+
    FUNCTION view_existing_apis (
-      p_table_name    user_tables.table_name%TYPE DEFAULT NULL)
-      RETURN t_tab_existing_apis
+      p_table_name    all_tables.table_name%TYPE DEFAULT NULL,
+      p_owner         all_users.username%TYPE DEFAULT USER)
+      RETURN g_tab_existing_apis
       PIPELINED
    IS
-      v_row   g_cur_existing_apis%ROWTYPE;
+      v_tab   g_tab_existing_apis;
+      v_row   g_row_existing_apis;
    BEGIN
-      OPEN g_cur_existing_apis (p_table_name);
+      -- I was not able to compile without execute immediate - got a strange ORA-03113.
+      -- Direct execution of the statement in SQL tool works :-(
+      EXECUTE IMMEDIATE
+         q'[
+-- ATTENTION: query columns need to match the global row definition om_tapigen.g_row_existing_apis.
+-- Creating a cursor was not possible - database throws
 
+WITH api_names
+     AS (SELECT owner, NAME AS api_name
+           FROM all_source
+          WHERE     owner = :p_owner
+                AND TYPE = 'PACKAGE'
+                AND line BETWEEN :spec_options_min_line
+                             AND :spec_options_max_line
+                AND INSTR (text, 'generator="OM_TAPIGEN"') > 0) -- select * from apis
+                                                               ,
+     sources
+     AS (  SELECT owner,
+                  package_name,
+                  xmltype (
+                     NVL (REGEXP_SUBSTR (REPLACE (source_code, '*', NULL),
+                                         '<options.*>',
+                                         1,
+                                         1,
+                                         'ni'),
+                          '<no_data_found/>'))
+                     AS options
+             FROM (SELECT owner,
+                          NAME AS package_name,
+                          LISTAGG (text, ' ')
+                             WITHIN GROUP (ORDER BY NAME, line)
+                             OVER (PARTITION BY NAME)
+                             AS source_code
+                     FROM all_source
+                    WHERE     owner = :p_owner
+                          AND name IN (SELECT api_name FROM api_names)
+                          AND TYPE = 'PACKAGE'
+                          AND line BETWEEN :spec_options_min_line
+                                       AND :spec_options_max_line)
+         GROUP BY owner, package_name, source_code)  -- select * from sources;
+                                                   ,
+     apis
+     AS (                        SELECT t.owner,
+                                        x.p_table_name AS table_name,
+                                        t.package_name,
+                                        x.generator,
+                                        x.generator_version,
+                                        x.generator_action,
+                                        TO_DATE (x.generated_at, 'yyyy-mm-dd hh24:mi:ss')
+                                           AS generated_at,
+                                        x.generated_by,
+                                        x.p_owner,
+                                        x.p_table_name,
+                                        x.p_reuse_existing_api_params,
+                                        x.p_enable_insertion_of_rows,
+                                        x.p_enable_update_of_rows,
+                                        x.p_enable_deletion_of_rows,
+                                        x.p_enable_parameter_prefixes,
+                                        x.p_enable_proc_with_out_params,
+                                        x.p_enable_getter_and_setter,
+                                        x.p_col_prefix_in_method_names,
+                                        x.p_return_row_instead_of_pk,
+                                        x.p_enable_dml_view,
+                                        x.p_enable_generic_change_log,
+                                        x.p_api_name,
+                                        x.p_sequence_name,
+                                        x.p_column_defaults
+                                   FROM sources t
+                                        CROSS JOIN
+                                        XMLTABLE (
+                                           '/options'
+                                           PASSING options
+                                           COLUMNS generator VARCHAR2 (30 CHAR) PATH '@generator',
+                                                   generator_version VARCHAR2 (10 CHAR)
+                                                      PATH '@generator_version',
+                                                   generator_action VARCHAR2 (30 CHAR)
+                                                      PATH '@generator_action',
+                                                   generated_at VARCHAR2 (30 CHAR)
+                                                      PATH '@generated_at',
+                                                   generated_by VARCHAR2 (128 CHAR)
+                                                      PATH '@generated_by',
+                                                   p_owner VARCHAR2 (128 CHAR) PATH '@p_owner',
+                                                   p_table_name VARCHAR2 (128 CHAR)
+                                                      PATH '@p_table_name',
+                                                   p_reuse_existing_api_params VARCHAR2 (5 CHAR)
+                                                      PATH '@p_reuse_existing_api_params',
+                                                   p_enable_insertion_of_rows VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_insertion_of_rows',
+                                                   p_enable_update_of_rows VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_update_of_rows',
+                                                   p_enable_deletion_of_rows VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_deletion_of_rows',
+                                                   p_enable_parameter_prefixes VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_parameter_prefixes',
+                                                   p_enable_proc_with_out_params VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_proc_with_out_params',
+                                                   p_enable_getter_and_setter VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_getter_and_setter',
+                                                   p_col_prefix_in_method_names VARCHAR2 (5 CHAR)
+                                                      PATH '@p_col_prefix_in_method_names',
+                                                   p_return_row_instead_of_pk VARCHAR2 (5 CHAR)
+                                                      PATH '@p_return_row_instead_of_pk',
+                                                   p_enable_dml_view VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_dml_view',
+                                                   p_enable_generic_change_log VARCHAR2 (5 CHAR)
+                                                      PATH '@p_enable_generic_change_log',
+                                                   p_api_name VARCHAR2 (128 CHAR) PATH '@p_api_name',
+                                                   p_sequence_name VARCHAR2 (128 CHAR)
+                                                      PATH '@p_sequence_name',
+                                                   p_column_defaults VARCHAR2 (30 CHAR)
+                                                      PATH '@p_column_defaults') x) -- SELECT * FROM apis;
+                                                                                   ,
+     objects
+     AS (SELECT specs.object_name AS package_name,
+                specs.status AS spec_status,
+                specs.last_ddl_time AS spec_last_ddl_time,
+                bodys.status AS body_status,
+                bodys.last_ddl_time AS body_last_ddl_time
+           FROM (SELECT object_name,
+                        object_type,
+                        status,
+                        last_ddl_time
+                   FROM all_objects
+                  WHERE     owner = :p_owner
+                        AND object_type = 'PACKAGE'
+                        AND object_name IN (SELECT api_name FROM api_names))
+                specs
+                LEFT JOIN
+                (SELECT object_name,
+                        object_type,
+                        status,
+                        last_ddl_time
+                   FROM all_objects
+                  WHERE     owner = :p_owner
+                        AND object_type = 'PACKAGE BODY'
+                        AND object_name IN (SELECT api_name FROM api_names))
+                bodys
+                   ON     specs.object_name = bodys.object_name
+                      AND specs.object_type || ' BODY' = bodys.object_type)
+SELECT NULL AS errors,
+       apis.owner,
+       apis.table_name,
+       objects.package_name,
+       objects.spec_status,
+       objects.spec_last_ddl_time,
+       objects.body_status,
+       objects.body_last_ddl_time,
+       apis.generator,
+       apis.generator_version,
+       apis.generator_action,
+       apis.generated_at,
+       apis.generated_by,
+       apis.p_owner,
+       apis.p_table_name,
+       apis.p_reuse_existing_api_params,
+       apis.p_enable_insertion_of_rows,
+       apis.p_enable_update_of_rows,
+       apis.p_enable_deletion_of_rows,
+       apis.p_enable_parameter_prefixes,
+       apis.p_enable_proc_with_out_params,
+       apis.p_enable_getter_and_setter,
+       apis.p_col_prefix_in_method_names,
+       apis.p_return_row_instead_of_pk,
+       apis.p_enable_dml_view,
+       apis.p_enable_generic_change_log,
+       apis.p_api_name,
+       apis.p_sequence_name,
+       apis.p_column_defaults
+  FROM apis JOIN objects ON apis.package_name = objects.package_name
+ WHERE table_name = NVL ( :p_table_name, table_name)
+            ]'
+         BULK COLLECT INTO v_tab
+         USING p_owner,
+               c_spec_options_min_line,
+               c_spec_options_max_line,
+               p_owner,
+               c_spec_options_min_line,
+               c_spec_options_max_line,
+               p_owner,
+               p_owner,
+               p_table_name;
+
+      FOR i IN v_tab.FIRST .. v_tab.LAST
       LOOP
-         FETCH g_cur_existing_apis INTO v_row;
-
-         EXIT WHEN g_cur_existing_apis%NOTFOUND;
-
          -----------------------------------------------------------------------
          -- parameters could be null, if older om_tapigen versions where used
          -- for creating table APIs, so coalesce ensures parameter validity.
          -- If existing parameter is null, then default is taken.
          -----------------------------------------------------------------------
-         v_row.p_reuse_existing_api_params :=
-            COALESCE (v_row.p_reuse_existing_api_params,
+         v_tab (i).p_reuse_existing_api_params :=
+            COALESCE (v_tab (i).p_reuse_existing_api_params,
                       util_bool_to_string (c_reuse_existing_api_params));
 
-         v_row.p_col_prefix_in_method_names :=
-            COALESCE (v_row.p_col_prefix_in_method_names,
-                      util_bool_to_string (c_col_prefix_in_method_names));
-
-         v_row.p_enable_insertion_of_rows :=
-            COALESCE (v_row.p_enable_insertion_of_rows,
-                      util_bool_to_string (c_enable_insertion_of_rows));
-
-         v_row.p_enable_update_of_rows :=
-            COALESCE (v_row.p_enable_update_of_rows,
-                      util_bool_to_string (c_enable_update_of_rows));
-
-         v_row.p_enable_deletion_of_rows :=
-            COALESCE (v_row.p_enable_deletion_of_rows,
-                      util_bool_to_string (c_enable_deletion_of_rows));
-
-         v_row.p_enable_generic_change_log :=
-            COALESCE (v_row.p_enable_generic_change_log,
-                      util_bool_to_string (c_enable_generic_change_log));
-
-         v_row.p_enable_dml_view :=
-            COALESCE (v_row.p_enable_dml_view,
-                      util_bool_to_string (c_enable_dml_view));
-
-         v_row.p_enable_getter_and_setter :=
-            COALESCE (v_row.p_enable_getter_and_setter,
-                      util_bool_to_string (c_enable_getter_and_setter));
-
-         v_row.p_enable_parameter_prefixes :=
-            COALESCE (v_row.p_enable_parameter_prefixes,
-                      util_bool_to_string (c_enable_parameter_prefixes));
-
-         v_row.p_return_row_instead_of_pk :=
-            COALESCE (v_row.p_return_row_instead_of_pk,
+         v_tab (i).p_return_row_instead_of_pk :=
+            COALESCE (v_tab (i).p_return_row_instead_of_pk,
                       util_bool_to_string (c_return_row_instead_of_pk));
 
-         IF p_table_name IS NOT NULL
-         THEN
-            IF v_row.table_name = p_table_name
-            THEN
-               PIPE ROW (v_row);
-            END IF;
-         ELSE
-            PIPE ROW (v_row);
-         END IF;
-      END LOOP;
+         v_tab (i).p_enable_insertion_of_rows :=
+            COALESCE (v_tab (i).p_enable_insertion_of_rows,
+                      util_bool_to_string (c_enable_insertion_of_rows));
 
-      CLOSE g_cur_existing_apis;
+         v_tab (i).p_enable_update_of_rows :=
+            COALESCE (v_tab (i).p_enable_update_of_rows,
+                      util_bool_to_string (c_enable_update_of_rows));
+
+         v_tab (i).p_enable_deletion_of_rows :=
+            COALESCE (v_tab (i).p_enable_deletion_of_rows,
+                      util_bool_to_string (c_enable_deletion_of_rows));
+
+         v_tab (i).p_enable_parameter_prefixes :=
+            COALESCE (v_tab (i).p_enable_parameter_prefixes,
+                      util_bool_to_string (c_enable_parameter_prefixes));
+
+         v_tab (i).p_enable_proc_with_out_params :=
+            COALESCE (v_tab (i).p_enable_proc_with_out_params,
+                      util_bool_to_string (c_enable_proc_with_out_params));
+
+         v_tab (i).p_enable_generic_change_log :=
+            COALESCE (v_tab (i).p_enable_generic_change_log,
+                      util_bool_to_string (c_enable_generic_change_log));
+
+         v_tab (i).p_enable_dml_view :=
+            COALESCE (v_tab (i).p_enable_dml_view,
+                      util_bool_to_string (c_enable_dml_view));
+
+         v_tab (i).p_enable_getter_and_setter :=
+            COALESCE (v_tab (i).p_enable_getter_and_setter,
+                      util_bool_to_string (c_enable_getter_and_setter));
+
+         v_tab (i).p_col_prefix_in_method_names :=
+            COALESCE (v_tab (i).p_col_prefix_in_method_names,
+                      util_bool_to_string (c_col_prefix_in_method_names));
+
+         PIPE ROW (v_tab (i));
+      END LOOP;
    EXCEPTION
       WHEN OTHERS
       THEN
          v_row.errors :=
-               'Incomplete resultset! This is the last correct proccessed row from the pipelined function. Did you change the params XML in one of the API packages? Original error message: '
-            || c_crlflf
-            || SQLERRM
-            || c_crlflf
-            || DBMS_UTILITY.format_error_backtrace;
+            SUBSTR (
+                  'Incomplete resultset! This is the last correct proccessed row from the pipelined function. Did you change the params XML in one of the API packages? Original error message: '
+               || c_crlflf
+               || SQLERRM
+               || c_crlflf
+               || DBMS_UTILITY.format_error_backtrace,
+               1,
+               4000);
          PIPE ROW (v_row);
-
-         CLOSE g_cur_existing_apis;
    END view_existing_apis;
 
    -----------------------------------------------------------------------------
-   FUNCTION view_naming_conflicts
-      RETURN t_tab_naming_conflicts
+
+   FUNCTION view_naming_conflicts (
+      p_owner    all_users.username%TYPE DEFAULT USER)
+      RETURN g_tab_naming_conflicts
       PIPELINED
    IS
    BEGIN
-      FOR i IN g_cur_naming_conflicts
+      FOR i
+         IN (WITH ut
+                  AS (SELECT table_name
+                        FROM all_tables
+                       WHERE owner = p_owner),
+                  temp
+                  AS (SELECT SUBSTR (table_name, 1, 26) || '_API'
+                                AS object_name
+                        FROM ut
+                      UNION ALL
+                      SELECT SUBSTR (table_name, 1, 24) || '_DML_V' FROM ut
+                      UNION ALL
+                      SELECT SUBSTR (table_name, 1, 24) || '_IOIUD' FROM ut
+                      UNION ALL
+                      SELECT 'GENERIC_CHANGE_LOG' FROM DUAL
+                      UNION ALL
+                      SELECT 'GENERIC_CHANGE_LOG_SEQ' FROM DUAL
+                      UNION ALL
+                      SELECT 'GENERIC_CHANGE_LOG_PK' FROM DUAL
+                      UNION ALL
+                      SELECT 'GENERIC_CHANGE_LOG_IDX' FROM DUAL)
+               SELECT uo.object_name,
+                      uo.object_type,
+                      uo.status,
+                      uo.last_ddl_time
+                 FROM all_objects uo
+                WHERE     owner = p_owner
+                      AND uo.object_name IN (SELECT object_name FROM temp)
+             ORDER BY uo.object_name)
       LOOP
          PIPE ROW (i);
       END LOOP;
    END view_naming_conflicts;
 -----------------------------------------------------------------------------
+
 END om_tapigen;
 /

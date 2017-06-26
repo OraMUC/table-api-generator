@@ -20,9 +20,13 @@
   - XMLTYPE because we need to save this parameter in the API spec for parameterless recreation and also this gives us the possibility to define some dynamic content like in the example below (the XML is very simple and since JSON is commonly used these days this xml should not be a problem for a developer
   - Additional reason is the SQL Developer integration - there we have only a reduced set of input types
   - Two new helper functions to retrieve automatically useful defaults:
-    - om_tapigen.util_get_custom_col_defaults
-    - om_tapigen.util_table_row_to_xml
+    - `util_get_custom_col_defaults`
+    - `util_table_row_to_xml`
     - The second one is used in the first one and the first one is a incomplete first implementation which could be used as a template for own business needs - please see also the spec and body for implementatione details; For the table EMPLOYEES the result works fine - see usage example below;
+- New Parameter `p_owner all_users.username%type default user` to be able to create APIs in other schemas
+- Rework pipelined table function `view_existing_apis` to be able to find also APIs with names other then `<TABLE_NAME>_API` since the API name is now changeable with the parameter `p_api_name`
+- Additional supported data types by the helper functions `util_get_custom_col_defaults` and `util_table_row_to_xml` - now the following data types should working: `NUMBER`, `INTEGER`, `FLOAT`, `%CHAR%`, `DATE`, `TIMESTAMP` and with Dummy data `CLOB`, `BLOB`, `XMLTYPE`
+- Some small fixes and maintainability changes
 
 ```xml
 <defaults>
@@ -66,6 +70,7 @@ SELECT XMLSERIALIZE (
 
 ## To Do
 
+- Support multi column primary keys
 - When using `p_col_prefix_in_method_names => false` then do NOT throw an exception when no unique column prefix is found for a table? To be discussed
 - Align oddgen wrapper package for SQL Developer integration
 - Update documentation
