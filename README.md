@@ -70,7 +70,8 @@ SELECT XMLSERIALIZE (
 
 ## To Do
 
-- Support multi column primary keys
+- Support the exclusion of audit columns
+– Support multi column primary keys
 - When using `p_col_prefix_in_method_names => false` then do NOT throw an exception when no unique column prefix is found for a table? To be discussed
 - Align oddgen wrapper package for SQL Developer integration
 - Update documentation
