@@ -67,25 +67,31 @@ Special thanks to Jacek Gębal (github.com/jgebal), Peter Ettinger (github.com/p
 ```sql
 -- usage of the helper om_tapigen.util_get_custom_col_defaults:
 BEGIN
-   om_tapigen.compile_api (
-      p_table_name                    => 'EMPLOYEES',
-      p_reuse_existing_api_params     => FALSE,
-      p_col_prefix_in_method_names    => TRUE,
-      p_enable_insertion_of_rows      => TRUE,
-      p_enable_update_of_rows         => TRUE,
-      p_enable_deletion_of_rows       => FALSE,
-      p_enable_generic_change_log     => TRUE,
-      p_enable_dml_view               => TRUE,
-      p_sequence_name                 => 'EMPLOYEES_SEQ',
-      p_api_name                      => 'EMPLOYEES_API',
-      p_enable_getter_and_setter      => FALSE,
-      p_enable_proc_with_out_params   => FALSE,
-      P_enable_parameter_prefixes     => FALSE,
-      p_return_row_instead_of_pk      => TRUE,
-      p_exclude_column_list           => 'SALARY,COMMISSION_PCT'
-      p_column_defaults               => om_tapigen.util_get_custom_col_defaults ('EMPLOYEES'));
+  om_tapigen.compile_api(
+    p_table_name                  => 'EMPLOYEES',
+    p_owner                       => USER,
+    p_reuse_existing_api_params   => FALSE,
+    --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
+    p_enable_insertion_of_rows    => TRUE,
+    p_enable_column_defaults      => TRUE,
+    p_enable_update_of_rows       => TRUE,
+    p_enable_deletion_of_rows     => FALSE,
+    p_enable_parameter_prefixes   => TRUE,
+    p_enable_proc_with_out_params => TRUE,
+    p_enable_getter_and_setter    => TRUE,
+    p_col_prefix_in_method_names  => TRUE,
+    p_return_row_instead_of_pk    => TRUE,
+    p_enable_dml_view             => TRUE,
+    p_enable_generic_change_log   => TRUE,
+    p_api_name                    => 'EMPLOYEES_API',
+    p_sequence_name               => 'EMPLOYEES_SEQ',
+    p_exclude_column_list         => 'SALARY,COMMISSION_PCT',
+    p_enable_custom_defaults      => TRUE,
+    p_custom_default_values       => om_tapigen.util_get_custom_col_defaults('EMPLOYEES')
+    );
 END;
 /
+
 -- inspect the result of the helper
 SELECT XMLSERIALIZE (
           DOCUMENT OM_TAPIGEN.UTIL_GET_CUSTOM_COL_DEFAULTS ('EMPLOYEES')

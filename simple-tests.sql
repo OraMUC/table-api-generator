@@ -56,7 +56,7 @@ BEGIN
                          p_col_prefix_in_method_names  => TRUE,
                          p_enable_proc_with_out_params => TRUE,
                          p_return_row_instead_of_pk    => TRUE
-                         --,p_custom_defaults        => om_tapigen.util_get_custom_col_defaults('EMPLOYEES')
+                         --,p_custom_default_values        => om_tapigen.util_get_custom_col_defaults('EMPLOYEES')
                          );
 END;
 /
