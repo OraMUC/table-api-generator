@@ -1,4 +1,9 @@
+BEGIN om_tapigen.util_set_debug_on; END;
+/
+
 -- SELECT * FROM TABLE(om_tapigen.view_existing_apis);
+-- SELECT * FROM TABLE(om_tapigen.util_view_debug);
+-- SELECT * FROM TABLE(om_tapigen.util_view_debug) where action != 'compile' order by elapsed desc;
 -- FIXME: provide a stable set of test tables and data and start to use utplsql
 
 BEGIN

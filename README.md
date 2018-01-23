@@ -29,7 +29,8 @@
 
 Special thanks to Jacek Gębal (github.com/jgebal), Peter Ettinger (github.com/pettinger) and PaoloM (github.com/softinn72) for the valuable feedback in several issues. That is the way how open source software works :-)
 
-- New branch `0.5`
+- New branches `0.5` and `0.5-dev`
+- ATTENTION: When installed in a central tools schema you need from version 0.5 on a public synonym `om_tapigen` to run the package from within other schemas because of SQL functions inside the package see also section [installation](#installation)
 - Support for multi column primary keys:
   - NOT generated: get_pk_by_unique_cols functions - use instead read_row functions, which are also overloaded with unique constraint params and returning the whole row
   - NOT supported: use of generic change log (p_enable_generic_change_log)
@@ -55,6 +56,13 @@ Special thanks to Jacek Gębal (github.com/jgebal), Peter Ettinger (github.com/p
   - This was needed for the column compare list, which can be easily grow over 32k with only slightly more then one hundred columns
   - Switched all column lists to dynamic substitutions, because since DB release 12 we have 128 chars for a column, so normal column lists could also easily grow over 32k
   - Nicer output: lowercase paramaters and method names, lists with one entry per line and we tried to align the parameter definitions and mappings...
+- New code instrumentation (debugging):
+  - Capture run time statistics for all steps in the API generation 
+  - Write session module and action for DB administration
+  - Debug can be enabled so: `BEGIN om_tapigen.util_set_debug_on; END;`
+  - Debug log can be inspected like so: `SELECT * FROM TABLE(om_tapigen.util_view_debug);`
+  - Maximum 1000 API creations will be captured for memory reasons (debug log is saved in memory)
+  - Debug log collection can be resetted by calling again `BEGIN om_tapigen.util_set_debug_on; END;`
 - Many rework in the background - mainly for the multi column primary keys; Thank you Peter ;-)
 
 ```xml
@@ -168,16 +176,21 @@ We give our best to produce clean and robust code, but we are NOT responsible, i
 
 ## How To Use
 
-1. Install the package om_tapigen in your schema, or even better in a central tools schema and grant execute rights to public
-1. Optional install the wrapper package for the SQL Developer integration (don't forget to install the [oddgen](https://www.oddgen.org/) extension)
-1. Create your API's :-)
+### Installation
+
+We recommend to install the package om_tapigen in a central tools schema. You need then the right to create a public synonym because of needed SQL functions inside the package. If you do not have this right please speak with your DBA or install the package in your local app schema.
+
+1. Compile the spec and body of the package om_tapigen
+2. Optional for central tools schema: `GRANT EXECUTE ON om_tapigen TO PUBLIC;`
+3. Optional for central tools schema: `CREATE PUBLIC SYNONYM om_tapigen FOR om_tapigen;`
+4. Optional install the wrapper package for the SQL Developer integration (don't forget to install the [oddgen](https://www.oddgen.org/) extension)
 
 ### PL/SQL
 
 ```sql
 begin
   --> minimal parameter, see also the section "The Parameters"
-  your_install_schema.om_tapigen.compile_api (p_table_name => 'EMP');
+  om_tapigen.compile_api (p_table_name => 'EMP');
 end;
 ```
 

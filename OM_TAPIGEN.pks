@@ -58,6 +58,12 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   c_custom_default_values       CONSTANT xmltype := NULL;
 
   -----------------------------------------------------------------------------
+  -- Subtypes
+  -----------------------------------------------------------------------------
+  SUBTYPE session_module IS VARCHAR2(48); --MODULE is limited to 48 bytes - see also: https://mwidlake.wordpress.com/2012/09/03/dbms_application_info-for-instrumentation/
+  SUBTYPE session_action IS VARCHAR2(32); --ACTION is limited to 32 bytes
+
+  -----------------------------------------------------------------------------
   -- public record (t_rec_*) and collection (tab_*) types
   -----------------------------------------------------------------------------
   TYPE t_tab_vc2 IS TABLE OF VARCHAR2(4000);
@@ -105,6 +111,18 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
     last_ddl_time all_objects.last_ddl_time%TYPE);
 
   TYPE t_tab_naming_conflicts IS TABLE OF t_rec_naming_conflicts;
+
+  TYPE t_rec_debug_data IS RECORD(
+    run        INTEGER(4),
+    step       INTEGER(4),
+    elapsed    NUMBER(10, 6),
+    total      NUMBER(10, 6),
+    action     session_action,
+    owner      all_users.username%TYPE,
+    table_name all_objects.object_name%TYPE,
+    start_time TIMESTAMP);
+
+  TYPE t_tab_debug_data IS TABLE OF t_rec_debug_data;
 
   --------------------------------------------------------------------------------
   PROCEDURE compile_api(p_table_name                IN all_objects.object_name%TYPE,
@@ -240,15 +258,32 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
                                         p_owner      VARCHAR2 DEFAULT USER) RETURN xmltype;
 
   --------------------------------------------------------------------------------
+  -- A table function to split a string to a selectable table
+  -- Usage: SELECT COLUMN_VALUE FROM TABLE (om_tapigen.util_split_to_table('1,2,3,test'));
 
   FUNCTION util_split_to_table(p_string    IN VARCHAR2,
                                p_delimiter IN VARCHAR2 DEFAULT ',') RETURN t_tab_vc2
     PIPELINED;
 
   --------------------------------------------------------------------------------
+  -- A function to determine the maximum length for an identifier name (e.g. column name) 
 
   FUNCTION util_get_ora_max_name_len RETURN INTEGER;
+
   --------------------------------------------------------------------------------
+  -- A procedure to enable (and reset) the debugging (previous debug data will be lost)
+  PROCEDURE util_set_debug_on;
+
+  --------------------------------------------------------------------------------
+  -- A procedure to disable debugging
+  PROCEDURE util_set_debug_off;
+
+  --------------------------------------------------------------------------------
+  -- A procedure to view the debug details. Maximum 999 API creations are captured
+  -- for memory reasons. You can reset the debugging by calling om_tapigen.util_set_debug_on.
+  -- Example: SELECT * FROM TABLE(om_tapigen.util_view_debug);
+  FUNCTION util_view_debug RETURN t_tab_debug_data
+    PIPELINED;
 
 END om_tapigen;
 /

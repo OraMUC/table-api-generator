@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE BODY tools.om_tapigen IS
+CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
   -----------------------------------------------------------------------------
   -- private global constants c_*
@@ -11,12 +11,13 @@ CREATE OR REPLACE PACKAGE BODY tools.om_tapigen IS
   c_custom_defaults_present_msg CONSTANT VARCHAR2(30) := 'SEE_END_OF_API_PACKAGE_SPEC';
   c_spec_options_min_line       CONSTANT NUMBER := 5;
   c_spec_options_max_line       CONSTANT NUMBER := 35;
+  c_debug_max_runs              CONSTANT NUMBER := 1000;
 
   -----------------------------------------------------------------------------
   -- private types (t_*),subtypes (st_*),records (t_rec_*) and collections (tab_*)
   -----------------------------------------------------------------------------
   TYPE t_rec_params IS RECORD(
-    table_name                  user_tables.table_name%TYPE,
+    table_name                  all_objects.object_name%TYPE,
     owner                       all_users.username%TYPE,
     reuse_existing_api_params   BOOLEAN,
     enable_insertion_of_rows    BOOLEAN,
@@ -101,9 +102,34 @@ CREATE OR REPLACE PACKAGE BODY tools.om_tapigen IS
 
   TYPE t_tab_columns_index IS TABLE OF INTEGER INDEX BY user_tab_columns.column_name%TYPE;
 
+  TYPE t_rec_debug_details IS RECORD(
+    step       INTEGER(4),
+    module     session_module,
+    action     session_action,
+    start_time TIMESTAMP,
+    stop_time  TIMESTAMP);
+
+  TYPE t_tab_debug_details IS TABLE OF t_rec_debug_details INDEX BY BINARY_INTEGER;
+
+  TYPE t_rec_debug IS RECORD(
+    run        INTEGER(4),
+    owner      all_users.username%TYPE,
+    table_name all_objects.object_name%TYPE,
+    start_time TIMESTAMP,
+    stop_time  TIMESTAMP,
+    details    t_tab_debug_details);
+
+  TYPE t_tab_debug IS TABLE OF t_rec_debug INDEX BY BINARY_INTEGER;
+
   -----------------------------------------------------------------------------
   -- private global variables g_*
   -----------------------------------------------------------------------------
+
+  --variables
+  g_debug_enabled BOOLEAN;
+  g_debug_run     INTEGER;
+  g_debug_step    INTEGER;
+  g_debug_module  session_module;
 
   -- records
   g_params              t_rec_params;
@@ -119,6 +145,7 @@ CREATE OR REPLACE PACKAGE BODY tools.om_tapigen IS
   g_unique_constraints t_tab_constraints;
   g_pk_columns         t_tab_cons_columns;
   g_uk_columns         t_tab_cons_columns;
+  g_debug              t_tab_debug;
 
   -----------------------------------------------------------------------------
   -- private global cursors g_cur_*
@@ -141,10 +168,12 @@ CREATE OR REPLACE PACKAGE BODY tools.om_tapigen IS
                ELSE
                 TRIM(both '"' FROM column_name_nn)
              END AS column_name_nn
-        FROM (SELECT regexp_substr( -- FIXME: since DB release 12 the column search_condition_vc already exists in all_constraints
-                                   om_tapigen.util_get_cons_search_condition(p_owner           => USER,
-                                                                             p_constraint_name => constraint_name),
-                                   '^\s*("[^"]+"|[a-zA-Z0-9_#$]+)\s+is\s+not\s+null\s*$',
+        FROM (SELECT regexp_substr(
+                                   $IF dbms_db_version.ver_le_11_2 $THEN om_tapigen.util_get_cons_search_condition(p_owner           => USER,
+                                                                              p_constraint_name => constraint_name)
+                                   $ELSE search_condition_vc
+                                   $END,
+                                    '^\s*("[^"]+"|[a-zA-Z0-9_#$]+)\s+is\s+not\s+null\s*$',
                                    1,
                                    1,
                                    'i',
@@ -1027,6 +1056,107 @@ END;';
   
     RETURN v_return;
   END util_get_custom_col_defaults;
+
+  PROCEDURE util_set_debug_on IS
+  BEGIN
+    g_debug_enabled := TRUE;
+    g_debug_run     := 0;
+    g_debug_step    := 0;
+    g_debug.delete;
+  END;
+
+  PROCEDURE util_set_debug_off IS
+  BEGIN
+    g_debug_enabled := FALSE;
+  END;
+
+  PROCEDURE util_debug_start_one_run(p_generator_action VARCHAR2,
+                                     p_table_name       all_objects.object_name%TYPE,
+                                     p_owner            all_users.username%TYPE) IS
+  BEGIN
+    g_debug_module := c_generator || ' v' || c_generator_version || ': ' || p_generator_action;
+    IF g_debug_enabled
+    THEN
+      g_debug_run := g_debug_run + 1;
+      IF g_debug_run <= c_debug_max_runs
+      THEN
+        g_debug_step := 0;
+        g_debug(g_debug_run).run := g_debug_run;
+        g_debug(g_debug_run).owner := p_owner;
+        g_debug(g_debug_run).table_name := p_table_name;
+        g_debug(g_debug_run).start_time := systimestamp;
+      END IF;
+    END IF;
+  END;
+
+  PROCEDURE util_debug_stop_one_run IS
+  BEGIN
+    IF g_debug_enabled AND g_debug_run <= c_debug_max_runs
+    THEN
+      g_debug(g_debug_run).stop_time := systimestamp;
+    END IF;
+  END;
+
+  PROCEDURE util_debug_start_one_step(p_action VARCHAR2) IS
+  BEGIN
+    dbms_application_info.set_module(module_name => g_debug_module,
+                                     action_name => p_action);
+    IF g_debug_enabled AND g_debug_run <= c_debug_max_runs
+    THEN
+      g_debug_step := g_debug_step + 1;
+      g_debug(g_debug_run).details(g_debug_step).step := g_debug_step;
+      g_debug(g_debug_run).details(g_debug_step).module := g_debug_module;
+      g_debug(g_debug_run).details(g_debug_step).action := p_action;
+      g_debug(g_debug_run).details(g_debug_step).start_time := systimestamp;
+    END IF;
+  END;
+
+  PROCEDURE util_debug_stop_one_step IS
+  BEGIN
+    dbms_application_info.set_module(module_name => NULL,
+                                     action_name => NULL);
+    IF g_debug_enabled AND g_debug_run <= c_debug_max_runs
+    THEN
+      g_debug(g_debug_run).details(g_debug_step).stop_time := systimestamp;
+    END IF;
+  END;
+
+  /*
+    run            INTEGER(4),
+  step           INTEGER(4),
+  start_time     TIMESTAMP,
+  run_time       NUMBER(10, 6),
+  run_time_total NUMBER(10, 6),
+  module         session_module,
+  action         session_action,
+  owner          all_users.username%TYPE,
+  table_name     all_objects.object_name%TYPE);*/
+
+  FUNCTION util_view_debug RETURN t_tab_debug_data
+    PIPELINED IS
+    v_return t_rec_debug_data;
+  BEGIN
+    FOR i IN 1 .. g_debug.count
+    LOOP
+      v_return.run        := g_debug(i).run;
+      v_return.total      := round((SYSDATE + ((g_debug(i).stop_time - g_debug(i).start_time) * 86400) - SYSDATE) * 1000);
+      v_return.owner      := g_debug(i).owner;
+      v_return.table_name := g_debug(i).table_name;
+      FOR j IN 1 .. g_debug(i).details.count
+      LOOP
+        v_return.step       := g_debug(i).details(j).step;
+        v_return.elapsed    := round((SYSDATE +
+                                     ((g_debug(i).details(j).stop_time - g_debug(i).details(j).start_time) * 86400) -
+                                     SYSDATE) * 1000);
+        v_return.action     := g_debug(i).details(j).action;
+        v_return.start_time := g_debug(i).details(j).start_time;
+        --sysdate + (interval_difference * 86400) - sysdate
+        --https://stackoverflow.com/questions/10092032/extracting-the-total-number-of-seconds-from-an-interval-data-type
+        PIPE ROW(v_return);
+      END LOOP;
+    END LOOP;
+  
+  END;
 
   -----------------------------------------------------------------------------
   -- Columns as flat list for insert - without p_column_exclude_list:
@@ -2119,6 +2249,7 @@ END;';
 
   PROCEDURE gen_header IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_header');
     g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
   /**
@@ -2157,7 +2288,7 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
    * This API provides DML functionality that can be easily called from APEX.
    * Target of the table API is to encapsulate the table DML source code for
    * security (UI schema needs only the execute right for the API and the
-   * read/write right for the {{ TABLE_NAME_MINUS_6 }}_DML_V,tables can be hidden in
+   * read/write right for the {{ TABLE_NAME_MINUS_6 }}_DML_V, tables can be hidden in
    * extra data schema) and easy readability of the business logic (all DML is
    * then written in the same style). For APEX automatic row processing like
    * tabular forms you can optionally use the {{ TABLE_NAME_MINUS_6 }}_DML_V,which has
@@ -2218,10 +2349,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
                               END;
   
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_header;
 
   PROCEDURE gen_row_exists_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_row_exists_fnc');
     g_code_blocks.template := '
 
   FUNCTION row_exists (
@@ -2250,10 +2383,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     RETURN v_return;
   END;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_row_exists_fnc;
 
   PROCEDURE gen_row_exists_yn_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_row_exists_yn_fnc');
     g_code_blocks.template := '
 
   FUNCTION row_exists_yn (
@@ -2273,10 +2408,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
            END;
   END;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_row_exists_yn_fnc;
 
   PROCEDURE gen_get_pk_by_unique_cols_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_get_pk_by_unique_cols_fnc');
     IF g_unique_constraints.count > 0
     THEN
       FOR i IN g_unique_constraints.first .. g_unique_constraints.last
@@ -2301,10 +2438,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
         template_replace('API BODY');
       END LOOP;
     END IF;
+    util_debug_stop_one_step;
   END gen_get_pk_by_unique_cols_fnc;
 
   PROCEDURE gen_get_a_row_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
     g_code_blocks.template := '
 
   FUNCTION get_a_row
@@ -2320,10 +2459,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     return v_row;
   END get_a_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_get_a_row_fnc;
 
   PROCEDURE gen_create_row_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_create_row_fnc');
     g_code_blocks.template := '
 
   FUNCTION create_row (
@@ -2364,10 +2505,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
   END create_row;';
   
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_create_row_fnc;
 
   PROCEDURE gen_create_row_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_create_row_prc');
     g_code_blocks.template := '
 
   PROCEDURE create_row (
@@ -2384,10 +2527,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
   END create_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_create_row_prc;
 
   PROCEDURE gen_create_rowtype_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_create_rowtype_fnc');
     g_code_blocks.template := '
 
   FUNCTION create_row (
@@ -2406,12 +2551,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     RETURN v_return;
   END create_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_create_rowtype_fnc;
 
   -----------------------------------------------------------------------------
 
   PROCEDURE gen_create_rowtype_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_create_rowtype_prc');
     g_code_blocks.template := '
 
   PROCEDURE create_row (
@@ -2428,10 +2575,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END create_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_create_rowtype_prc;
 
   PROCEDURE gen_create_a_row_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_create_a_row_fnc');
     g_code_blocks.template := '
 
   FUNCTION create_a_row (
@@ -2450,10 +2599,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     RETURN v_return;
   END create_a_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_create_a_row_fnc;
 
   PROCEDURE gen_create_a_row_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
     g_code_blocks.template := '
 
   PROCEDURE create_a_row (
@@ -2470,10 +2621,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
   END create_a_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_create_a_row_prc;
 
   PROCEDURE gen_createorupdate_row_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_createorupdate_row_fnc');
     g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
@@ -2498,10 +2651,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     RETURN v_return;
   END create_or_update_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_createorupdate_row_fnc;
 
   PROCEDURE gen_createorupdate_row_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_createorupdate_row_prc');
     g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
@@ -2518,12 +2673,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
   END create_or_update_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_createorupdate_row_prc;
 
   -----------------------------------------------------------------------------
 
   PROCEDURE gen_createorupdate_rowtype_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_fnc');
     g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
@@ -2542,10 +2699,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     RETURN v_return;
   END create_or_update_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_createorupdate_rowtype_fnc;
 
   PROCEDURE gen_createorupdate_rowtype_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_prc');
     g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
@@ -2562,10 +2721,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END create_or_update_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_createorupdate_rowtype_prc;
 
   PROCEDURE gen_read_row_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_read_row_fnc');
     g_code_blocks.template := '
 
   FUNCTION read_row (
@@ -2589,10 +2750,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     RETURN v_row;
   END read_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_read_row_fnc;
 
   PROCEDURE gen_read_row_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_read_row_prc');
     g_code_blocks.template := '
 
   PROCEDURE read_row (
@@ -2611,10 +2774,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     END IF;
   END read_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_read_row_prc;
 
   PROCEDURE gen_read_row_by_uk_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_read_row_by_uk_fnc');
     IF g_unique_constraints.count > 0
     THEN
       FOR i IN g_unique_constraints.first .. g_unique_constraints.last
@@ -2645,10 +2810,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
         template_replace('API BODY');
       END LOOP;
     END IF;
+    util_debug_stop_one_step;
   END gen_read_row_by_uk_fnc;
 
   PROCEDURE gen_read_a_row_fnc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
     g_code_blocks.template := '
 
   FUNCTION read_a_row
@@ -2667,10 +2834,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     RETURN v_row;
   END read_a_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_read_a_row_fnc;
 
   PROCEDURE gen_update_row_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_update_row_prc');
     g_code_blocks.template := '
 
   PROCEDURE update_row (
@@ -2696,10 +2865,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     END IF;
   END update_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_update_row_prc;
 
   PROCEDURE gen_update_rowtype_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_update_rowtype_prc');
     g_code_blocks.template := '
 
   PROCEDURE update_row (
@@ -2715,10 +2886,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END update_row;';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_update_rowtype_prc;
 
   PROCEDURE gen_delete_row_prc IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_delete_row_prc');
     g_code_blocks.template := '
 
   PROCEDURE delete_row (
@@ -2744,10 +2917,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
   END delete_row;';
   
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_delete_row_prc;
 
   PROCEDURE gen_getter_functions IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_getter_functions');
     FOR i IN g_columns.first .. g_columns.last
     LOOP
       IF g_columns(i).is_pk_yn = 'N'
@@ -2773,10 +2948,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
         template_replace('API BODY');
       END IF;
     END LOOP;
+    util_debug_stop_one_step;
   END gen_getter_functions;
 
   PROCEDURE gen_setter_procedures IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_setter_procedures');
     FOR i IN g_columns.first .. g_columns.last
     LOOP
       IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
@@ -2835,10 +3012,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
         template_replace('API BODY');
       END IF;
     END LOOP;
+    util_debug_stop_one_step;
   END gen_setter_procedures;
 
   PROCEDURE gen_footer IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_footer');
     g_code_blocks.template := CASE
                                 WHEN g_params.custom_defaults_serialized IS NOT NULL THEN
                                  c_crlf || '
@@ -2855,21 +3034,25 @@ END "{{ API_NAME }}";';
 
 END "{{ API_NAME }}";';
     template_replace('API BODY');
+    util_debug_stop_one_step;
   END gen_footer;
 
   PROCEDURE gen_dml_view IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_dml_view');
     g_code_blocks.template := '
 CREATE OR REPLACE VIEW "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_DML_V" AS
 SELECT {% LIST_COLUMNS_W_PK_FULL %}
   FROM {{ TABLE_NAME }}';
     template_replace('VIEW');
+    util_debug_stop_one_step;
   END gen_dml_view;
 
   -----------------------------------------------------------------------------
 
   PROCEDURE gen_dml_view_trigger IS
   BEGIN
+    util_debug_start_one_step(p_action => 'gen_dml_view_trigger');
     g_code_blocks.template := '
 CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
@@ -2910,6 +3093,7 @@ BEGIN
 END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   
     template_replace('TRIGGER');
+    util_debug_stop_one_step;
   END gen_dml_view_trigger;
 
   PROCEDURE main_generate(p_generator_action            IN VARCHAR2,
@@ -2935,6 +3119,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     PROCEDURE initialize IS
       PROCEDURE reset_globals IS
       BEGIN
+        util_debug_start_one_step(p_action => 'reset_globals');
         -- global records
         g_params              := NULL;
         g_params_existing_api := NULL;
@@ -2948,6 +3133,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
         g_unique_constraints.delete;
         g_uk_columns.delete;
         g_pk_columns.delete;
+        util_debug_stop_one_step;
       END reset_globals;
     
       PROCEDURE process_parameters IS
@@ -2960,18 +3146,17 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
              WHERE owner = g_params.owner
                AND table_name = g_params.table_name;
         BEGIN
+          util_debug_start_one_step(p_action => 'check_if_table_exists');
           OPEN v_cur;
-        
           FETCH v_cur
             INTO v_object_name;
-        
           CLOSE v_cur;
-        
           IF (v_object_name IS NULL)
           THEN
             raise_application_error(c_generator_error_number,
                                     'Table "' || g_params.table_name || '" does not exist.');
           END IF;
+          util_debug_stop_one_step;
         END check_if_table_exists;
       
         PROCEDURE check_if_sequence_exists IS
@@ -2983,6 +3168,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
              WHERE sequence_owner = g_params.owner
                AND sequence_name = g_params.sequence_name;
         BEGIN
+          util_debug_start_one_step(p_action => 'check_if_sequence_exists');
           IF g_params.sequence_name IS NOT NULL
           THEN
             OPEN v_cur;
@@ -2999,6 +3185,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
                                       ' does not exist. Please provide correct sequence name or create missing sequence.');
             END IF;
           END IF;
+          util_debug_stop_one_step;
         END check_if_sequence_exists;
       
         PROCEDURE check_if_api_name_exists IS
@@ -3012,6 +3199,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
                AND object_type NOT IN ('PACKAGE',
                                        'PACKAGE BODY');
         BEGIN
+          util_debug_start_one_step(p_action => 'check_if_api_name_exists');
           IF g_params.api_name IS NOT NULL
           THEN
             OPEN v_cur;
@@ -3028,6 +3216,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
                                       v_object_type || '". Please provide a different API name.');
             END IF;
           END IF;
+          util_debug_stop_one_step;
         END check_if_api_name_exists;
       
         PROCEDURE fetch_existing_api_params IS
@@ -3036,6 +3225,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               FROM TABLE(view_existing_apis(p_table_name => g_params.table_name,
                                             p_owner      => g_params.owner));
         BEGIN
+          util_debug_start_one_step(p_action => 'fetch_existing_api_params');
           g_status.api_exists := FALSE;
         
           IF g_params.reuse_existing_api_params
@@ -3052,10 +3242,12 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
           
             CLOSE v_cur;
           END IF;
+          util_debug_stop_one_step;
         END fetch_existing_api_params;
       
         PROCEDURE check_column_prefix_validity IS
         BEGIN
+          util_debug_start_one_step(p_action => 'check_column_prefix_validity');
           -- check,if option "col_prefix_in_method_names" is set and check then
           -- if table's column prefix is unique
           IF g_params.col_prefix_in_method_names = FALSE AND g_status.column_prefix IS NULL
@@ -3063,11 +3255,13 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
             raise_application_error(c_generator_error_number,
                                     'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
           END IF;
+          util_debug_stop_one_step;
         END check_column_prefix_validity;
       
         PROCEDURE check_if_log_table_exists IS
           v_count PLS_INTEGER;
         BEGIN
+          util_debug_start_one_step(p_action => 'check_if_log_table_exists');
           IF g_params.enable_generic_change_log
           THEN
             FOR i IN (SELECT 'GENERIC_CHANGE_LOG'
@@ -3164,6 +3358,7 @@ comment on column generic_change_log.gcl_user is 'The user,who changed the data'
 comment on column generic_change_log.gcl_timestamp is 'The time when the change occured']';
             END LOOP;
           END IF;
+          util_debug_stop_one_step;
         END check_if_log_table_exists;
       BEGIN
         -- meta
@@ -3337,6 +3532,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     
       PROCEDURE create_temporary_lobs IS
       BEGIN
+        util_debug_start_one_step(p_action => 'create_temporary_lobs');
         dbms_lob.createtemporary(lob_loc => g_code_blocks.api_spec,
                                  cache   => FALSE);
         dbms_lob.createtemporary(lob_loc => g_code_blocks.api_body,
@@ -3345,53 +3541,54 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                  cache   => FALSE);
         dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view_trigger,
                                  cache   => FALSE);
+        util_debug_stop_one_step;
       END create_temporary_lobs;
     
       PROCEDURE fetch_columns IS
       BEGIN
+        util_debug_start_one_step(p_action => 'fetch_columns');
         OPEN g_cur_columns;
-      
         FETCH g_cur_columns BULK COLLECT
           INTO g_columns LIMIT c_bulk_collect_limit;
-      
         CLOSE g_cur_columns;
+        util_debug_stop_one_step;
       END fetch_columns;
     
       PROCEDURE fetch_unique_constraints IS
       BEGIN
+        util_debug_start_one_step(p_action => 'fetch_unique_constraints');
         OPEN g_cur_unique_constraints;
-      
         FETCH g_cur_unique_constraints BULK COLLECT
           INTO g_unique_constraints LIMIT c_bulk_collect_limit;
-      
         CLOSE g_cur_unique_constraints;
+        util_debug_stop_one_step;
       END fetch_unique_constraints;
     
       PROCEDURE fetch_unique_cons_columns IS
       BEGIN
+        util_debug_start_one_step(p_action => 'fetch_unique_cons_columns');
         OPEN g_cur_uk_columns;
-      
         FETCH g_cur_uk_columns BULK COLLECT
           INTO g_uk_columns LIMIT c_bulk_collect_limit;
-      
         CLOSE g_cur_uk_columns;
+        util_debug_stop_one_step;
       END fetch_unique_cons_columns;
     
       PROCEDURE fetch_pk_cons_columns IS
       BEGIN
+        util_debug_start_one_step(p_action => 'fetch_pk_cons_columns');
         OPEN g_cur_pk_columns;
-      
         FETCH g_cur_pk_columns BULK COLLECT
           INTO g_pk_columns LIMIT c_bulk_collect_limit;
-      
         CLOSE g_cur_pk_columns;
+        util_debug_stop_one_step;
       END fetch_pk_cons_columns;
     
       PROCEDURE process_columns IS
       BEGIN
+        util_debug_start_one_step(p_action => 'process_columns');
         -- init rpad
         g_status.rpad_columns := 0;
-      
         FOR i IN g_columns.first .. g_columns.last
         LOOP
           -- calc rpad length
@@ -3399,28 +3596,25 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
           THEN
             g_status.rpad_columns := g_columns(i).column_name_length;
           END IF;
-        
-          -- set initial pk info (will be refined in mark_columns_as_pk)
-        
+          -- set initial pk info (will be refined in mark_columns_as_pk)        
           g_columns(i).is_pk_yn := 'N';
-        
           -- create reverse index to get collection id by column name
           g_columns_index(g_columns(i).column_name) := i;
-        
           -- check,if we have a xmltype column present (we have then to provide a XML compare function)
           IF g_columns(i).data_type = 'XMLTYPE'
           THEN
             g_status.xmltype_column_present := TRUE;
           END IF;
         END LOOP;
+        util_debug_stop_one_step;
       END process_columns;
     
       PROCEDURE process_pk_columns IS
         v_count PLS_INTEGER;
       BEGIN
+        util_debug_start_one_step(p_action => 'process_pk_columns');
         -- check pk
         v_count := g_pk_columns.count;
-      
         IF v_count = 0
         THEN
           raise_application_error(c_generator_error_number,
@@ -3432,9 +3626,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
         THEN
           g_status.pk_is_multi_column := TRUE;
         END IF;
-      
-        -- check validity of generic change log parameter
-      
+        -- check validity of generic change log parameter      
         IF g_params.enable_generic_change_log AND g_status.pk_is_multi_column
         THEN
           raise_application_error(c_generator_error_number,
@@ -3442,11 +3634,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                   g_params.table_name ||
                                   '" has a multi column primary key. This combination is not supported.');
         END IF;
-      
-        -- init rpad
-      
+        -- init rpad      
         g_status.rpad_pk_columns := 0;
-      
         FOR i IN g_pk_columns.first .. g_pk_columns.last
         LOOP
           -- mark column as pk
@@ -3461,19 +3650,19 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             g_status.rpad_pk_columns := g_pk_columns(i).column_name_length;
           END IF;
         END LOOP;
+        util_debug_stop_one_step;
       END process_pk_columns;
     
       PROCEDURE process_uk_columns IS
         v_count PLS_INTEGER;
       BEGIN
+        util_debug_start_one_step(p_action => 'process_uk_columns');
         -- check uk
         v_count := g_uk_columns.count;
-      
         IF v_count > 0
         THEN
           -- init rpad
           g_status.rpad_uk_columns := 0;
-        
           FOR i IN g_uk_columns.first .. g_uk_columns.last
           LOOP
             -- calc rpad length
@@ -3483,6 +3672,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
             END IF;
           END LOOP;
         END IF;
+        util_debug_stop_one_step;
       END process_uk_columns;
     BEGIN
       reset_globals;
@@ -3499,6 +3689,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
   
     PROCEDURE finalize IS
     BEGIN
+      util_debug_start_one_step(p_action => 'finalize');
       -- finalize CLOB varchar caches
       util_clob_append(p_clob               => g_code_blocks.api_spec,
                        p_clob_varchar_cache => g_code_blocks.api_spec_varchar_cache,
@@ -3522,6 +3713,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                          p_varchar_to_append  => NULL,
                          p_final_call         => TRUE);
       END IF;
+      util_debug_stop_one_step;
     END finalize;
   BEGIN
     initialize;
@@ -3614,6 +3806,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
   PROCEDURE main_compile IS
   BEGIN
+    util_debug_start_one_step(p_action => 'compile');
     -- compile package spec
     BEGIN
       util_execute_sql(g_code_blocks.api_spec);
@@ -3645,6 +3838,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       WHEN OTHERS THEN
         NULL;
     END;
+    util_debug_stop_one_step;
   END main_compile;
 
   FUNCTION main_return RETURN CLOB IS
@@ -3674,6 +3868,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                         p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
                         p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values) IS
   BEGIN
+    util_debug_start_one_run(p_generator_action => 'compile API',
+                             p_table_name       => p_table_name,
+                             p_owner            => p_owner);
     main_generate(p_generator_action            => 'COMPILE_API',
                   p_table_name                  => p_table_name,
                   p_owner                       => p_owner,
@@ -3694,8 +3891,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   p_exclude_column_list         => p_exclude_column_list,
                   p_enable_custom_defaults      => p_enable_custom_defaults,
                   p_custom_default_values       => p_custom_default_values);
-  
     main_compile;
+    util_debug_stop_one_run;
   END compile_api;
 
   FUNCTION compile_api_and_get_code(p_table_name                IN all_objects.object_name%TYPE,
@@ -3720,6 +3917,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                     p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values)
     RETURN CLOB IS
   BEGIN
+    util_debug_start_one_run(p_generator_action => 'compile API, get code',
+                             p_table_name       => p_table_name,
+                             p_owner            => p_owner);
     main_generate(p_generator_action            => 'COMPILE_API_AND_GET_CODE',
                   p_table_name                  => p_table_name,
                   p_owner                       => p_owner,
@@ -3740,8 +3940,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   p_exclude_column_list         => p_exclude_column_list,
                   p_enable_custom_defaults      => p_enable_custom_defaults,
                   p_custom_default_values       => p_custom_default_values);
-  
     main_compile;
+    util_debug_stop_one_run;
     RETURN main_return;
   END compile_api_and_get_code;
 
@@ -3766,6 +3966,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                     p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
                     p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values) RETURN CLOB IS
   BEGIN
+    util_debug_start_one_run(p_generator_action => 'get code',
+                             p_table_name       => p_table_name,
+                             p_owner            => p_owner);
     main_generate(p_generator_action            => 'GET_CODE',
                   p_table_name                  => p_table_name,
                   p_owner                       => p_owner,
@@ -3786,7 +3989,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                   p_exclude_column_list         => p_exclude_column_list,
                   p_enable_custom_defaults      => p_enable_custom_defaults,
                   p_custom_default_values       => p_custom_default_values);
-  
+    util_debug_stop_one_run;
     RETURN main_return;
   END get_code;
 
