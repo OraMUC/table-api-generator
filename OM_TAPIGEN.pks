@@ -113,13 +113,14 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   TYPE t_tab_naming_conflicts IS TABLE OF t_rec_naming_conflicts;
 
   TYPE t_rec_debug_data IS RECORD(
-    run        INTEGER(4),
-    step       INTEGER(4),
-    elapsed    NUMBER(10, 6),
-    total      NUMBER(10, 6),
-    action     session_action,
+    run        INTEGER,
+    run_time   NUMBER,
     owner      all_users.username%TYPE,
     table_name all_objects.object_name%TYPE,
+    step       INTEGER,
+    elapsed    NUMBER,
+    execution  NUMBER,
+    action     session_action,
     start_time TIMESTAMP);
 
   TYPE t_tab_debug_data IS TABLE OF t_rec_debug_data;

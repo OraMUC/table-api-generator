@@ -1139,15 +1139,20 @@ END;';
     FOR i IN 1 .. g_debug.count
     LOOP
       v_return.run        := g_debug(i).run;
-      v_return.total      := round((SYSDATE + ((g_debug(i).stop_time - g_debug(i).start_time) * 86400) - SYSDATE) * 1000);
+      v_return.run_time   := round(SYSDATE + ((g_debug(i).stop_time - g_debug(i).start_time) * 86400) - SYSDATE,
+                                   6);
       v_return.owner      := g_debug(i).owner;
       v_return.table_name := g_debug(i).table_name;
       FOR j IN 1 .. g_debug(i).details.count
       LOOP
         v_return.step       := g_debug(i).details(j).step;
-        v_return.elapsed    := round((SYSDATE +
+        v_return.elapsed    := round(SYSDATE + ((g_debug(i).details(j).stop_time - g_debug(i).start_time) * 86400) -
+                                     SYSDATE,
+                                     6);
+        v_return.execution  := round(SYSDATE +
                                      ((g_debug(i).details(j).stop_time - g_debug(i).details(j).start_time) * 86400) -
-                                     SYSDATE) * 1000);
+                                     SYSDATE,
+                                     6);
         v_return.action     := g_debug(i).details(j).action;
         v_return.start_time := g_debug(i).details(j).start_time;
         --sysdate + (interval_difference * 86400) - sysdate
@@ -1427,7 +1432,7 @@ END;';
                                         g_params.table_name || '"."' || CASE
                                           WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
                                            rpad(g_columns(i).column_name || '"%TYPE',
-                                                g_status.rpad_columns + 5)
+                                                g_status.rpad_columns + 6)
                                           ELSE
                                            g_columns(i).column_name || '"%TYPE'
                                         END || CASE
@@ -2309,7 +2314,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     SELECT CASE
              WHEN XMLEXISTS(
                     ''declare default element namespace "http://xmlns.oracle.com/xdb/xdiff.xsd"; /xdiff/*''
-                    PASSING XMLDIFF( p_doc1,p_doc2 ) )
+                    PASSING XMLDIFF( p_doc1, p_doc2 ) )
              THEN 1
              ELSE 0
            END
@@ -3231,15 +3236,12 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
           IF g_params.reuse_existing_api_params
           THEN
             OPEN v_cur;
-          
             FETCH v_cur
               INTO g_params_existing_api;
-          
             IF v_cur%FOUND
             THEN
               g_status.api_exists := TRUE;
             END IF;
-          
             CLOSE v_cur;
           END IF;
           util_debug_stop_one_step;
@@ -3253,7 +3255,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
           IF g_params.col_prefix_in_method_names = FALSE AND g_status.column_prefix IS NULL
           THEN
             raise_application_error(c_generator_error_number,
-                                    'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
+                                    'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for getter and setter method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
           END IF;
           util_debug_stop_one_step;
         END check_column_prefix_validity;

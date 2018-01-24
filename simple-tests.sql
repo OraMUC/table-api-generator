@@ -3,7 +3,10 @@ BEGIN om_tapigen.util_set_debug_on; END;
 
 -- SELECT * FROM TABLE(om_tapigen.view_existing_apis);
 -- SELECT * FROM TABLE(om_tapigen.util_view_debug);
--- SELECT * FROM TABLE(om_tapigen.util_view_debug) where action != 'compile' order by elapsed desc;
+-- SELECT * FROM TABLE(om_tapigen.util_view_debug) WHERE action != 'compile' ORDER BY execution DESC;
+-- SELECT * FROM TABLE(om_tapigen.util_view_debug) WHERE action = 'fetch_columns';
+-- SELECT DISTINCT run, run_time, table_name FROM TABLE(om_tapigen.util_view_debug) ORDER BY run_time DESC;
+-- SELECT * FROM TABLE(om_tapigen.util_view_debug) WHERE table_name = 'TEST_TABLE_2' ORDER BY execution DESC;
 -- FIXME: provide a stable set of test tables and data and start to use utplsql
 
 BEGIN
@@ -18,7 +21,6 @@ END;
 BEGIN
   om_tapigen.compile_api(p_table_name                  => 'EMP',
                          p_reuse_existing_api_params   => FALSE,
-                         p_col_prefix_in_method_names  => true,
                          p_enable_insertion_of_rows    => TRUE,
                          p_enable_update_of_rows       => TRUE,
                          p_enable_deletion_of_rows     => TRUE,
@@ -27,11 +29,12 @@ BEGIN
                          p_sequence_name               => NULL,
                          p_api_name                    => 'EMP_API',
                          p_enable_getter_and_setter    => TRUE,
+                         p_col_prefix_in_method_names  => true,
                          p_enable_proc_with_out_params => TRUE,
                          p_enable_parameter_prefixes   => TRUE,
                          p_return_row_instead_of_pk    => FALSE,
                          p_exclude_column_list         => 'HIREDATE'
-                         --,p_custom_defaults        => om_tapigen.util_get_custom_col_defaults('EMP')
+                         --,p_custom_default_values        => om_tapigen.util_get_custom_col_defaults('EMP')
                          );
 END;
 /
@@ -60,7 +63,8 @@ BEGIN
                          p_enable_getter_and_setter    => TRUE,
                          p_col_prefix_in_method_names  => TRUE,
                          p_enable_proc_with_out_params => TRUE,
-                         p_return_row_instead_of_pk    => TRUE
+                         p_return_row_instead_of_pk    => TRUE,
+                         p_enable_custom_defaults      => FALSE
                          --,p_custom_default_values        => om_tapigen.util_get_custom_col_defaults('EMPLOYEES')
                          );
 END;
@@ -77,22 +81,22 @@ END;
 BEGIN
   om_tapigen.compile_api(p_table_name                  => 'TEST_TABLE',
                          p_reuse_existing_api_params   => FALSE,
-                         p_col_prefix_in_method_names  => TRUE,
                          p_enable_insertion_of_rows    => TRUE,
                          p_enable_column_defaults      => FALSE,
-                         p_enable_custom_defaults      => FALSE,
                          p_enable_update_of_rows       => TRUE,
                          p_enable_deletion_of_rows     => TRUE,
                          p_enable_generic_change_log   => TRUE,
                          p_enable_dml_view             => TRUE,
                          p_sequence_name               => 'TEST_TABLE_SEQ',
                          p_api_name                    => 'TEST_TABLE_API',
+                         p_exclude_column_list         => 'HIREDATE',
                          p_enable_getter_and_setter    => TRUE,
+                         p_col_prefix_in_method_names  => false,
                          p_enable_proc_with_out_params => TRUE,
                          p_enable_parameter_prefixes   => TRUE,
                          p_return_row_instead_of_pk    => FALSE,
-                         p_exclude_column_list         => 'HIREDATE'
-                         -- ,p_custom_defaults               => om_tapigen.util_get_custom_col_defaults ('TEST_TABLE')
+                         p_enable_custom_defaults      => FALSE
+                         -- ,p_custom_default_values               => om_tapigen.util_get_custom_col_defaults ('TEST_TABLE')
                          );
 END;
 /
