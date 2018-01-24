@@ -121,7 +121,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
     elapsed    NUMBER,
     execution  NUMBER,
     action     session_action,
-    start_time TIMESTAMP);
+    start_time TIMESTAMP(6));
 
   TYPE t_tab_debug_data IS TABLE OF t_rec_debug_data;
 

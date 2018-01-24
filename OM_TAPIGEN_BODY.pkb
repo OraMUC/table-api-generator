@@ -22,7 +22,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     reuse_existing_api_params   BOOLEAN,
     enable_insertion_of_rows    BOOLEAN,
     enable_column_defaults      BOOLEAN,
-    enable_custom_defaults      BOOLEAN,
     enable_update_of_rows       BOOLEAN,
     enable_deletion_of_rows     BOOLEAN,
     enable_parameter_prefixes   BOOLEAN,
@@ -35,7 +34,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     api_name                    user_objects.object_name%TYPE,
     sequence_name               user_sequences.sequence_name%TYPE,
     exclude_column_list         VARCHAR2(4000 CHAR),
-    custom_defaults             xmltype,
+    enable_custom_defaults      BOOLEAN,
+    custom_default_values       xmltype,
     custom_defaults_serialized  VARCHAR2(32767 CHAR));
 
   TYPE t_rec_iterator IS RECORD(
@@ -58,14 +58,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     rpad_uk_columns        INTEGER);
 
   TYPE t_rec_columns IS RECORD(
-    column_name         user_tab_columns.column_name%TYPE,
-    column_name_length  INTEGER,
-    data_type           user_tab_cols.data_type%TYPE,
-    data_default        VARCHAR2(4000 CHAR),
-    data_default_length INTEGER,
-    is_pk_yn            VARCHAR2(1 CHAR),
-    is_nullable_yn      VARCHAR2(1 CHAR),
-    is_excluded_yn      VARCHAR2(1 CHAR));
+    column_name                user_tab_columns.column_name%TYPE,
+    column_name_length         INTEGER,
+    data_type                  user_tab_cols.data_type%TYPE,
+    data_default               VARCHAR2(4000 CHAR),
+    data_default_length        INTEGER,
+    data_custom_default        VARCHAR2(4000 CHAR),
+    data_custom_default_length INTEGER,
+    is_pk_yn                   VARCHAR2(1 CHAR),
+    is_nullable_yn             VARCHAR2(1 CHAR),
+    is_excluded_yn             VARCHAR2(1 CHAR));
 
   TYPE t_rec_constraints IS RECORD(
     constraint_name user_constraints.constraint_name%TYPE);
@@ -98,7 +100,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
   TYPE t_tab_cons_columns IS TABLE OF t_rec_cons_columns INDEX BY BINARY_INTEGER;
 
-  TYPE t_tab_result_list IS TABLE OF VARCHAR2(1024) INDEX BY BINARY_INTEGER;
+  TYPE t_tab_result_list IS TABLE OF VARCHAR2(5000) INDEX BY BINARY_INTEGER;
 
   TYPE t_tab_columns_index IS TABLE OF INTEGER INDEX BY user_tab_columns.column_name%TYPE;
 
@@ -106,8 +108,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     step       INTEGER(4),
     module     session_module,
     action     session_action,
-    start_time TIMESTAMP,
-    stop_time  TIMESTAMP);
+    start_time TIMESTAMP(6),
+    stop_time  TIMESTAMP(6));
 
   TYPE t_tab_debug_details IS TABLE OF t_rec_debug_details INDEX BY BINARY_INTEGER;
 
@@ -115,8 +117,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     run        INTEGER(4),
     owner      all_users.username%TYPE,
     table_name all_objects.object_name%TYPE,
-    start_time TIMESTAMP,
-    stop_time  TIMESTAMP,
+    start_time TIMESTAMP(6),
+    stop_time  TIMESTAMP(6),
     details    t_tab_debug_details);
 
   TYPE t_tab_debug IS TABLE OF t_rec_debug INDEX BY BINARY_INTEGER;
@@ -229,6 +231,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
            data_type,
            data_default,
            length(data_default) AS data_default_length,
+           NULL AS data_custom_default,
+           NULL AS data_custom_default_length,
            NULL AS is_pk_yn,
            is_nullable_yn,
            is_excluded_yn
@@ -1278,7 +1282,7 @@ END;';
       RETURN v_return;
     END;
   BEGIN
-    IF g_params.custom_defaults IS NULL
+    IF g_params.custom_default_values IS NULL
     THEN
       -- normal list processing
       FOR i IN g_columns.first .. g_columns.last
@@ -1294,7 +1298,7 @@ END;';
       -- special handling of given XML parameter
       FOR i IN (SELECT x.column_name,
                        x.data_default
-                  FROM xmltable('/defaults/item' passing g_params.custom_defaults --
+                  FROM xmltable('/defaults/item' passing g_params.custom_default_values --
                                 columns --
                                 column_name VARCHAR2(128) path './col',
                                 data_default VARCHAR2(4000) path './val') x)
@@ -1466,8 +1470,8 @@ END;';
   -- {% LIST_PARAMS_W_PK_CUST_DEFAULTS %}
   -- Example:
   --   p_employee_id IN employees.employee_id%TYPE DEFAULT get_a_row()."EMPLOYEE_ID",
-  --   p_first_name  IN employees.first_name%TYPE DEFAULT get_a_row()."FIRST_NAME",
-  --   p_last_name   IN employees.last_name%TYPE DEFAULT get_a_row()."LAST_NAME",
+  --   p_first_name  IN employees.first_name%TYPE  DEFAULT get_a_row()."FIRST_NAME",
+  --   p_last_name   IN employees.last_name%TYPE   DEFAULT get_a_row()."LAST_NAME",
   --   ...
   -----------------------------------------------------------------------------
 
@@ -2069,7 +2073,7 @@ END;';
           code_append(util_bool_to_string(g_params.return_row_instead_of_pk));
         WHEN 'CUSTOM_DEFAULTS' THEN
           code_append(CASE
-                        WHEN g_params.custom_defaults IS NOT NULL THEN
+                        WHEN g_params.custom_default_values IS NOT NULL THEN
                         -- We set only a placeholder to signal that column defaults are given.
                         -- Column defaults itself could be very large XML and are saved at
                         -- the end of the package spec.
@@ -3164,34 +3168,126 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
           util_debug_stop_one_step;
         END check_if_table_exists;
       
-        PROCEDURE check_if_sequence_exists IS
-          v_object_name all_objects.object_name%TYPE;
-        
+        PROCEDURE fetch_existing_api_params IS
           CURSOR v_cur IS
-            SELECT sequence_name
-              FROM all_sequences
-             WHERE sequence_owner = g_params.owner
-               AND sequence_name = g_params.sequence_name;
+            SELECT *
+              FROM TABLE(view_existing_apis(p_table_name => g_params.table_name,
+                                            p_owner      => g_params.owner));
         BEGIN
-          util_debug_start_one_step(p_action => 'check_if_sequence_exists');
-          IF g_params.sequence_name IS NOT NULL
+          util_debug_start_one_step(p_action => 'fetch_existing_api_params');
+          OPEN v_cur;
+          FETCH v_cur
+            INTO g_params_existing_api;
+          IF v_cur%FOUND
           THEN
-            OPEN v_cur;
-          
-            FETCH v_cur
-              INTO v_object_name;
-          
-            CLOSE v_cur;
-          
-            IF (v_object_name IS NULL)
-            THEN
-              raise_application_error(c_generator_error_number,
-                                      'Sequence ' || g_params.sequence_name ||
-                                      ' does not exist. Please provide correct sequence name or create missing sequence.');
-            END IF;
+            g_status.api_exists := TRUE;
+          END IF;
+          CLOSE v_cur;
+          util_debug_stop_one_step;
+        END fetch_existing_api_params;
+      
+        PROCEDURE check_table_column_prefix IS
+        BEGIN
+          util_debug_start_one_step(p_action => 'check_table_column_prefix');
+          -- check,if option "col_prefix_in_method_names" is set and check then
+          -- if table's column prefix is unique
+          g_status.column_prefix := util_get_table_column_prefix(p_table_name => g_params.table_name);
+          IF g_status.column_prefix IS NULL
+          THEN
+            raise_application_error(c_generator_error_number,
+                                    'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for getter and setter method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
           END IF;
           util_debug_stop_one_step;
-        END check_if_sequence_exists;
+        END check_table_column_prefix;
+      
+        PROCEDURE check_if_log_table_exists IS
+          v_count PLS_INTEGER;
+        BEGIN
+          util_debug_start_one_step(p_action => 'check_if_log_table_exists');
+          FOR i IN (SELECT 'GENERIC_CHANGE_LOG'
+                      FROM dual
+                    MINUS
+                    SELECT table_name
+                      FROM all_tables
+                     WHERE owner = g_params.owner
+                       AND table_name = 'GENERIC_CHANGE_LOG')
+          LOOP
+            -- check constraint
+            SELECT COUNT(*)
+              INTO v_count
+              FROM all_objects
+             WHERE owner = g_params.owner
+               AND object_name = 'GENERIC_CHANGE_LOG_PK';
+          
+            IF v_count > 0
+            THEN
+              raise_application_error(c_generator_error_number,
+                                      'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_PK already exists.');
+            END IF;
+          
+            -- check sequence
+            SELECT COUNT(*)
+              INTO v_count
+              FROM all_objects
+             WHERE owner = g_params.owner
+               AND object_name = 'GENERIC_CHANGE_LOG_SEQ';
+          
+            IF v_count > 0
+            THEN
+              raise_application_error(c_generator_error_number,
+                                      'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_SEQ already exists.');
+            END IF;
+          
+            -- check index
+            SELECT COUNT(*)
+              INTO v_count
+              FROM all_objects
+             WHERE owner = g_params.owner
+               AND object_name = 'GENERIC_CHANGE_LOG_IDX';
+          
+            IF v_count > 0
+            THEN
+              raise_application_error(c_generator_error_number,
+                                      'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_IDX already exists.');
+            END IF;
+          
+            EXECUTE IMMEDIATE q'[
+create table generic_change_log (
+  gcl_id        NUMBER not null,
+  gcl_table     VARCHAR2(128 CHAR) not null,
+  gcl_column    VARCHAR2(128 CHAR) not null,
+  gcl_pk_id     VARCHAR2(128 CHAR) not null,
+  gcl_old_value VARCHAR2(4000 CHAR),
+  gcl_new_value VARCHAR2(4000 CHAR),
+  gcl_user      VARCHAR2(30 CHAR),
+  gcl_timestamp TIMESTAMP(6) default systimestamp,
+  constraint generic_change_log_pk primary key (gcl_id)
+)
+]';
+          
+            EXECUTE IMMEDIATE q'[
+create sequence generic_change_log_seq nocache noorder nocycle]';
+            EXECUTE IMMEDIATE q'[
+create index generic_change_log_idx on generic_change_log (gcl_table,gcl_column,gcl_pk_id)]';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_id is 'Primary key of the table']';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_table is 'Table on which the change occured']';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_column is 'Column on which the change occured']';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_pk_id is 'We assume that the pk column of the changed table has a number type']';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_old_value is 'The old value before the change']';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_new_value is 'The new value after the change']';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_user is 'The user,who changed the data']';
+            EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_timestamp is 'The time when the change occured']';
+          END LOOP;
+          util_debug_stop_one_step;
+        END check_if_log_table_exists;
       
         PROCEDURE check_if_api_name_exists IS
           v_object_type all_objects.object_type%TYPE;
@@ -3205,163 +3301,73 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
                                        'PACKAGE BODY');
         BEGIN
           util_debug_start_one_step(p_action => 'check_if_api_name_exists');
-          IF g_params.api_name IS NOT NULL
+          OPEN v_cur;
+          FETCH v_cur
+            INTO v_object_type;
+          CLOSE v_cur;
+          IF (v_object_type IS NOT NULL)
           THEN
-            OPEN v_cur;
-          
-            FETCH v_cur
-              INTO v_object_type;
-          
-            CLOSE v_cur;
-          
-            IF (v_object_type IS NOT NULL)
-            THEN
-              raise_application_error(c_generator_error_number,
-                                      'API name "' || g_params.api_name || '" does already exist as an object type "' ||
-                                      v_object_type || '". Please provide a different API name.');
-            END IF;
+            raise_application_error(c_generator_error_number,
+                                    'API name "' || g_params.api_name || '" does already exist as an object type "' ||
+                                    v_object_type || '". Please provide a different API name.');
           END IF;
           util_debug_stop_one_step;
         END check_if_api_name_exists;
       
-        PROCEDURE fetch_existing_api_params IS
-          CURSOR v_cur IS
-            SELECT *
-              FROM TABLE(view_existing_apis(p_table_name => g_params.table_name,
-                                            p_owner      => g_params.owner));
-        BEGIN
-          util_debug_start_one_step(p_action => 'fetch_existing_api_params');
-          g_status.api_exists := FALSE;
+        PROCEDURE check_if_sequence_exists IS
+          v_object_name all_objects.object_name%TYPE;
         
-          IF g_params.reuse_existing_api_params
-          THEN
-            OPEN v_cur;
-            FETCH v_cur
-              INTO g_params_existing_api;
-            IF v_cur%FOUND
-            THEN
-              g_status.api_exists := TRUE;
-            END IF;
-            CLOSE v_cur;
-          END IF;
-          util_debug_stop_one_step;
-        END fetch_existing_api_params;
-      
-        PROCEDURE check_column_prefix_validity IS
+          CURSOR v_cur IS
+            SELECT sequence_name
+              FROM all_sequences
+             WHERE sequence_owner = g_params.owner
+               AND sequence_name = g_params.sequence_name;
         BEGIN
-          util_debug_start_one_step(p_action => 'check_column_prefix_validity');
-          -- check,if option "col_prefix_in_method_names" is set and check then
-          -- if table's column prefix is unique
-          IF g_params.col_prefix_in_method_names = FALSE AND g_status.column_prefix IS NULL
+          util_debug_start_one_step(p_action => 'check_if_sequence_exists');
+          OPEN v_cur;
+          FETCH v_cur
+            INTO v_object_name;
+          CLOSE v_cur;
+          IF (v_object_name IS NULL)
           THEN
             raise_application_error(c_generator_error_number,
-                                    'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for getter and setter method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
+                                    'Sequence ' || g_params.sequence_name ||
+                                    ' does not exist. Please provide correct sequence name or create missing sequence.');
           END IF;
           util_debug_stop_one_step;
-        END check_column_prefix_validity;
+        END check_if_sequence_exists;
       
-        PROCEDURE check_if_log_table_exists IS
-          v_count PLS_INTEGER;
+        PROCEDURE fetch_custom_default_values IS
         BEGIN
-          util_debug_start_one_step(p_action => 'check_if_log_table_exists');
-          IF g_params.enable_generic_change_log
+          util_debug_start_one_step(p_action => 'fetch_custom_default_values');
+          g_params.custom_default_values := CASE
+                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                              -- g_status.api_exists contains only placeholder 
+                                              -- to signal that defaults exists. We have to 
+                                              -- fetch the defaults from the spec
+                                               CASE
+                                                 WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
+                                                 -- get the xml defaults from the end of the package spec
+                                                  util_get_spec_custom_defaults(g_params.api_name)
+                                               END
+                                              ELSE
+                                               p_custom_default_values
+                                            END;
+        
+          IF g_params.custom_default_values IS NOT NULL
           THEN
-            FOR i IN (SELECT 'GENERIC_CHANGE_LOG'
-                        FROM dual
-                      MINUS
-                      SELECT table_name
-                        FROM all_tables
-                       WHERE owner = g_params.owner
-                         AND table_name = 'GENERIC_CHANGE_LOG')
-            LOOP
-              -- check constraint
-              SELECT COUNT(*)
-                INTO v_count
-                FROM all_objects
-               WHERE owner = g_params.owner
-                 AND object_name = 'GENERIC_CHANGE_LOG_PK';
-            
-              IF v_count > 0
-              THEN
-                raise_application_error(c_generator_error_number,
-                                        'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_PK already exists.');
-              END IF;
-            
-              -- check sequence
-              SELECT COUNT(*)
-                INTO v_count
-                FROM all_objects
-               WHERE owner = g_params.owner
-                 AND object_name = 'GENERIC_CHANGE_LOG_SEQ';
-            
-              IF v_count > 0
-              THEN
-                raise_application_error(c_generator_error_number,
-                                        'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_SEQ already exists.');
-              END IF;
-            
-              -- check index
-              SELECT COUNT(*)
-                INTO v_count
-                FROM all_objects
-               WHERE owner = g_params.owner
-                 AND object_name = 'GENERIC_CHANGE_LOG_IDX';
-            
-              IF v_count > 0
-              THEN
-                raise_application_error(c_generator_error_number,
-                                        'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_IDX already exists.');
-              END IF;
-            
-              EXECUTE IMMEDIATE q'[
-create table generic_change_log (
-  gcl_id        NUMBER not null,
-  gcl_table     VARCHAR2(128 CHAR) not null,
-  gcl_column    VARCHAR2(128 CHAR) not null,
-  gcl_pk_id     NUMBER not null,
-  gcl_old_value VARCHAR2(4000 CHAR),
-  gcl_new_value VARCHAR2(4000 CHAR),
-  gcl_user      VARCHAR2(30 CHAR),
-  gcl_timestamp TIMESTAMP(6) default systimestamp,
-  constraint generic_change_log_pk primary key (gcl_id)
-)
-]';
-            
-              EXECUTE IMMEDIATE q'[
-create sequence generic_change_log_seq nocache noorder nocycle
-]';
-            
-              EXECUTE IMMEDIATE q'[
-create index generic_change_log_idx on generic_change_log (gcl_table,gcl_column,gcl_pk_id)
-]';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_id is 'Primary key of the table']';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_table is 'Table on which the change occured']';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_column is 'Column on which the change occured']';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_pk_id is 'We assume that the pk column of the changed table has a number type']';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_old_value is 'The old value before the change']';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_new_value is 'The new value after the change']';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_user is 'The user,who changed the data']';
-            
-              EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_timestamp is 'The time when the change occured']';
-            END LOOP;
+            g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
+          END IF;
+        
+          -- check for empty XML element
+          IF g_params.custom_defaults_serialized = '<defaults/>'
+          THEN
+            g_params.custom_default_values      := NULL;
+            g_params.custom_defaults_serialized := NULL;
           END IF;
           util_debug_stop_one_step;
-        END check_if_log_table_exists;
+        END fetch_custom_default_values;
+      
       BEGIN
         -- meta
         g_status.generator_action := p_generator_action;
@@ -3370,45 +3376,16 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
         g_params.owner      := p_owner;
         g_params.table_name := p_table_name;
         check_if_table_exists;
-        g_status.column_prefix := util_get_table_column_prefix(p_table_name => g_params.table_name);
       
         -- process existing API params
         g_params.reuse_existing_api_params := p_reuse_existing_api_params;
-        fetch_existing_api_params;
+        g_status.api_exists                := FALSE;
+        IF g_params.reuse_existing_api_params
+        THEN
+          fetch_existing_api_params;
+        END IF;
       
-        -- process rest of parameters        
-        g_params.sequence_name := CASE
-                                    WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                     g_params_existing_api.p_sequence_name
-                                    ELSE
-                                     CASE
-                                       WHEN p_sequence_name IS NOT NULL THEN
-                                        util_get_substituted_name(p_sequence_name)
-                                       ELSE
-                                        NULL
-                                     END
-                                  END;
-        check_if_sequence_exists;
-      
-        g_params.api_name := CASE
-                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists AND
-                                    g_params_existing_api.p_api_name IS NOT NULL THEN
-                                g_params_existing_api.p_api_name
-                               ELSE
-                                util_get_substituted_name(nvl(p_api_name,
-                                                              '#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'))
-                             END;
-        check_if_api_name_exists;
-      
-        g_params.col_prefix_in_method_names := CASE
-                                                 WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                  coalesce(util_string_to_bool(g_params_existing_api.p_col_prefix_in_method_names),
-                                                           c_col_prefix_in_method_names)
-                                                 ELSE
-                                                  p_col_prefix_in_method_names
-                                               END;
-        check_column_prefix_validity;
-      
+        -- process rest of parameters 
         g_params.enable_insertion_of_rows := CASE
                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_insertion_of_rows),
@@ -3423,14 +3400,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                                        c_enable_column_defaults)
                                              ELSE
                                               p_enable_column_defaults
-                                           END;
-      
-        g_params.enable_custom_defaults := CASE
-                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_custom_defaults),
-                                                       c_enable_custom_defaults)
-                                             ELSE
-                                              p_enable_custom_defaults
                                            END;
       
         g_params.enable_update_of_rows := CASE
@@ -3449,30 +3418,13 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                                p_enable_deletion_of_rows
                                             END;
       
-        g_params.enable_generic_change_log := CASE
+        g_params.enable_parameter_prefixes := CASE
                                                 WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_generic_change_log),
-                                                          c_enable_generic_change_log)
+                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_parameter_prefixes),
+                                                          c_enable_parameter_prefixes)
                                                 ELSE
-                                                 p_enable_generic_change_log
+                                                 p_enable_parameter_prefixes
                                               END;
-        check_if_log_table_exists;
-      
-        g_params.enable_dml_view := CASE
-                                      WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                       coalesce(util_string_to_bool(g_params_existing_api.p_enable_dml_view),
-                                                c_enable_dml_view)
-                                      ELSE
-                                       p_enable_dml_view
-                                    END;
-      
-        g_params.enable_getter_and_setter := CASE
-                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_getter_and_setter),
-                                                         c_enable_getter_and_setter)
-                                               ELSE
-                                                p_enable_getter_and_setter
-                                             END;
       
         g_params.enable_proc_with_out_params := CASE
                                                   WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
@@ -3482,13 +3434,25 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                                    p_enable_proc_with_out_params
                                                 END;
       
-        g_params.enable_parameter_prefixes := CASE
-                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_parameter_prefixes),
-                                                          c_enable_parameter_prefixes)
-                                                ELSE
-                                                 p_enable_parameter_prefixes
-                                              END;
+        g_params.enable_getter_and_setter := CASE
+                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_getter_and_setter),
+                                                         c_enable_getter_and_setter)
+                                               ELSE
+                                                p_enable_getter_and_setter
+                                             END;
+      
+        g_params.col_prefix_in_method_names := CASE
+                                                 WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                                  coalesce(util_string_to_bool(g_params_existing_api.p_col_prefix_in_method_names),
+                                                           c_col_prefix_in_method_names)
+                                                 ELSE
+                                                  p_col_prefix_in_method_names
+                                               END;
+        IF g_params.col_prefix_in_method_names = FALSE
+        THEN
+          check_table_column_prefix;
+        END IF;
       
         g_params.return_row_instead_of_pk := CASE
                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
@@ -3498,6 +3462,55 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                                 p_return_row_instead_of_pk
                                              END;
       
+        g_params.enable_dml_view := CASE
+                                      WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                       coalesce(util_string_to_bool(g_params_existing_api.p_enable_dml_view),
+                                                c_enable_dml_view)
+                                      ELSE
+                                       p_enable_dml_view
+                                    END;
+      
+        g_params.enable_generic_change_log := CASE
+                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_generic_change_log),
+                                                          c_enable_generic_change_log)
+                                                ELSE
+                                                 p_enable_generic_change_log
+                                              END;
+        IF g_params.enable_generic_change_log
+        THEN
+          check_if_log_table_exists;
+        END IF;
+      
+        g_params.api_name := CASE
+                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists AND
+                                    g_params_existing_api.p_api_name IS NOT NULL THEN
+                                g_params_existing_api.p_api_name
+                               ELSE
+                                util_get_substituted_name(nvl(p_api_name,
+                                                              '#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'))
+                             END;
+        IF g_params.api_name IS NOT NULL
+        THEN
+          check_if_api_name_exists;
+        END IF;
+      
+        g_params.sequence_name := CASE
+                                    WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                     g_params_existing_api.p_sequence_name
+                                    ELSE
+                                     CASE
+                                       WHEN p_sequence_name IS NOT NULL THEN
+                                        util_get_substituted_name(p_sequence_name)
+                                       ELSE
+                                        NULL
+                                     END
+                                  END;
+        IF g_params.sequence_name IS NOT NULL
+        THEN
+          check_if_sequence_exists;
+        END IF;
+      
         g_params.exclude_column_list := CASE
                                           WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                            g_params_existing_api.p_exclude_column_list
@@ -3505,31 +3518,18 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                            p_exclude_column_list
                                         END;
       
-        g_params.custom_defaults := CASE
-                                      WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                      -- g_status.api_exists contains only placeholder 
-                                      -- to signal that defaults exists. We have to 
-                                      -- fetch the defaults from the spec
-                                       CASE
-                                         WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
-                                         -- get the xml defaults from the end of the package spec
-                                          util_get_spec_custom_defaults(g_params.api_name)
-                                       END
-                                      ELSE
-                                       p_custom_default_values
-                                    END;
-      
-        IF g_params.custom_defaults IS NOT NULL
+        g_params.enable_custom_defaults := CASE
+                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_custom_defaults),
+                                                       c_enable_custom_defaults)
+                                             ELSE
+                                              p_enable_custom_defaults
+                                           END;
+        IF g_params.enable_custom_defaults
         THEN
-          g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_defaults);
+          fetch_custom_default_values;
         END IF;
       
-        -- check for empty XML element
-        IF g_params.custom_defaults_serialized = '<defaults/>'
-        THEN
-          g_params.custom_defaults            := NULL;
-          g_params.custom_defaults_serialized := NULL;
-        END IF;
       END process_parameters;
     
       PROCEDURE create_temporary_lobs IS
@@ -3598,7 +3598,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
           THEN
             g_status.rpad_columns := g_columns(i).column_name_length;
           END IF;
-          -- set initial pk info (will be refined in mark_columns_as_pk)        
+          -- set initial pk info (will be refined in process_pk_columns)        
           g_columns(i).is_pk_yn := 'N';
           -- create reverse index to get collection id by column name
           g_columns_index(g_columns(i).column_name) := i;
@@ -3689,9 +3689,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       process_uk_columns;
     END initialize;
   
-    PROCEDURE finalize IS
+    PROCEDURE finalize_clob_vc2_caching IS
     BEGIN
-      util_debug_start_one_step(p_action => 'finalize');
+      util_debug_start_one_step(p_action => 'finalize_clob_vc2_caching');
       -- finalize CLOB varchar caches
       util_clob_append(p_clob               => g_code_blocks.api_spec,
                        p_clob_varchar_cache => g_code_blocks.api_spec_varchar_cache,
@@ -3703,7 +3703,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                        p_varchar_to_append  => NULL,
                        p_final_call         => TRUE);
     
-      IF (g_params.enable_dml_view)
+      IF g_params.enable_dml_view
       THEN
         util_clob_append(p_clob               => g_code_blocks.dml_view,
                          p_clob_varchar_cache => g_code_blocks.dml_view_varchar_cache,
@@ -3716,7 +3716,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                          p_final_call         => TRUE);
       END IF;
       util_debug_stop_one_step;
-    END finalize;
+    END finalize_clob_vc2_caching;
   BEGIN
     initialize;
     gen_header;
@@ -3737,7 +3737,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     END IF;
   
     -- CREATE procedures/functions only if allowed
-    IF (g_params.enable_insertion_of_rows)
+    IF g_params.enable_insertion_of_rows
     THEN
       gen_create_row_fnc;
       gen_create_row_prc;
@@ -3760,20 +3760,20 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     gen_read_a_row_fnc;
   
     -- UPDATE procedures/functions only if allowed
-    IF (g_params.enable_update_of_rows)
+    IF g_params.enable_update_of_rows
     THEN
       gen_update_row_prc;
       gen_update_rowtype_prc;
     END IF;
   
     -- DELETE procedures only if allowed
-    IF (g_params.enable_deletion_of_rows)
+    IF g_params.enable_deletion_of_rows
     THEN
       gen_delete_row_prc;
     END IF;
   
     -- CREATE or UPDATE procedures/functions only if both is allowed
-    IF (g_params.enable_insertion_of_rows AND g_params.enable_update_of_rows)
+    IF g_params.enable_insertion_of_rows AND g_params.enable_update_of_rows
     THEN
       gen_createorupdate_row_fnc;
       gen_createorupdate_row_prc;
@@ -3789,7 +3789,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     END IF;
   
     -- SETTER procedures/functions only if allowed
-    IF (g_params.enable_update_of_rows AND g_params.enable_getter_and_setter)
+    IF g_params.enable_update_of_rows AND g_params.enable_getter_and_setter
     THEN
       gen_setter_procedures;
     END IF;
@@ -3797,50 +3797,61 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     gen_footer;
   
     -- DML View and Trigger only if allowed
-    IF (g_params.enable_dml_view)
+    IF g_params.enable_dml_view
     THEN
       gen_dml_view;
       gen_dml_view_trigger;
     END IF;
   
-    finalize;
+    finalize_clob_vc2_caching;
   END main_generate;
 
   PROCEDURE main_compile IS
   BEGIN
-    util_debug_start_one_step(p_action => 'compile');
     -- compile package spec
+    util_debug_start_one_step(p_action => 'compile_spec');
     BEGIN
       util_execute_sql(g_code_blocks.api_spec);
     EXCEPTION
       WHEN OTHERS THEN
         NULL;
     END;
+    util_debug_stop_one_step;
   
     -- compile package body
+    util_debug_start_one_step(p_action => 'compile_body');
     BEGIN
       util_execute_sql(g_code_blocks.api_body);
     EXCEPTION
       WHEN OTHERS THEN
         NULL;
     END;
-  
-    -- compile DML view
-    BEGIN
-      util_execute_sql(g_code_blocks.dml_view);
-    EXCEPTION
-      WHEN OTHERS THEN
-        NULL;
-    END;
-  
-    -- compile DML view trigger
-    BEGIN
-      util_execute_sql(g_code_blocks.dml_view_trigger);
-    EXCEPTION
-      WHEN OTHERS THEN
-        NULL;
-    END;
     util_debug_stop_one_step;
+  
+    IF g_params.enable_dml_view
+    THEN
+    
+      -- compile DML view
+      util_debug_start_one_step(p_action => 'compile_dml_view');
+      BEGIN
+        util_execute_sql(g_code_blocks.dml_view);
+      EXCEPTION
+        WHEN OTHERS THEN
+          NULL;
+      END;
+      util_debug_stop_one_step;
+    
+      -- compile DML view trigger
+      util_debug_start_one_step(p_action => 'compile_dml_view_trigger');
+      BEGIN
+        util_execute_sql(g_code_blocks.dml_view_trigger);
+      EXCEPTION
+        WHEN OTHERS THEN
+          NULL;
+      END;
+      util_debug_stop_one_step;
+    
+    END IF;
   END main_compile;
 
   FUNCTION main_return RETURN CLOB IS
