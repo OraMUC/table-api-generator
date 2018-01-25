@@ -1,45 +1,14 @@
-/* FIXME: provide a stable set of test tables and data and start to use utplsql
-
-SELECT * FROM TABLE(om_tapigen.view_existing_apis);
-SELECT * FROM TABLE(om_tapigen.util_view_debug);
-SELECT * FROM TABLE(om_tapigen.util_view_debug) WHERE action != 'compile' ORDER BY execution DESC;
-SELECT * FROM TABLE(om_tapigen.util_view_debug) WHERE action = 'fetch_columns';
-SELECT * FROM TABLE(om_tapigen.util_view_debug) WHERE table_name = 'TEST_TABLE_2' ORDER BY execution DESC;
-
--- check overall run time
-SELECT run, 
-       run_time, 
-       table_name, 
-       to_char(min(start_time),'hh24:mi:ss') as start_time
-  FROM TABLE(om_tapigen.util_view_debug) 
- GROUP BY run, run_time, table_name
- ORDER BY run_time DESC;
- 
--- check if we have any unmessured time (missing debug calls or overhead)
-SELECT table_name,
-       run_time, 
-       sum(execution) as sum_execution, 
-       run_time - sum(execution) as unmessured_time
-  FROM TABLE(om_tapigen.util_view_debug) 
- GROUP BY table_name, run_time;
- 
-*/
+/* FIXME: provide a stable set of test tables and data and start to use utplsql */
 
 BEGIN
     om_tapigen.util_set_debug_on;
-END;
-/
 
-BEGIN
   om_tapigen.compile_api(p_table_name                => 'COUNTRIES',
                          p_reuse_existing_api_params => FALSE,
                          p_enable_dml_view           => false,
                          p_enable_generic_change_log => TRUE,
                          p_sequence_name             => 'COUNTRIES_SEQ');
-END;
-/
 
-BEGIN
   om_tapigen.compile_api(p_table_name                  => 'EMP',
                          p_reuse_existing_api_params   => FALSE,
                          p_enable_insertion_of_rows    => TRUE,
@@ -57,18 +26,11 @@ BEGIN
                          p_exclude_column_list         => 'HIREDATE'
                          --,p_custom_default_values        => om_tapigen.util_get_custom_col_defaults('EMP')
                          );
-END;
-/
-
-
-BEGIN
+                         
   om_tapigen.compile_api(p_table_name                => 'DEPT',
                          p_reuse_existing_api_params => FALSE,
                          p_enable_dml_view           => TRUE);
-END;
-/
 
-BEGIN
   om_tapigen.compile_api(p_table_name                  => 'EMPLOYEES',
                          p_reuse_existing_api_params   => FALSE,
                          p_enable_insertion_of_rows    => TRUE,
@@ -88,22 +50,16 @@ BEGIN
                          p_enable_custom_defaults      => FALSE
                          --,p_custom_default_values        => om_tapigen.util_get_custom_col_defaults('EMPLOYEES')
                          );
-END;
-/
 
-BEGIN
   om_tapigen.compile_api(p_table_name                => 'TEST_2',
                          p_reuse_existing_api_params => FALSE,
                          p_enable_dml_view           => TRUE,
                          p_sequence_name             => 'TEST_2_SEQ');
-END;
-/
 
-BEGIN
   om_tapigen.compile_api(p_table_name                  => 'TEST_TABLE',
                          p_reuse_existing_api_params   => FALSE,
                          p_enable_insertion_of_rows    => TRUE,
-                         p_enable_column_defaults      => FALSE,
+                         p_enable_column_defaults      => false,
                          p_enable_update_of_rows       => TRUE,
                          p_enable_deletion_of_rows     => TRUE,
                          p_enable_generic_change_log   => TRUE,
@@ -117,12 +73,9 @@ BEGIN
                          p_enable_parameter_prefixes   => TRUE,
                          p_return_row_instead_of_pk    => FALSE,
                          p_enable_custom_defaults      => true
-                         -- ,p_custom_default_values               => om_tapigen.util_get_custom_col_defaults ('TEST_TABLE')
+                         --,p_custom_default_values               => om_tapigen.util_get_custom_col_defaults ('TEST_TABLE')
                          );
-END;
-/
 
-BEGIN
   om_tapigen.compile_api(p_table_name                  => 'TEST_TABLE_2',
                          p_reuse_existing_api_params   => FALSE,
                          p_enable_insertion_of_rows    => TRUE,

@@ -58,16 +58,18 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     rpad_uk_columns        INTEGER);
 
   TYPE t_rec_columns IS RECORD(
-    column_name                user_tab_columns.column_name%TYPE,
-    column_name_length         INTEGER,
-    data_type                  user_tab_cols.data_type%TYPE,
-    data_default               VARCHAR2(4000 CHAR),
-    data_default_length        INTEGER,
-    data_custom_default        VARCHAR2(4000 CHAR),
-    data_custom_default_length INTEGER,
-    is_pk_yn                   VARCHAR2(1 CHAR),
-    is_nullable_yn             VARCHAR2(1 CHAR),
-    is_excluded_yn             VARCHAR2(1 CHAR));
+    column_name         user_tab_columns.column_name%TYPE,
+    char_length         user_tab_cols.char_length%TYPE,
+    data_type           user_tab_cols.data_type%TYPE,
+    data_length         user_tab_cols.data_length%TYPE,
+    data_precision      user_tab_cols.data_precision%TYPE,
+    data_scale          user_tab_cols.data_scale%TYPE,
+    data_default        VARCHAR2(4000 CHAR),
+    data_custom_default VARCHAR2(4000 CHAR),
+    is_pk_yn            VARCHAR2(1 CHAR),
+    is_uk_yn            VARCHAR2(1 CHAR),
+    is_nullable_yn      VARCHAR2(1 CHAR),
+    is_excluded_yn      VARCHAR2(1 CHAR));
 
   TYPE t_rec_constraints IS RECORD(
     constraint_name user_constraints.constraint_name%TYPE);
@@ -142,12 +144,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   g_template_options    t_rec_template_options;
 
   -- collections
-  g_columns            t_tab_columns;
-  g_columns_index      t_tab_columns_index;
-  g_unique_constraints t_tab_constraints;
-  g_pk_columns         t_tab_cons_columns;
-  g_uk_columns         t_tab_cons_columns;
-  g_debug              t_tab_debug;
+  g_columns               t_tab_columns;
+  g_columns_reverse_index t_tab_columns_index;
+  g_unique_constraints    t_tab_constraints;
+  g_pk_columns            t_tab_cons_columns;
+  g_uk_columns            t_tab_cons_columns;
+  g_debug                 t_tab_debug;
 
   -----------------------------------------------------------------------------
   -- private global cursors g_cur_*
@@ -192,8 +194,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     t AS
      (SELECT column_id,
              column_name,
-             length(column_name) AS column_name_length,
+             char_length,
              data_type,
+             data_length,
+             data_precision,
+             data_scale,
              CASE
                WHEN data_default IS NOT NULL THEN
                 (SELECT om_tapigen.util_get_column_data_default(p_owner       => g_params.owner,
@@ -227,13 +232,15 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
          AND hidden_column = 'NO'
        ORDER BY column_id)
     SELECT column_name,
-           column_name_length,
+           char_length,
            data_type,
+           data_length,
+           data_precision,
+           data_scale,
            data_default,
-           length(data_default) AS data_default_length,
            NULL AS data_custom_default,
-           NULL AS data_custom_default_length,
-           NULL AS is_pk_yn,
+           'N' AS is_pk_yn,
+           'N' AS is_uk_yn,
            is_nullable_yn,
            is_excluded_yn
       FROM t;
@@ -278,55 +285,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
               acc.position;
 
   -----------------------------------------------------------------------------
-  -- util_clob_append is a private helper procedure to append a varchar2 value
-  -- to an existing clob. The idea is to increase performance by avoiding the
-  -- slow DBMS_LOB.append call. Only for the final append or if the varchar
-  -- cache is fullfilled,this call is done.
-  -----------------------------------------------------------------------------
-
-  PROCEDURE util_clob_append(p_clob               IN OUT NOCOPY CLOB,
-                             p_clob_varchar_cache IN OUT NOCOPY VARCHAR2,
-                             p_varchar_to_append  IN VARCHAR2,
-                             p_final_call         IN BOOLEAN DEFAULT FALSE) IS
-  BEGIN
-    p_clob_varchar_cache := p_clob_varchar_cache || p_varchar_to_append;
-  
-    IF p_final_call
-    THEN
-      IF p_clob IS NULL
-      THEN
-        p_clob := p_clob_varchar_cache;
-      ELSE
-        dbms_lob.append(p_clob,
-                        p_clob_varchar_cache);
-      END IF;
-    
-      -- clear cache on final call
-    
-      p_clob_varchar_cache := NULL;
-    END IF;
-  EXCEPTION
-    WHEN value_error THEN
-      IF p_clob IS NULL
-      THEN
-        p_clob := p_clob_varchar_cache;
-      ELSE
-        dbms_lob.append(p_clob,
-                        p_clob_varchar_cache);
-      END IF;
-    
-      p_clob_varchar_cache := p_varchar_to_append;
-    
-      IF p_final_call
-      THEN
-        dbms_lob.append(p_clob,
-                        p_clob_varchar_cache);
-        -- clear cache on final call
-        p_clob_varchar_cache := NULL;
-      END IF;
-  END util_clob_append;
-
-  -----------------------------------------------------------------------------
   -- util_execute_sql is a private helper procedure that parses and executes
   -- generated code with the help of DBMS_SQL package. Execute immediate is not
   -- used here directly,because of the missing possibility of parsing a
@@ -334,7 +292,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   -- the error is more expensive than parsing the statement and catching the
   -- error.
   -----------------------------------------------------------------------------
-
   PROCEDURE util_execute_sql(p_sql IN OUT NOCOPY CLOB) IS
     v_cursor      NUMBER;
     v_exec_result PLS_INTEGER;
@@ -1136,7 +1093,7 @@ END;';
   owner          all_users.username%TYPE,
   table_name     all_objects.object_name%TYPE);*/
 
-  FUNCTION util_view_debug RETURN t_tab_debug_data
+  FUNCTION util_view_debug_log RETURN t_tab_debug_data
     PIPELINED IS
     v_return t_rec_debug_data;
   BEGIN
@@ -1167,754 +1124,828 @@ END;';
   
   END;
 
-  -----------------------------------------------------------------------------
-  -- Columns as flat list for insert - without p_column_exclude_list:
-  -- {% LIST_INSERT_COLUMNS %}
-  -- Example:
-  --   col1,
-  --   col2,
-  --   col3,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_insert_columns RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '      ' || '"' || g_columns(i).column_name || '"' || c_list_delimiter;
-      END IF;
-    END LOOP;
+  FUNCTION util_generate_list(p_list_name VARCHAR2) RETURN t_tab_result_list IS
   
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
+    -----------------------------------------------------------------------------
+    -- Columns as flat list for insert - without p_column_exclude_list:
+    -- {% LIST_INSERT_COLUMNS %}
+    -- Example:
+    --   col1,
+    --   col2,
+    --   col3,
+    --   ...
+    -----------------------------------------------------------------------------
   
-    RETURN v_result;
-  END list_insert_columns;
-
-  -----------------------------------------------------------------------------
-  -- Columns as flat list for insert - without p_column_exclude_list:
-  -- {% LIST_INSERT_PARAMS %}
-  -- Example:
-  --   p_col2,
-  --   p_col3,
-  --   p_col4,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_insert_params RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '      ' || CASE
-                                          WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_params.sequence_name IS NOT NULL THEN
-                                           'COALESCE( ' || util_get_parameter_name(g_columns(i).column_name,
-                                                                                   NULL) || ',"' || g_params.sequence_name || '".nextval )'
-                                          ELSE
-                                           util_get_parameter_name(g_columns(i).column_name,
-                                                                   NULL)
-                                        END || c_list_delimiter;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_insert_params;
-
-  -----------------------------------------------------------------------------
-  -- Columns as flat list - with p_column_exclude_list:
-  -- {% LIST_COLUMNS_W_PK_FULL %}
-  -- Example:
-  --   col1,
-  --   col2,
-  --   col3,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_columns_w_pk_full RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      v_result(v_result.count + 1) := '      ' || '"' || g_columns(i).column_name || '"' || c_list_delimiter;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_columns_w_pk_full;
-
-  -----------------------------------------------------------------------------
-  -- A list of column defaults - used in the function get_a_row:
-  -- {% LIST_COLUMNS_W_PK_DEFAULTS %}
-  -- Example:
-  --   v_row.employee_id := employees_seq.nextval; --generated from SEQ
-  --   v_row.first_name  := 'Rowan';
-  --   v_row.last_name   := 'Atkinson';
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_columns_w_pk_defaults RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  
-    FUNCTION is_excluded_yn(p_column_name IN user_tab_cols.column_name%TYPE) RETURN VARCHAR2 IS
-      v_return VARCHAR2(1 CHAR) := 'N';
+    FUNCTION list_insert_columns RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
-        IF g_columns(i).column_name = p_column_name
+        IF g_columns(i).is_excluded_yn = 'N'
         THEN
-          v_return := g_columns(i).is_excluded_yn;
+          v_result(v_result.count + 1) := '      ' || '"' || g_columns(i).column_name || '"' || c_list_delimiter;
         END IF;
       END LOOP;
     
-      RETURN v_return;
-    END;
-  BEGIN
-    IF g_params.custom_default_values IS NULL
-    THEN
-      -- normal list processing
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_insert_columns;
+  
+    -----------------------------------------------------------------------------
+    -- Columns as flat list for insert - without p_column_exclude_list:
+    -- {% LIST_INSERT_PARAMS %}
+    -- Example:
+    --   p_col2,
+    --   p_col3,
+    --   p_col4,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_insert_params RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).data_default IS NOT NULL
+        IF g_columns(i).is_excluded_yn = 'N'
         THEN
-          v_result(v_result.count + 1) := '    ' || 'v_row.' || rpad('"' || g_columns(i).column_name || '"',
-                                                                     g_status.rpad_columns + 2) || ' := ' || g_columns(i)
-                                         .data_default || ';' || c_crlf;
+          v_result(v_result.count + 1) := '      ' || CASE
+                                            WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_params.sequence_name IS NOT NULL THEN
+                                             'COALESCE( ' || util_get_parameter_name(g_columns(i).column_name,
+                                                                                     NULL) || ',"' || g_params.sequence_name || '".nextval )'
+                                            ELSE
+                                             util_get_parameter_name(g_columns(i).column_name,
+                                                                     NULL)
+                                          END || c_list_delimiter;
         END IF;
       END LOOP;
-    ELSE
-      -- special handling of given XML parameter
-      FOR i IN (SELECT x.column_name,
-                       x.data_default
-                  FROM xmltable('/defaults/item' passing g_params.custom_default_values --
-                                columns --
-                                column_name VARCHAR2(128) path './col',
-                                data_default VARCHAR2(4000) path './val') x)
-      LOOP
-        -- check,if column was excluded with param p_column_exclude_list
-        IF is_excluded_yn(i.column_name) = 'N' AND i.data_default IS NOT NULL
-        THEN
-          v_result(v_result.count + 1) := '    v_row."' || i.column_name || '" := ' || i.data_default || ';' || c_crlf;
-        END IF;
-      END LOOP;
-    END IF;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_insert_params;
   
-    IF v_result.count > 0
-    THEN
+    -----------------------------------------------------------------------------
+    -- Columns as flat list - with p_column_exclude_list:
+    -- {% LIST_COLUMNS_W_PK_FULL %}
+    -- Example:
+    --   col1,
+    --   col2,
+    --   col3,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_columns_w_pk_full RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        v_result(v_result.count + 1) := '      ' || '"' || g_columns(i).column_name || '"' || c_list_delimiter;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_columns_w_pk_full;
+  
+    -----------------------------------------------------------------------------
+    -- A block of code who compares new and old column values (without PK column) and
+    -- counts the number  of differences:
+    --    {% LIST_COLUMNS_WO_PK_COMPARE %}
+    -- Example:
+    --    IF COALESCE( v_row.test_number,-9999.9999 ) <> COALESCE( p_test_number,-9999.9999 ) THEN
+    --        v_count := v_count + 1;
+    --        create_change_log_entry( p_table     => 'map_users_roles'
+    --                         ,p_column    => 'mur_u_id'
+    --                         ,p_pk_id     => v_row.mur_id
+    --                         ,p_old_value => to_char(v_row.mur_u_id)
+    --                         ,p_new_value => to_char(p_mur_u_id) );
+    --    END IF;
+    --    IF DBMS_LOB.compare(COALESCE(v_row.test_clob,TO_CLOB('$$$$')),COALESCE(p_test_clob,TO_CLOB('$$$$'))) <> 0 THEN
+    --        v_count := v_count + 1;
+    --        create_change_log_entry( p_table     => 'map_users_roles'
+    --                         ,p_column    => 'mur_u_id'
+    --                         ,p_pk_id     => v_row.mur_id
+    --                         ,p_old_value => to_char(v_row.mur_u_id)
+    --                         ,p_new_value => to_char(p_mur_u_id) );
+    --    END IF;
+    --    ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_columns_wo_pk_compare RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := CASE
+                                            WHEN i != v_result.first THEN
+                                             CASE
+                                               WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+                                                '      IF '
+                                               ELSE
+                                                '      OR '
+                                             END
+                                          END || util_get_attribute_compare(p_data_type         => g_columns(i).data_type,
+                                                                            p_first_attribute   => 'v_row."' || g_columns(i)
+                                                                                                  .column_name || '"',
+                                                                            p_second_attribute  => util_get_parameter_name(g_columns(i)
+                                                                                                                           .column_name,
+                                                                                                                           NULL),
+                                                                            p_compare_operation => '<>') || CASE
+                                            WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+                                             ' THEN'
+                                          END || c_crlf;
+        
+          IF g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column
+          THEN
+            v_result(v_result.count + 1) := '        v_count := v_count + 1;' || c_crlf;
+            v_result(v_result.count + 1) := '        create_change_log_entry (' || c_crlf;
+            v_result(v_result.count + 1) := '          p_table     => ''' || g_params.table_name || ''',' || c_crlf;
+          
+            v_result(v_result.count + 1) := '          p_column    => ''' || g_columns(i).column_name || ''',' ||
+                                            c_crlf;
+          
+            v_result(v_result.count + 1) := '          p_pk_id     => v_row."' || g_pk_columns(1).column_name || '",' ||
+                                            c_crlf;
+          
+            v_result(v_result.count + 1) := '          p_old_value => ' ||
+                                            util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
+                                                                        p_attribute_name => 'v_row."' || g_columns(i)
+                                                                                           .column_name || '"') || ',' ||
+                                            c_crlf;
+          
+            v_result(v_result.count + 1) := '          p_new_value => ' ||
+                                            util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
+                                                                        p_attribute_name => util_get_parameter_name(g_columns(i)
+                                                                                                                    .column_name,
+                                                                                                                    NULL)) ||
+                                            ' );' || c_crlf;
+          
+            v_result(v_result.count + 1) := '      END IF;' || c_crlf;
+          END IF;
+        END IF;
+      END LOOP;
+    
+      IF g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column
+      THEN
+        v_result(v_result.count + 1) := '      IF v_count > 0';
+      END IF;
+    
+      RETURN v_result;
+    END list_columns_wo_pk_compare;
+  
+    -----------------------------------------------------------------------------
+    -- Columns as parameter definition for create_row,update_row with PK:
+    -- {% LIST_PARAMS_W_PK %}
+    -- Example:
+    --   p_col1 IN table.col1%TYPE,
+    --   p_col2 IN table.col2%TYPE,
+    --   p_col3 IN table.col3%TYPE,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_params_w_pk RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := CASE
+                                            WHEN g_template_options.rpad IS NOT NULL THEN
+                                             rpad(' ',
+                                                  g_template_options.rpad)
+                                            ELSE
+                                             '    '
+                                          END || util_get_parameter_name(g_columns(i).column_name,
+                                                                         g_status.rpad_columns) || ' IN "' ||
+                                          g_params.table_name || '"."' || CASE
+                                            WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
+                                             rpad(g_columns(i).column_name || '"%TYPE',
+                                                  g_status.rpad_columns + 6)
+                                            ELSE
+                                             g_columns(i).column_name || '"%TYPE'
+                                          END || CASE
+                                            WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_columns(i).data_default IS NULL THEN
+                                             ' DEFAULT NULL'
+                                            WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
+                                             CASE
+                                               WHEN g_columns(i).data_default IS NOT NULL THEN
+                                                ' DEFAULT ' || g_columns(i).data_default
+                                               WHEN g_columns(i).is_nullable_yn = 'Y' THEN
+                                                ' DEFAULT NULL'
+                                               ELSE
+                                                ' '
+                                             END
+                                          END || CASE
+                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
+                                             ' /*PK*/'
+                                          END || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_params_w_pk;
+  
+    -----------------------------------------------------------------------------
+    -- A parameter list with column defaults:
+    -- {% LIST_PARAMS_W_PK_CUST_DEFAULTS %}
+    -- Example:
+    --   p_employee_id IN employees.employee_id%TYPE DEFAULT get_a_row()."EMPLOYEE_ID",
+    --   p_first_name  IN employees.first_name%TYPE  DEFAULT get_a_row()."FIRST_NAME",
+    --   p_last_name   IN employees.last_name%TYPE   DEFAULT get_a_row()."LAST_NAME",
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_params_w_pk_cust_defaults RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_columns(i).column_name,
+                                                                            g_status.rpad_columns) || ' IN "' ||
+                                          g_params.table_name || '".' ||
+                                          rpad('"' || g_columns(i).column_name || '"%TYPE',
+                                               g_status.rpad_columns + 7) || ' DEFAULT get_a_row()."' || g_columns(i)
+                                         .column_name || '"' || CASE
+                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
+                                             ' /*PK*/'
+                                          END || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_params_w_pk_cust_defaults;
+  
+    -----------------------------------------------------------------------------
+    -- Columns as parameter IN OUT definition for read_row with PK:
+    -- {% LIST_PARAMS_W_PK_IO %}
+    -- Example:
+    --   p_col1 IN            table.col1%TYPE,
+    --   p_col2 IN OUT NOCOPY table.col2%TYPE,
+    --   p_col3 IN OUT NOCOPY table.col3%TYPE,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_params_w_pk_io RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_columns(i).column_name,
+                                                                          g_status.rpad_columns) || CASE
+                                          WHEN g_columns(i).is_pk_yn = 'Y' THEN
+                                           ' IN            '
+                                          ELSE
+                                           '    OUT NOCOPY '
+                                        END || '"' || g_params.table_name || '"."' || g_columns(i).column_name ||
+                                        '"%TYPE' || CASE
+                                          WHEN g_columns(i).is_pk_yn = 'Y' THEN
+                                           ' /*PK*/'
+                                        END || c_list_delimiter;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_params_w_pk_io;
+  
+    -----------------------------------------------------------------------------
+    -- Map :new values to parameter for IOIUD-Trigger with PK:
+    -- {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %}
+    -- Example:
+    --   p_col1 => :new.col1,
+    --   p_col2 => :new.col2,
+    --   p_col3 => :new.col3,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_map_par_eq_newcol_w_pk RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
+                                                                              g_status.rpad_columns) || ' => :new."' || g_columns(i)
+                                         .column_name || '"' || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_map_par_eq_newcol_w_pk;
+  
+    -----------------------------------------------------------------------------
+    --  Map parameter to parameter as pass-through parameter with PK:
+    -- {% LIST_MAP_PAR_EQ_PARAM_W_PK %}
+    -- Example:
+    --   p_col1 => p_col1,
+    --   p_col2 => p_col2,
+    --   p_col3 => p_col3,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_map_par_eq_param_w_pk RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
+                                                                              g_status.rpad_columns) || ' => ' ||
+                                          util_get_parameter_name(g_columns(i).column_name,
+                                                                  NULL) || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_map_par_eq_param_w_pk;
+  
+    -----------------------------------------------------------------------------
+    -- map rowtype columns to parameter for rowtype handling with PK:
+    -- {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %}
+    -- Example:
+    --   p_col1 => p_row.col1,
+    --   p_col2 => p_row.col2,
+    --   p_col3 => p_row.col3,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_map_par_eq_rowtypcol_w_pk RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
+                                                                              g_status.rpad_columns) || ' => p_row."' || g_columns(i)
+                                         .column_name || '"' || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_map_par_eq_rowtypcol_w_pk;
+  
+    -----------------------------------------------------------------------------
+    -- A column list for updating a row without PK:
+    -- {% LIST_SET_COL_EQ_PARAM_WO_PK %}
+    -- Example:
+    --   test_number   = p_test_number,
+    --   test_varchar2 = p_test_varchar2,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_set_col_eq_param_wo_pk RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := '               ' || rpad('"' || g_columns(i).column_name || '"',
+                                                                    g_status.rpad_columns + 2) || ' = ' ||
+                                          util_get_parameter_name(g_columns(i).column_name,
+                                                                  NULL) || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_set_col_eq_param_wo_pk;
+  
+    -----------------------------------------------------------------------------
+    -- A column list without pk for setting parameter to row columns:
+    -- {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
+    -- Example:
+    --   p_test_number   := v_row.test_number;
+    --   p_test_varchar2 := v_row.test_varchar2;
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_set_par_eq_rowtycol_wo_pk RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
+        THEN
+          v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
+                                                                              g_status.rpad_columns) || ' := v_row."' || g_columns(i)
+                                         .column_name || '"; ' || c_crlf;
+        END IF;
+      END LOOP;
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last),
                                        c_crlf);
-    END IF;
+    
+      RETURN v_result;
+    END list_set_par_eq_rowtycol_wo_pk;
   
-    RETURN v_result;
-  END list_columns_w_pk_defaults;
-
-  -----------------------------------------------------------------------------
-  -- A block of code who compares new and old column values (without PK column) and
-  -- counts the number  of differences:
-  --    {% LIST_COLUMNS_WO_PK_COMPARE %}
-  -- Example:
-  --    IF COALESCE( v_row.test_number,-9999.9999 ) <> COALESCE( p_test_number,-9999.9999 ) THEN
-  --        v_count := v_count + 1;
-  --        create_change_log_entry( p_table     => 'map_users_roles'
-  --                         ,p_column    => 'mur_u_id'
-  --                         ,p_pk_id     => v_row.mur_id
-  --                         ,p_old_value => to_char(v_row.mur_u_id)
-  --                         ,p_new_value => to_char(p_mur_u_id) );
-  --    END IF;
-  --    IF DBMS_LOB.compare(COALESCE(v_row.test_clob,TO_CLOB('$$$$')),COALESCE(p_test_clob,TO_CLOB('$$$$'))) <> 0 THEN
-  --        v_count := v_count + 1;
-  --        create_change_log_entry( p_table     => 'map_users_roles'
-  --                         ,p_column    => 'mur_u_id'
-  --                         ,p_pk_id     => v_row.mur_id
-  --                         ,p_old_value => to_char(v_row.mur_u_id)
-  --                         ,p_new_value => to_char(p_mur_u_id) );
-  --    END IF;
-  --    ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_columns_wo_pk_compare RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := CASE
-                                          WHEN i != v_result.first THEN
-                                           CASE
-                                             WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                              '      IF '
-                                             ELSE
-                                              '      OR '
-                                           END
-                                        END || util_get_attribute_compare(p_data_type         => g_columns(i).data_type,
-                                                                          p_first_attribute   => 'v_row."' || g_columns(i)
-                                                                                                .column_name || '"',
-                                                                          p_second_attribute  => util_get_parameter_name(g_columns(i)
-                                                                                                                         .column_name,
-                                                                                                                         NULL),
-                                                                          p_compare_operation => '<>') || CASE
-                                          WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                           ' THEN'
-                                        END || c_crlf;
-      
-        IF g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column
-        THEN
-          v_result(v_result.count + 1) := '        v_count := v_count + 1;' || c_crlf;
-          v_result(v_result.count + 1) := '        create_change_log_entry (' || c_crlf;
-          v_result(v_result.count + 1) := '          p_table     => ''' || g_params.table_name || ''',' || c_crlf;
-        
-          v_result(v_result.count + 1) := '          p_column    => ''' || g_columns(i).column_name || ''',' || c_crlf;
-        
-          v_result(v_result.count + 1) := '          p_pk_id     => v_row."' || g_pk_columns(1).column_name || '",' ||
-                                          c_crlf;
-        
-          v_result(v_result.count + 1) := '          p_old_value => ' ||
-                                          util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
-                                                                      p_attribute_name => 'v_row."' || g_columns(i)
-                                                                                         .column_name || '"') || ',' ||
-                                          c_crlf;
-        
-          v_result(v_result.count + 1) := '          p_new_value => ' ||
-                                          util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
-                                                                      p_attribute_name => util_get_parameter_name(g_columns(i)
-                                                                                                                  .column_name,
-                                                                                                                  NULL)) ||
-                                          ' );' || c_crlf;
-        
-          v_result(v_result.count + 1) := '      END IF;' || c_crlf;
-        END IF;
-      END IF;
-    END LOOP;
+    -----------------------------------------------------------------------------
+    -- Primary key parameter definition for create_row:
+    -- {% LIST_PARAMS_PK %}
+    -- Example:
+    --   p_col1 IN table.col1%TYPE,
+    --   p_col2 IN table.col2%TYPE,
+    --   p_col3 IN table.col3%TYPE,
+    --   ...
+    -----------------------------------------------------------------------------
   
-    IF g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column
-    THEN
-      v_result(v_result.count + 1) := '      IF v_count > 0';
-    END IF;
-  
-    RETURN v_result;
-  END list_columns_wo_pk_compare;
-
-  -----------------------------------------------------------------------------
-  -- Columns as parameter definition for create_row,update_row with PK:
-  -- {% LIST_PARAMS_W_PK %}
-  -- Example:
-  --   p_col1 IN table.col1%TYPE,
-  --   p_col2 IN table.col2%TYPE,
-  --   p_col3 IN table.col3%TYPE,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_params_w_pk RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := CASE
-                                          WHEN g_template_options.rpad IS NOT NULL THEN
-                                           rpad(' ',
-                                                g_template_options.rpad)
-                                          ELSE
-                                           '    '
-                                        END || util_get_parameter_name(g_columns(i).column_name,
-                                                                       g_status.rpad_columns) || ' IN "' ||
-                                        g_params.table_name || '"."' || CASE
-                                          WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
-                                           rpad(g_columns(i).column_name || '"%TYPE',
-                                                g_status.rpad_columns + 6)
-                                          ELSE
-                                           g_columns(i).column_name || '"%TYPE'
-                                        END || CASE
-                                          WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_columns(i).data_default IS NULL THEN
-                                           ' DEFAULT NULL'
-                                          WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
-                                           CASE
-                                             WHEN g_columns(i).data_default IS NOT NULL THEN
-                                              ' DEFAULT ' || g_columns(i).data_default
-                                             WHEN g_columns(i).is_nullable_yn = 'Y' THEN
-                                              ' DEFAULT NULL'
-                                             ELSE
-                                              ' '
-                                           END
-                                        END || CASE
-                                          WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                           ' /*PK*/'
-                                        END || c_list_delimiter;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_params_w_pk;
-
-  -----------------------------------------------------------------------------
-  -- A parameter list with column defaults:
-  -- {% LIST_PARAMS_W_PK_CUST_DEFAULTS %}
-  -- Example:
-  --   p_employee_id IN employees.employee_id%TYPE DEFAULT get_a_row()."EMPLOYEE_ID",
-  --   p_first_name  IN employees.first_name%TYPE  DEFAULT get_a_row()."FIRST_NAME",
-  --   p_last_name   IN employees.last_name%TYPE   DEFAULT get_a_row()."LAST_NAME",
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_params_w_pk_cust_defaults RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_columns(i).column_name,
+    FUNCTION list_pk_params RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last
+      LOOP
+        v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_pk_columns(i).column_name,
                                                                           g_status.rpad_columns) || ' IN "' ||
-                                        g_params.table_name || '".' ||
-                                        rpad('"' || g_columns(i).column_name || '"%TYPE',
-                                             g_status.rpad_columns + 7) || ' DEFAULT get_a_row()."' || g_columns(i)
-                                       .column_name || '"' || CASE
-                                          WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                           ' /*PK*/'
-                                        END || c_list_delimiter;
-      END IF;
-    END LOOP;
+                                        g_params.table_name || '"."' || g_pk_columns(i).column_name || '"%TYPE /*PK*/' ||
+                                        c_list_delimiter;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_pk_params;
   
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
+    -----------------------------------------------------------------------------
+    -- Primary key columns parameter compare for get_pk_by_unique_cols functions:
+    -- {% LIST_PK_COLUMN_COMPARE %}
+    -- Example:
+    --       COALESCE( "COL1",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col1,'@@@@@@@@@@@@@@@' )
+    --   AND COALESCE( "COL2",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col2,'@@@@@@@@@@@@@@@' )
+    --   ...
+    -----------------------------------------------------------------------------
   
-    RETURN v_result;
-  END list_params_w_pk_cust_defaults;
-
-  -----------------------------------------------------------------------------
-  -- Columns as parameter IN OUT definition for read_row with PK:
-  -- {% LIST_PARAMS_W_PK_IO %}
-  -- Example:
-  --   p_col1 IN            table.col1%TYPE,
-  --   p_col2 IN OUT NOCOPY table.col2%TYPE,
-  --   p_col3 IN OUT NOCOPY table.col3%TYPE,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_params_w_pk_io RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_columns(i).column_name,
-                                                                        g_status.rpad_columns) || CASE
-                                        WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                         ' IN            '
-                                        ELSE
-                                         '    OUT NOCOPY '
-                                      END || '"' || g_params.table_name || '"."' || g_columns(i).column_name ||
-                                      '"%TYPE' || CASE
-                                        WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                         ' /*PK*/'
-                                      END || c_list_delimiter;
-    END LOOP;
+    FUNCTION list_pk_column_compare RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last
+      LOOP
+        v_result(v_result.count + 1) := '               ' || 'AND ' ||
+                                        util_get_attribute_compare(p_data_type         => g_pk_columns(i).data_type,
+                                                                   p_first_attribute   => '"' || g_pk_columns(i)
+                                                                                         .column_name || '"',
+                                                                   p_second_attribute  => util_get_parameter_name(g_pk_columns(i)
+                                                                                                                  .column_name,
+                                                                                                                  NULL),
+                                                                   p_compare_operation => '=') || c_crlf;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)),
+                                        'AND ');
+    
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_crlf);
+    
+      RETURN v_result;
+    END list_pk_column_compare;
   
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
+    -----------------------------------------------------------------------------
+    -- Primary key columns as "parameter => parameter" mapping for read_row functions:
+    -- {% LIST_PK_MAP_PARAM_EQ_PARAM %}
+    -- Example:
+    --   p_col1 => p_col1,
+    --   p_col2 => p_col2,
+    --   ...
+    -----------------------------------------------------------------------------
   
-    RETURN v_result;
-  END list_params_w_pk_io;
-
-  -----------------------------------------------------------------------------
-  -- Map :new values to parameter for IOIUD-Trigger with PK:
-  -- {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %}
-  -- Example:
-  --   p_col1 => :new.col1,
-  --   p_col2 => :new.col2,
-  --   p_col3 => :new.col3,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_map_par_eq_newcol_w_pk RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
-                                                                            g_status.rpad_columns) || ' => :new."' || g_columns(i)
-                                       .column_name || '"' || c_list_delimiter;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_map_par_eq_newcol_w_pk;
-
-  -----------------------------------------------------------------------------
-  --  Map parameter to parameter as pass-through parameter with PK:
-  -- {% LIST_MAP_PAR_EQ_PARAM_W_PK %}
-  -- Example:
-  --   p_col1 => p_col1,
-  --   p_col2 => p_col2,
-  --   p_col3 => p_col3,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_map_par_eq_param_w_pk RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
-                                                                            g_status.rpad_columns) || ' => ' ||
-                                        util_get_parameter_name(g_columns(i).column_name,
-                                                                NULL) || c_list_delimiter;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_map_par_eq_param_w_pk;
-
-  -----------------------------------------------------------------------------
-  -- map rowtype columns to parameter for rowtype handling with PK:
-  -- {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %}
-  -- Example:
-  --   p_col1 => p_row.col1,
-  --   p_col2 => p_row.col2,
-  --   p_col3 => p_row.col3,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_map_par_eq_rowtypcol_w_pk RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
-                                                                            g_status.rpad_columns) || ' => p_row."' || g_columns(i)
-                                       .column_name || '"' || c_list_delimiter;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_map_par_eq_rowtypcol_w_pk;
-
-  -----------------------------------------------------------------------------
-  -- A column list for updating a row without PK:
-  -- {% LIST_SET_COL_EQ_PARAM_WO_PK %}
-  -- Example:
-  --   test_number   = p_test_number,
-  --   test_varchar2 = p_test_varchar2,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_set_col_eq_param_wo_pk RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '               ' || rpad('"' || g_columns(i).column_name || '"',
-                                                                  g_status.rpad_columns + 2) || ' = ' ||
-                                        util_get_parameter_name(g_columns(i).column_name,
-                                                                NULL) || c_list_delimiter;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_set_col_eq_param_wo_pk;
-
-  -----------------------------------------------------------------------------
-  -- A column list without pk for setting parameter to row columns:
-  -- {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
-  -- Example:
-  --   p_test_number   := v_row.test_number;
-  --   p_test_varchar2 := v_row.test_varchar2;
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_set_par_eq_rowtycol_wo_pk RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
-      THEN
-        v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_columns(i).column_name,
-                                                                            g_status.rpad_columns) || ' := v_row."' || g_columns(i)
-                                       .column_name || '"; ' || c_crlf;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_crlf);
-  
-    RETURN v_result;
-  END list_set_par_eq_rowtycol_wo_pk;
-
-  -----------------------------------------------------------------------------
-  -- Primary key parameter definition for create_row:
-  -- {% LIST_PARAMS_PK %}
-  -- Example:
-  --   p_col1 IN table.col1%TYPE,
-  --   p_col2 IN table.col2%TYPE,
-  --   p_col3 IN table.col3%TYPE,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_pk_params RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_pk_columns.first .. g_pk_columns.last
-    LOOP
-      v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_pk_columns(i).column_name,
-                                                                        g_status.rpad_columns) || ' IN "' ||
-                                      g_params.table_name || '"."' || g_pk_columns(i).column_name || '"%TYPE /*PK*/' ||
-                                      c_list_delimiter;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_pk_params;
-
-  -----------------------------------------------------------------------------
-  -- Primary key columns parameter compare for get_pk_by_unique_cols functions:
-  -- {% LIST_PK_COLUMN_COMPARE %}
-  -- Example:
-  --       COALESCE( "COL1",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col1,'@@@@@@@@@@@@@@@' )
-  --   AND COALESCE( "COL2",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col2,'@@@@@@@@@@@@@@@' )
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_pk_column_compare RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_pk_columns.first .. g_pk_columns.last
-    LOOP
-      v_result(v_result.count + 1) := '               ' || 'AND ' ||
-                                      util_get_attribute_compare(p_data_type         => g_pk_columns(i).data_type,
-                                                                 p_first_attribute   => '"' || g_pk_columns(i)
-                                                                                       .column_name || '"',
-                                                                 p_second_attribute  => util_get_parameter_name(g_pk_columns(i)
-                                                                                                                .column_name,
-                                                                                                                NULL),
-                                                                 p_compare_operation => '=') || c_crlf;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)),
-                                      'AND ');
-  
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_crlf);
-  
-    RETURN v_result;
-  END list_pk_column_compare;
-
-  -----------------------------------------------------------------------------
-  -- Primary key columns as "parameter => parameter" mapping for read_row functions:
-  -- {% LIST_PK_MAP_PARAM_EQ_PARAM %}
-  -- Example:
-  --   p_col1 => p_col1,
-  --   p_col2 => p_col2,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_pk_map_param_eq_param RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_pk_columns.first .. g_pk_columns.last
-    LOOP
-      v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_pk_columns(i).column_name,
-                                                                        CASE
-                                                                          WHEN g_status.pk_is_multi_column THEN
-                                                                           g_status.rpad_pk_columns
-                                                                          ELSE
-                                                                           NULL
-                                                                        END) || ' => ' ||
-                                      util_get_parameter_name(g_pk_columns(i).column_name,
-                                                              NULL) || c_list_delimiter;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_pk_map_param_eq_param;
-
-  -----------------------------------------------------------------------------
-  -- Primary key columns as "parameter => :old.column" mapping for DML view trigger:
-  -- {% LIST_PK_MAP_PARAM_EQ_OLDCOL %}
-  -- Example:
-  --   p_col1 => :old.col1,
-  --   p_col2 => :old.col2,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_pk_map_param_eq_oldcol RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_pk_columns.first .. g_pk_columns.last
-    LOOP
-      v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_pk_columns(i).column_name,
+    FUNCTION list_pk_map_param_eq_param RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last
+      LOOP
+        v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_pk_columns(i).column_name,
                                                                           CASE
                                                                             WHEN g_status.pk_is_multi_column THEN
                                                                              g_status.rpad_pk_columns
                                                                             ELSE
                                                                              NULL
-                                                                          END) || ' => ' || ':old."' || g_pk_columns(i)
-                                     .column_name || '"' || c_list_delimiter;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_pk_map_param_eq_oldcol;
-
-  -----------------------------------------------------------------------------
-  -- Unique columns as parameter definition for get_pk_by_unique_cols/read_row functions:
-  -- {% LIST_UK_PARAMS %}
-  -- Example:
-  --   p_col1 IN table.col1%TYPE,
-  --   p_col2 IN table.col2%TYPE,
-  --   p_col3 IN table.col3%TYPE,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_uk_params RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_uk_columns.first .. g_uk_columns.last
-    LOOP
-      IF g_uk_columns(i).constraint_name = g_iterator.current_unique_constraint
-      THEN
-        v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_uk_columns(i).column_name,
-                                                                          g_status.rpad_columns) || ' IN "' ||
-                                        g_params.table_name || '"."' || g_uk_columns(i).column_name || '"%TYPE /*UK*/' ||
-                                        c_list_delimiter;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_uk_params;
-
-  -----------------------------------------------------------------------------
-  -- Unique columns parameter compare for get_pk_by_unique_cols functions:
-  -- {% LIST_UK_COLUMN_COMPARE %}
-  -- Example:
-  --       COALESCE( "COL1",'@@@@@@@@@@@@@@@' ) = COALESCE( p_COL1,'@@@@@@@@@@@@@@@' )
-  --   AND COALESCE( "COL2",'@@@@@@@@@@@@@@@' ) = COALESCE( p_COL2,'@@@@@@@@@@@@@@@' )
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_uk_column_compare RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_uk_columns.first .. g_uk_columns.last
-    LOOP
-      IF g_uk_columns(i).constraint_name = g_iterator.current_unique_constraint
-      THEN
-        v_result(v_result.count + 1) := '         AND ' ||
-                                        util_get_attribute_compare(p_data_type         => g_uk_columns(i).data_type,
-                                                                   p_first_attribute   => '"' || g_uk_columns(i)
-                                                                                         .column_name || '"',
-                                                                   p_second_attribute  => util_get_parameter_name(g_uk_columns(i)
-                                                                                                                  .column_name,
-                                                                                                                  NULL),
-                                                                   p_compare_operation => '=') || c_crlf;
-      END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)),
-                                      'AND ');
-  
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_crlf);
-  
-    RETURN v_result;
-  END list_uk_column_compare;
-
-  -----------------------------------------------------------------------------
-  -- Unique key columns as "parameter => parameter" mapping for read_row functions:
-  -- {% LIST_UK_MAP_PARAM_EQ_PARAM %}
-  -- Example:
-  --   p_col1 => p_col1,
-  --   p_col2 => p_col2,
-  --   ...
-  -----------------------------------------------------------------------------
-
-  FUNCTION list_uk_map_param_eq_param RETURN t_tab_result_list IS
-    v_result t_tab_result_list;
-  BEGIN
-    FOR i IN g_uk_columns.first .. g_uk_columns.last
-    LOOP
-      IF g_uk_columns(i).constraint_name = g_iterator.current_unique_constraint
-      THEN
-        v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_uk_columns(i).column_name,
-                                                                          CASE
-                                                                            WHEN g_status.pk_is_multi_column THEN
-                                                                             g_status.rpad_uk_columns
-                                                                            ELSE
-                                                                             NULL
                                                                           END) || ' => ' ||
-                                        util_get_parameter_name(g_uk_columns(i).column_name,
+                                        util_get_parameter_name(g_pk_columns(i).column_name,
                                                                 NULL) || c_list_delimiter;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_pk_map_param_eq_param;
+  
+    -----------------------------------------------------------------------------
+    -- Primary key columns as "parameter => :old.column" mapping for DML view trigger:
+    -- {% LIST_PK_MAP_PARAM_EQ_OLDCOL %}
+    -- Example:
+    --   p_col1 => :old.col1,
+    --   p_col2 => :old.col2,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_pk_map_param_eq_oldcol RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last
+      LOOP
+        v_result(v_result.count + 1) := '      ' || util_get_parameter_name(g_pk_columns(i).column_name,
+                                                                            CASE
+                                                                              WHEN g_status.pk_is_multi_column THEN
+                                                                               g_status.rpad_pk_columns
+                                                                              ELSE
+                                                                               NULL
+                                                                            END) || ' => ' || ':old."' || g_pk_columns(i)
+                                       .column_name || '"' || c_list_delimiter;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_pk_map_param_eq_oldcol;
+  
+    -----------------------------------------------------------------------------
+    -- Unique columns as parameter definition for get_pk_by_unique_cols/read_row functions:
+    -- {% LIST_UK_PARAMS %}
+    -- Example:
+    --   p_col1 IN table.col1%TYPE,
+    --   p_col2 IN table.col2%TYPE,
+    --   p_col3 IN table.col3%TYPE,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_uk_params RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_uk_columns.first .. g_uk_columns.last
+      LOOP
+        IF g_uk_columns(i).constraint_name = g_iterator.current_unique_constraint
+        THEN
+          v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_uk_columns(i).column_name,
+                                                                            g_status.rpad_columns) || ' IN "' ||
+                                          g_params.table_name || '"."' || g_uk_columns(i).column_name ||
+                                          '"%TYPE /*UK*/' || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_uk_params;
+  
+    -----------------------------------------------------------------------------
+    -- Unique columns parameter compare for get_pk_by_unique_cols functions:
+    -- {% LIST_UK_COLUMN_COMPARE %}
+    -- Example:
+    --       COALESCE( "COL1",'@@@@@@@@@@@@@@@' ) = COALESCE( p_COL1,'@@@@@@@@@@@@@@@' )
+    --   AND COALESCE( "COL2",'@@@@@@@@@@@@@@@' ) = COALESCE( p_COL2,'@@@@@@@@@@@@@@@' )
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_uk_column_compare RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_uk_columns.first .. g_uk_columns.last
+      LOOP
+        IF g_uk_columns(i).constraint_name = g_iterator.current_unique_constraint
+        THEN
+          v_result(v_result.count + 1) := '         AND ' ||
+                                          util_get_attribute_compare(p_data_type         => g_uk_columns(i).data_type,
+                                                                     p_first_attribute   => '"' || g_uk_columns(i)
+                                                                                           .column_name || '"',
+                                                                     p_second_attribute  => util_get_parameter_name(g_uk_columns(i)
+                                                                                                                    .column_name,
+                                                                                                                    NULL),
+                                                                     p_compare_operation => '=') || c_crlf;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)),
+                                        'AND ');
+    
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_crlf);
+    
+      RETURN v_result;
+    END list_uk_column_compare;
+  
+    -----------------------------------------------------------------------------
+    -- Unique key columns as "parameter => parameter" mapping for read_row functions:
+    -- {% LIST_UK_MAP_PARAM_EQ_PARAM %}
+    -- Example:
+    --   p_col1 => p_col1,
+    --   p_col2 => p_col2,
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_uk_map_param_eq_param RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+      FOR i IN g_uk_columns.first .. g_uk_columns.last
+      LOOP
+        IF g_uk_columns(i).constraint_name = g_iterator.current_unique_constraint
+        THEN
+          v_result(v_result.count + 1) := '    ' || util_get_parameter_name(g_uk_columns(i).column_name,
+                                                                            CASE
+                                                                              WHEN g_status.pk_is_multi_column THEN
+                                                                               g_status.rpad_uk_columns
+                                                                              ELSE
+                                                                               NULL
+                                                                            END) || ' => ' ||
+                                          util_get_parameter_name(g_uk_columns(i).column_name,
+                                                                  NULL) || c_list_delimiter;
+        END IF;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                       c_list_delimiter);
+    
+      RETURN v_result;
+    END list_uk_map_param_eq_param;
+  
+    -----------------------------------------------------------------------------
+    -- A list of column defaults - used in the function get_a_row:
+    -- {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
+    -- Example:
+    --   v_row.employee_id := employees_seq.nextval; --generated from SEQ
+    --   v_row.first_name  := 'Rowan';
+    --   v_row.last_name   := 'Atkinson';
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_rowcols_w_cust_defaults RETURN t_tab_result_list IS
+      v_result t_tab_result_list;
+    BEGIN
+    
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N' AND
+            (g_columns(i).data_custom_default IS NOT NULL OR g_columns(i).data_default IS NOT NULL)
+        THEN
+          v_result(v_result.count + 1) := '    ' || 'v_row.' || rpad('"' || g_columns(i).column_name || '"',
+                                                                     g_status.rpad_columns + 2) || ' := ' ||
+                                          nvl(g_columns(i).data_custom_default,
+                                              g_columns(i).data_default) || ';' || c_crlf;
+        END IF;
+      END LOOP;
+    
+      IF v_result.count > 0
+      THEN
+        v_result(v_result.first) := ltrim(v_result(v_result.first));
+        v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                         c_crlf);
       END IF;
-    END LOOP;
-  
-    v_result(v_result.first) := ltrim(v_result(v_result.first));
-    v_result(v_result.last) := rtrim(v_result(v_result.last),
-                                     c_list_delimiter);
-  
-    RETURN v_result;
-  END list_uk_map_param_eq_param;
+    
+      RETURN v_result;
+    END list_rowcols_w_cust_defaults;
+  BEGIN
+    CASE p_list_name
+      WHEN 'LIST_INSERT_COLUMNS' THEN
+        RETURN list_insert_columns;
+      WHEN 'LIST_COLUMNS_W_PK_FULL' THEN
+        RETURN list_columns_w_pk_full;
+      WHEN 'LIST_ROWCOLS_W_CUST_DEFAULTS' THEN
+        RETURN list_rowcols_w_cust_defaults;
+      WHEN 'LIST_COLUMNS_WO_PK_COMPARE' THEN
+        RETURN list_columns_wo_pk_compare;
+      WHEN 'LIST_MAP_PAR_EQ_NEWCOL_W_PK' THEN
+        RETURN list_map_par_eq_newcol_w_pk;
+      WHEN 'LIST_MAP_PAR_EQ_PARAM_W_PK' THEN
+        RETURN list_map_par_eq_param_w_pk;
+      WHEN 'LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK' THEN
+        RETURN list_map_par_eq_rowtypcol_w_pk;
+      WHEN 'LIST_PARAMS_W_PK' THEN
+        RETURN list_params_w_pk;
+      WHEN 'LIST_PARAMS_W_PK_IO' THEN
+        RETURN list_params_w_pk_io;
+      WHEN 'LIST_PARAMS_W_PK_CUST_DEFAULTS' THEN
+        RETURN list_params_w_pk_cust_defaults;
+      WHEN 'LIST_INSERT_PARAMS' THEN
+        RETURN list_insert_params;
+      WHEN 'LIST_SET_COL_EQ_PARAM_WO_PK' THEN
+        RETURN list_set_col_eq_param_wo_pk;
+      WHEN 'LIST_SET_PAR_EQ_ROWTYCOL_WO_PK' THEN
+        RETURN list_set_par_eq_rowtycol_wo_pk;
+      WHEN 'LIST_PK_PARAMS' THEN
+        RETURN list_pk_params;
+      WHEN 'LIST_PK_COLUMN_COMPARE' THEN
+        RETURN list_pk_column_compare;
+      WHEN 'LIST_PK_MAP_PARAM_EQ_PARAM' THEN
+        RETURN list_pk_map_param_eq_param;
+      WHEN 'LIST_PK_MAP_PARAM_EQ_OLDCOL' THEN
+        RETURN list_pk_map_param_eq_oldcol;
+      WHEN 'LIST_UK_PARAMS' THEN
+        RETURN list_uk_params;
+      WHEN 'LIST_UK_COLUMN_COMPARE' THEN
+        RETURN list_uk_column_compare;
+      WHEN 'LIST_UK_MAP_PARAM_EQ_PARAM' THEN
+        RETURN list_uk_map_param_eq_param;
+      ELSE
+        raise_application_error(c_generator_error_number,
+                                'FIXME: Bug - list ' || p_list_name || ' not defined');
+    END CASE;
+  END;
 
   -----------------------------------------------------------------------------
+  -- util_clob_append is a private helper procedure to append a varchar2 value
+  -- to an existing clob. The idea is to increase performance by avoiding the
+  -- slow DBMS_LOB.append call. Only for the final append or if the varchar
+  -- cache is fullfilled,this call is done.
+  -----------------------------------------------------------------------------
 
-  PROCEDURE template_replace(p_scope IN VARCHAR2 DEFAULT NULL) IS
+  PROCEDURE util_clob_append(p_clob               IN OUT NOCOPY CLOB,
+                             p_clob_varchar_cache IN OUT NOCOPY VARCHAR2,
+                             p_varchar_to_append  IN VARCHAR2,
+                             p_final_call         IN BOOLEAN DEFAULT FALSE) IS
+  BEGIN
+    p_clob_varchar_cache := p_clob_varchar_cache || p_varchar_to_append;
+  
+    IF p_final_call
+    THEN
+      IF p_clob IS NULL
+      THEN
+        p_clob := p_clob_varchar_cache;
+      ELSE
+        dbms_lob.append(p_clob,
+                        p_clob_varchar_cache);
+      END IF;
+    
+      -- clear cache on final call
+    
+      p_clob_varchar_cache := NULL;
+    END IF;
+  EXCEPTION
+    WHEN value_error THEN
+      IF p_clob IS NULL
+      THEN
+        p_clob := p_clob_varchar_cache;
+      ELSE
+        dbms_lob.append(p_clob,
+                        p_clob_varchar_cache);
+      END IF;
+    
+      p_clob_varchar_cache := p_varchar_to_append;
+    
+      IF p_final_call
+      THEN
+        dbms_lob.append(p_clob,
+                        p_clob_varchar_cache);
+        -- clear cache on final call
+        p_clob_varchar_cache := NULL;
+      END IF;
+  END util_clob_append;
+
+  -----------------------------------------------------------------------------
+  -- util_template_replace is a private helper procedure:
+  -- * processes static or dynamic replacements
+  -- * slices the templates in blocks of code at the replacement positions
+  -- * appends the slices to the resulting clobs for spec, body, view and trigger
+  -- * uses a varchar2 cache to speed up the clob processing
+  -----------------------------------------------------------------------------
+  PROCEDURE util_template_replace(p_scope IN VARCHAR2 DEFAULT NULL) IS
     v_current_pos       PLS_INTEGER := 1;
     v_match_pos_static  PLS_INTEGER := 0;
     v_match_pos_dynamic PLS_INTEGER := 0;
@@ -1967,7 +1998,8 @@ END;';
       IF instr(v_match,
                '?') > 0
       THEN
-        g_template_options.use_column_defaults := nvl(util_string_to_bool(regexp_substr(srcstr        => v_match,
+        g_template_options.use_column_defaults := nvl(util_string_to_bool(regexp_substr(srcstr => v_match,
+                                                                                        
                                                                                         pattern       => 'defaults=([a-z0-9]+)',
                                                                                         position      => 1,
                                                                                         occurrence    => 1,
@@ -1985,7 +2017,7 @@ END;';
                                                          instr(v_match,
                                                                '?') - 1);
       END IF;
-    END;
+    END get_options;
   
     PROCEDURE process_static_match IS
     BEGIN
@@ -2165,58 +2197,22 @@ END;';
       v_dynamic_result.delete;
       get_options;
     
-      CASE v_match
-        WHEN 'LIST_INSERT_COLUMNS' THEN
-          v_dynamic_result := list_insert_columns;
-        WHEN 'LIST_COLUMNS_W_PK_FULL' THEN
-          v_dynamic_result := list_columns_w_pk_full;
-        WHEN 'LIST_COLUMNS_W_PK_DEFAULTS' THEN
-          v_dynamic_result := list_columns_w_pk_defaults;
-        WHEN 'LIST_COLUMNS_WO_PK_COMPARE' THEN
-          v_dynamic_result := list_columns_wo_pk_compare;
-        WHEN 'LIST_MAP_PAR_EQ_NEWCOL_W_PK' THEN
-          v_dynamic_result := list_map_par_eq_newcol_w_pk;
-        WHEN 'LIST_MAP_PAR_EQ_PARAM_W_PK' THEN
-          v_dynamic_result := list_map_par_eq_param_w_pk;
-        WHEN 'LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK' THEN
-          v_dynamic_result := list_map_par_eq_rowtypcol_w_pk;
-        WHEN 'LIST_PARAMS_W_PK' THEN
-          v_dynamic_result := list_params_w_pk;
-        WHEN 'LIST_PARAMS_W_PK_IO' THEN
-          v_dynamic_result := list_params_w_pk_io;
-        WHEN 'LIST_PARAMS_W_PK_CUST_DEFAULTS' THEN
-          v_dynamic_result := list_params_w_pk_cust_defaults;
-        WHEN 'LIST_INSERT_PARAMS' THEN
-          v_dynamic_result := list_insert_params;
-        WHEN 'LIST_SET_COL_EQ_PARAM_WO_PK' THEN
-          v_dynamic_result := list_set_col_eq_param_wo_pk;
-        WHEN 'LIST_SET_PAR_EQ_ROWTYCOL_WO_PK' THEN
-          v_dynamic_result := list_set_par_eq_rowtycol_wo_pk;
-        WHEN 'LIST_PK_PARAMS' THEN
-          v_dynamic_result := list_pk_params;
-        WHEN 'LIST_PK_COLUMN_COMPARE' THEN
-          v_dynamic_result := list_pk_column_compare;
-        WHEN 'LIST_PK_MAP_PARAM_EQ_PARAM' THEN
-          v_dynamic_result := list_pk_map_param_eq_param;
-        WHEN 'LIST_PK_MAP_PARAM_EQ_OLDCOL' THEN
-          v_dynamic_result := list_pk_map_param_eq_oldcol;
-        WHEN 'LIST_UK_PARAMS' THEN
-          v_dynamic_result := list_uk_params;
-        WHEN 'LIST_UK_COLUMN_COMPARE' THEN
-          v_dynamic_result := list_uk_column_compare;
-        WHEN 'LIST_UK_MAP_PARAM_EQ_PARAM' THEN
-          v_dynamic_result := list_uk_map_param_eq_param;
-        WHEN 'RETURN_VALUE' THEN
-          IF g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column
-          THEN
-            v_dynamic_result := list_columns_w_pk_full;
-          ELSE
-            v_dynamic_result(1) := '"' || g_pk_columns(1).column_name || '"';
-          END IF;
+      IF v_match LIKE 'LIST%'
+      THEN
+        v_dynamic_result := util_generate_list(v_match);
+      
+      ELSIF v_match = 'RETURN_VALUE'
+      THEN
+        IF g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column
+        THEN
+          v_dynamic_result := util_generate_list('LIST_COLUMNS_W_PK_FULL');
         ELSE
-          raise_application_error(c_generator_error_number,
-                                  'FIXME: Bug - dynamic substitution ' || v_match || ' not defined');
-      END CASE;
+          v_dynamic_result(1) := '"' || g_pk_columns(1).column_name || '"';
+        END IF;
+      ELSE
+        raise_application_error(c_generator_error_number,
+                                'FIXME: Bug - dynamic substitution ' || v_match || ' not defined');
+      END IF;
     
       IF v_dynamic_result.count > 0
       THEN
@@ -2252,14 +2248,659 @@ END;';
         v_current_pos := v_tpl_len;
       END IF;
     END LOOP;
-  END template_replace;
+  END util_template_replace;
 
-  -----------------------------------------------------------------------------
-
-  PROCEDURE gen_header IS
+  PROCEDURE main_init(p_generator_action            IN VARCHAR2,
+                      p_table_name                  IN all_objects.object_name%TYPE,
+                      p_owner                       IN all_users.username%TYPE,
+                      p_reuse_existing_api_params   IN BOOLEAN,
+                      p_enable_insertion_of_rows    IN BOOLEAN,
+                      p_enable_column_defaults      IN BOOLEAN,
+                      p_enable_update_of_rows       IN BOOLEAN,
+                      p_enable_deletion_of_rows     IN BOOLEAN,
+                      p_enable_parameter_prefixes   IN BOOLEAN,
+                      p_enable_proc_with_out_params IN BOOLEAN,
+                      p_enable_getter_and_setter    IN BOOLEAN,
+                      p_col_prefix_in_method_names  IN BOOLEAN,
+                      p_return_row_instead_of_pk    IN BOOLEAN,
+                      p_enable_dml_view             IN BOOLEAN,
+                      p_enable_generic_change_log   IN BOOLEAN,
+                      p_api_name                    IN all_objects.object_name%TYPE,
+                      p_sequence_name               IN all_objects.object_name%TYPE,
+                      p_exclude_column_list         IN VARCHAR2,
+                      p_enable_custom_defaults      IN BOOLEAN,
+                      p_custom_default_values       IN xmltype) IS
+  
+    PROCEDURE init_reset_globals IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_reset_globals');
+      -- global records
+      g_params              := NULL;
+      g_params_existing_api := NULL;
+      g_iterator            := NULL;
+      g_code_blocks         := NULL;
+      g_status              := NULL;
+      -- global collections
+      g_columns.delete;
+      g_columns_reverse_index.delete;
+      g_unique_constraints.delete;
+      g_uk_columns.delete;
+      g_pk_columns.delete;
+      util_debug_stop_one_step;
+    END init_reset_globals;
+  
+    PROCEDURE init_process_parameters IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_process_parameters');
+      g_params.enable_insertion_of_rows := CASE
+                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_insertion_of_rows),
+                                                       c_enable_insertion_of_rows)
+                                             ELSE
+                                              p_enable_insertion_of_rows
+                                           END;
+    
+      g_params.enable_column_defaults := CASE
+                                           WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                            coalesce(util_string_to_bool(g_params_existing_api.p_enable_column_defaults),
+                                                     c_enable_column_defaults)
+                                           ELSE
+                                            p_enable_column_defaults
+                                         END;
+    
+      g_params.enable_update_of_rows := CASE
+                                          WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                           coalesce(util_string_to_bool(g_params_existing_api.p_enable_update_of_rows),
+                                                    c_enable_update_of_rows)
+                                          ELSE
+                                           p_enable_update_of_rows
+                                        END;
+    
+      g_params.enable_deletion_of_rows := CASE
+                                            WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                             coalesce(util_string_to_bool(g_params_existing_api.p_enable_deletion_of_rows),
+                                                      c_enable_deletion_of_rows)
+                                            ELSE
+                                             p_enable_deletion_of_rows
+                                          END;
+    
+      g_params.enable_parameter_prefixes := CASE
+                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_parameter_prefixes),
+                                                        c_enable_parameter_prefixes)
+                                              ELSE
+                                               p_enable_parameter_prefixes
+                                            END;
+    
+      g_params.enable_proc_with_out_params := CASE
+                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_proc_with_out_params),
+                                                          c_enable_proc_with_out_params)
+                                                ELSE
+                                                 p_enable_proc_with_out_params
+                                              END;
+    
+      g_params.enable_getter_and_setter := CASE
+                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_getter_and_setter),
+                                                       c_enable_getter_and_setter)
+                                             ELSE
+                                              p_enable_getter_and_setter
+                                           END;
+    
+      g_params.col_prefix_in_method_names := CASE
+                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                                coalesce(util_string_to_bool(g_params_existing_api.p_col_prefix_in_method_names),
+                                                         c_col_prefix_in_method_names)
+                                               ELSE
+                                                p_col_prefix_in_method_names
+                                             END;
+    
+      g_params.return_row_instead_of_pk := CASE
+                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                              coalesce(util_string_to_bool(g_params_existing_api.p_return_row_instead_of_pk),
+                                                       c_return_row_instead_of_pk)
+                                             ELSE
+                                              p_return_row_instead_of_pk
+                                           END;
+    
+      g_params.enable_dml_view := CASE
+                                    WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                     coalesce(util_string_to_bool(g_params_existing_api.p_enable_dml_view),
+                                              c_enable_dml_view)
+                                    ELSE
+                                     p_enable_dml_view
+                                  END;
+    
+      g_params.enable_generic_change_log := CASE
+                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_generic_change_log),
+                                                        c_enable_generic_change_log)
+                                              ELSE
+                                               p_enable_generic_change_log
+                                            END;
+    
+      g_params.api_name := CASE
+                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists AND
+                                  g_params_existing_api.p_api_name IS NOT NULL THEN
+                              g_params_existing_api.p_api_name
+                             ELSE
+                              util_get_substituted_name(nvl(p_api_name,
+                                                            '#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'))
+                           END;
+    
+      g_params.sequence_name := CASE
+                                  WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                   g_params_existing_api.p_sequence_name
+                                  ELSE
+                                   CASE
+                                     WHEN p_sequence_name IS NOT NULL THEN
+                                      util_get_substituted_name(p_sequence_name)
+                                     ELSE
+                                      NULL
+                                   END
+                                END;
+    
+      g_params.exclude_column_list := CASE
+                                        WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                         g_params_existing_api.p_exclude_column_list
+                                        ELSE
+                                         p_exclude_column_list
+                                      END;
+    
+      g_params.enable_custom_defaults := CASE
+                                           WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                            coalesce(util_string_to_bool(g_params_existing_api.p_enable_custom_defaults),
+                                                     c_enable_custom_defaults)
+                                           ELSE
+                                            p_enable_custom_defaults
+                                         END;
+      util_debug_stop_one_step;
+    END init_process_parameters;
+  
+    PROCEDURE init_check_if_table_exists IS
+      v_object_name all_objects.object_name%TYPE;
+    
+      CURSOR v_cur IS
+        SELECT table_name
+          FROM all_tables
+         WHERE owner = g_params.owner
+           AND table_name = g_params.table_name;
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_check_if_table_exists');
+      OPEN v_cur;
+      FETCH v_cur
+        INTO v_object_name;
+      CLOSE v_cur;
+      IF (v_object_name IS NULL)
+      THEN
+        raise_application_error(c_generator_error_number,
+                                'Table "' || g_params.table_name || '" does not exist.');
+      END IF;
+      util_debug_stop_one_step;
+    END init_check_if_table_exists;
+  
+    PROCEDURE init_fetch_existing_api_params IS
+      CURSOR v_cur IS
+        SELECT *
+          FROM TABLE(view_existing_apis(p_table_name => g_params.table_name,
+                                        p_owner      => g_params.owner));
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_fetch_existing_api_params');
+      OPEN v_cur;
+      FETCH v_cur
+        INTO g_params_existing_api;
+      IF v_cur%FOUND
+      THEN
+        g_status.api_exists := TRUE;
+      END IF;
+      CLOSE v_cur;
+      util_debug_stop_one_step;
+    END init_fetch_existing_api_params;
+  
+    PROCEDURE init_check_table_column_prefix IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_check_table_column_prefix');
+      -- check,if option "col_prefix_in_method_names" is set and check then
+      -- if table's column prefix is unique
+      g_status.column_prefix := util_get_table_column_prefix(p_table_name => g_params.table_name);
+      IF g_status.column_prefix IS NULL
+      THEN
+        raise_application_error(c_generator_error_number,
+                                'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for getter and setter method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
+      END IF;
+      util_debug_stop_one_step;
+    END init_check_table_column_prefix;
+  
+    PROCEDURE init_check_if_log_table_exists IS
+      v_count PLS_INTEGER;
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_check_if_log_table_exists');
+      FOR i IN (SELECT 'GENERIC_CHANGE_LOG'
+                  FROM dual
+                MINUS
+                SELECT table_name
+                  FROM all_tables
+                 WHERE owner = g_params.owner
+                   AND table_name = 'GENERIC_CHANGE_LOG')
+      LOOP
+        -- check constraint
+        SELECT COUNT(*)
+          INTO v_count
+          FROM all_objects
+         WHERE owner = g_params.owner
+           AND object_name = 'GENERIC_CHANGE_LOG_PK';
+      
+        IF v_count > 0
+        THEN
+          raise_application_error(c_generator_error_number,
+                                  'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_PK already exists.');
+        END IF;
+      
+        -- check sequence
+        SELECT COUNT(*)
+          INTO v_count
+          FROM all_objects
+         WHERE owner = g_params.owner
+           AND object_name = 'GENERIC_CHANGE_LOG_SEQ';
+      
+        IF v_count > 0
+        THEN
+          raise_application_error(c_generator_error_number,
+                                  'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_SEQ already exists.');
+        END IF;
+      
+        -- check index
+        SELECT COUNT(*)
+          INTO v_count
+          FROM all_objects
+         WHERE owner = g_params.owner
+           AND object_name = 'GENERIC_CHANGE_LOG_IDX';
+      
+        IF v_count > 0
+        THEN
+          raise_application_error(c_generator_error_number,
+                                  'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_IDX already exists.');
+        END IF;
+      
+        EXECUTE IMMEDIATE q'[
+create table generic_change_log (
+  gcl_id        NUMBER not null,
+  gcl_table     VARCHAR2(128 CHAR) not null,
+  gcl_column    VARCHAR2(128 CHAR) not null,
+  gcl_pk_id     VARCHAR2(128 CHAR) not null,
+  gcl_old_value VARCHAR2(4000 CHAR),
+  gcl_new_value VARCHAR2(4000 CHAR),
+  gcl_user      VARCHAR2(30 CHAR),
+  gcl_timestamp TIMESTAMP(6) default systimestamp,
+  constraint generic_change_log_pk primary key (gcl_id)
+)
+]';
+      
+        EXECUTE IMMEDIATE q'[
+create sequence generic_change_log_seq nocache noorder nocycle]';
+        EXECUTE IMMEDIATE q'[
+create index generic_change_log_idx on generic_change_log (gcl_table,gcl_column,gcl_pk_id)]';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_id is 'Primary key of the table']';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_table is 'Table on which the change occured']';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_column is 'Column on which the change occured']';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_pk_id is 'We assume that the pk column of the changed table has a number type']';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_old_value is 'The old value before the change']';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_new_value is 'The new value after the change']';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_user is 'The user,who changed the data']';
+        EXECUTE IMMEDIATE q'[
+comment on column generic_change_log.gcl_timestamp is 'The time when the change occured']';
+      END LOOP;
+      util_debug_stop_one_step;
+    END init_check_if_log_table_exists;
+  
+    PROCEDURE init_check_if_api_name_exists IS
+      v_object_type all_objects.object_type%TYPE;
+    
+      CURSOR v_cur IS
+        SELECT object_type
+          FROM all_objects
+         WHERE owner = g_params.owner
+           AND object_name = g_params.api_name
+           AND object_type NOT IN ('PACKAGE',
+                                   'PACKAGE BODY');
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_check_if_api_name_exists');
+      OPEN v_cur;
+      FETCH v_cur
+        INTO v_object_type;
+      CLOSE v_cur;
+      IF (v_object_type IS NOT NULL)
+      THEN
+        raise_application_error(c_generator_error_number,
+                                'API name "' || g_params.api_name || '" does already exist as an object type "' ||
+                                v_object_type || '". Please provide a different API name.');
+      END IF;
+      util_debug_stop_one_step;
+    END init_check_if_api_name_exists;
+  
+    PROCEDURE init_check_if_sequence_exists IS
+      v_object_name all_objects.object_name%TYPE;
+    
+      CURSOR v_cur IS
+        SELECT sequence_name
+          FROM all_sequences
+         WHERE sequence_owner = g_params.owner
+           AND sequence_name = g_params.sequence_name;
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_check_if_sequence_exists');
+      OPEN v_cur;
+      FETCH v_cur
+        INTO v_object_name;
+      CLOSE v_cur;
+      IF (v_object_name IS NULL)
+      THEN
+        raise_application_error(c_generator_error_number,
+                                'Sequence ' || g_params.sequence_name ||
+                                ' does not exist. Please provide correct sequence name or create missing sequence.');
+      END IF;
+      util_debug_stop_one_step;
+    END init_check_if_sequence_exists;
+  
+    PROCEDURE init_fetch_custom_defaults IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_fetch_custom_defaults');
+      g_params.custom_default_values := CASE
+                                          WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                          -- g_status.api_exists contains only placeholder 
+                                          -- to signal that defaults exists. We have to 
+                                          -- fetch the defaults from the spec
+                                           CASE
+                                             WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
+                                             -- get the xml defaults from the end of the package spec
+                                              util_get_spec_custom_defaults(g_params.api_name)
+                                           END
+                                          ELSE
+                                           p_custom_default_values
+                                        END;
+    
+      IF g_params.custom_default_values IS NOT NULL
+      THEN
+        g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
+      END IF;
+    
+      -- check for empty XML element
+      IF g_params.custom_defaults_serialized = '<defaults/>'
+      THEN
+        g_params.custom_default_values      := NULL;
+        g_params.custom_defaults_serialized := NULL;
+      END IF;
+      util_debug_stop_one_step;
+    END init_fetch_custom_defaults;
+  
+    PROCEDURE init_create_temporary_lobs IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_create_temporary_lobs');
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.api_spec,
+                               cache   => FALSE);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.api_body,
+                               cache   => FALSE);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view,
+                               cache   => FALSE);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view_trigger,
+                               cache   => FALSE);
+      util_debug_stop_one_step;
+    END init_create_temporary_lobs;
+  
+    PROCEDURE init_fetch_columns IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_fetch_columns');
+      OPEN g_cur_columns;
+      FETCH g_cur_columns BULK COLLECT
+        INTO g_columns LIMIT c_bulk_collect_limit;
+      CLOSE g_cur_columns;
+      util_debug_stop_one_step;
+    END init_fetch_columns;
+  
+    PROCEDURE init_fetch_unique_constraints IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_fetch_unique_constraints');
+      OPEN g_cur_unique_constraints;
+      FETCH g_cur_unique_constraints BULK COLLECT
+        INTO g_unique_constraints LIMIT c_bulk_collect_limit;
+      CLOSE g_cur_unique_constraints;
+      util_debug_stop_one_step;
+    END init_fetch_unique_constraints;
+  
+    PROCEDURE init_fetch_unique_cons_columns IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_fetch_unique_cons_columns');
+      OPEN g_cur_uk_columns;
+      FETCH g_cur_uk_columns BULK COLLECT
+        INTO g_uk_columns LIMIT c_bulk_collect_limit;
+      CLOSE g_cur_uk_columns;
+      util_debug_stop_one_step;
+    END init_fetch_unique_cons_columns;
+  
+    PROCEDURE init_fetch_pk_cons_columns IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_fetch_pk_cons_columns');
+      OPEN g_cur_pk_columns;
+      FETCH g_cur_pk_columns BULK COLLECT
+        INTO g_pk_columns LIMIT c_bulk_collect_limit;
+      CLOSE g_cur_pk_columns;
+      util_debug_stop_one_step;
+    END init_fetch_pk_cons_columns;
+  
+    PROCEDURE init_process_columns IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_process_columns');
+      -- init rpad
+      g_status.rpad_columns := 0;
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        -- calc rpad length
+        IF length(g_columns(i).column_name) > g_status.rpad_columns
+        THEN
+          g_status.rpad_columns := length(g_columns(i).column_name);
+        END IF;
+        -- set initial pk info (will be refined in init_process_pk_columns)        
+        g_columns(i).is_pk_yn := 'N';
+        -- create reverse index to get collection id by column name
+        g_columns_reverse_index(g_columns(i).column_name) := i;
+        -- check,if we have a xmltype column present (we have then to provide a XML compare function)
+        IF g_columns(i).data_type = 'XMLTYPE'
+        THEN
+          g_status.xmltype_column_present := TRUE;
+        END IF;
+      END LOOP;
+      util_debug_stop_one_step;
+    END init_process_columns;
+  
+    PROCEDURE init_process_pk_columns IS
+      v_count PLS_INTEGER;
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_process_pk_columns');
+      -- check pk
+      v_count := g_pk_columns.count;
+      IF v_count = 0
+      THEN
+        raise_application_error(c_generator_error_number,
+                                'Unable to generate API - no primary key present for table ' || g_params.table_name);
+      ELSIF v_count = 1
+      THEN
+        g_status.pk_is_multi_column := FALSE;
+      ELSIF v_count > 1
+      THEN
+        g_status.pk_is_multi_column := TRUE;
+      END IF;
+      -- check validity of generic change log parameter      
+      IF g_params.enable_generic_change_log AND g_status.pk_is_multi_column
+      THEN
+        raise_application_error(c_generator_error_number,
+                                'Unable to generate API - you requested to use the generic change log and your table "' ||
+                                g_params.table_name ||
+                                '" has a multi column primary key. This combination is not supported.');
+      END IF;
+      -- init rpad      
+      g_status.rpad_pk_columns := 0;
+      FOR i IN g_pk_columns.first .. g_pk_columns.last
+      LOOP
+        -- mark column as pk
+        g_columns(g_columns_reverse_index(g_pk_columns(i).column_name)).is_pk_yn := 'Y';
+      
+        -- mark column as not nullable
+        g_columns(g_columns_reverse_index(g_pk_columns(i).column_name)).is_nullable_yn := 'N';
+      
+        -- calc rpad length
+        IF g_pk_columns(i).column_name_length > g_status.rpad_pk_columns
+        THEN
+          g_status.rpad_pk_columns := g_pk_columns(i).column_name_length;
+        END IF;
+      END LOOP;
+      util_debug_stop_one_step;
+    END init_process_pk_columns;
+  
+    PROCEDURE init_process_uk_columns IS
+      v_count PLS_INTEGER;
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_process_uk_columns');
+      -- check uk
+      v_count := g_uk_columns.count;
+      IF v_count > 0
+      THEN
+        -- init rpad
+        g_status.rpad_uk_columns := 0;
+        FOR i IN g_uk_columns.first .. g_uk_columns.last
+        LOOP
+          -- mark column as uk
+          g_columns(g_columns_reverse_index(g_uk_columns(i).column_name)).is_uk_yn := 'Y';
+        
+          -- calc rpad length
+          IF g_uk_columns(i).column_name_length > g_status.rpad_uk_columns
+          THEN
+            g_status.rpad_uk_columns := g_uk_columns(i).column_name_length;
+          END IF;
+        END LOOP;
+      END IF;
+      util_debug_stop_one_step;
+    END init_process_uk_columns;
+  
+    PROCEDURE init_generate_custom_defaults IS
+      v_index INTEGER;
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_generate_custom_defaults');
+      -- generate standard custom defaults for the users convenience...
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        g_columns(i).data_custom_default := CASE
+                                              WHEN g_columns(i).is_pk_yn = 'Y' --
+                                                   OR g_columns(i).is_excluded_yn = 'Y' --
+                                                   OR (g_columns(i).is_nullable_yn = 'Y' --
+                                                       AND g_columns(i).data_default IS NULL) THEN
+                                               NULL
+                                              ELSE
+                                               nvl(g_columns(i).data_default,
+                                                   CASE
+                                                     WHEN g_columns(i).data_type IN ('NUMBER',
+                                                                         'INTEGER',
+                                                                         'FLOAT') THEN
+                                                      'to_char(systimestamp,''yyyymmddhh24missff'')'
+                                                     WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
+                                                      'substr(sys_guid(),1,' || g_columns(i).char_length || ')'
+                                                     WHEN g_columns(i).data_type = 'CLOB' THEN
+                                                      'to_clob(''Dummy clob for API method get_a_row: '' || sys_guid())'
+                                                     WHEN g_columns(i).data_type = 'BLOB' THEN
+                                                      'to_blob(utl_raw.cast_to_raw(''Dummy clob for API method get_a_row: '' || sys_guid()))'
+                                                     WHEN g_columns(i).data_type = 'XMLTYPE' THEN
+                                                      'xmltype(''<dummy>Dummy XML for API method get_a_row: '' || sys_guid() || ''</dummy>'')'
+                                                     ELSE
+                                                      NULL
+                                                   END)
+                                            END;
+      END LOOP;
+      -- overwrite standard custom default value with user provided ones
+      IF g_params.custom_default_values IS NOT NULL
+      THEN
+        FOR i IN (SELECT x.column_name,
+                         x.data_default
+                    FROM xmltable('/defaults/item' passing g_params.custom_default_values --
+                                  columns --
+                                  column_name VARCHAR2(128) path './col',
+                                  data_default VARCHAR2(4000) path './val') x)
+        LOOP
+          v_index := g_columns_reverse_index(i.column_name);
+          IF v_index IS NOT NULL
+          THEN
+            g_columns(v_index).data_custom_default := i.data_default;
+          END IF;
+        END LOOP;
+      END IF;
+      util_debug_stop_one_step;
+    END init_generate_custom_defaults;
   BEGIN
-    util_debug_start_one_step(p_action => 'gen_header');
-    g_code_blocks.template := '
+    init_reset_globals;
+    --
+    g_status.generator_action := p_generator_action;
+    g_params.owner            := p_owner;
+    g_params.table_name       := p_table_name;
+    --
+    init_check_if_table_exists;
+    --
+    g_params.reuse_existing_api_params := p_reuse_existing_api_params;
+    g_status.api_exists                := FALSE;
+    --
+    IF g_params.reuse_existing_api_params
+    THEN
+      init_fetch_existing_api_params;
+    END IF;
+    --
+    init_process_parameters;
+    --
+    IF g_params.col_prefix_in_method_names = FALSE
+    THEN
+      init_check_table_column_prefix;
+    END IF;
+    --
+    IF g_params.enable_generic_change_log
+    THEN
+      init_check_if_log_table_exists;
+    END IF;
+    --
+    IF g_params.api_name IS NOT NULL
+    THEN
+      init_check_if_api_name_exists;
+    END IF;
+    --
+    IF g_params.sequence_name IS NOT NULL
+    THEN
+      init_check_if_sequence_exists;
+    END IF;
+    --
+    IF g_params.enable_custom_defaults
+    THEN
+      init_fetch_custom_defaults;
+    END IF;
+    --
+    init_create_temporary_lobs;
+    init_fetch_columns;
+    init_fetch_unique_constraints;
+    init_fetch_unique_cons_columns;
+    init_fetch_pk_cons_columns;
+    init_process_columns;
+    init_process_pk_columns;
+    init_process_uk_columns;
+    init_generate_custom_defaults;
+  END main_init;
+
+  PROCEDURE main_generate_code IS
+  
+    PROCEDURE gen_header IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_header');
+      g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
   /**
    * This is the API for the table "{{ TABLE_NAME }}".
@@ -2303,11 +2944,11 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
    * tabular forms you can optionally use the {{ TABLE_NAME_MINUS_6 }}_DML_V,which has
    * an instead of trigger who is also calling this "{{ API_NAME }}".
    */';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
-                                WHEN g_status.xmltype_column_present THEN
-                                 '
+                                  WHEN g_status.xmltype_column_present THEN
+                                   '
 
   FUNCTION util_xml_compare (
     p_doc1 XMLTYPE,
@@ -2326,9 +2967,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       FROM DUAL;
     RETURN v_return;
   END util_xml_compare;'
-                              END || CASE
-                                WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                 '
+                                END || CASE
+                                  WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+                                   '
 
   PROCEDURE create_change_log_entry (
     p_table     IN generic_change_log.gcl_table%TYPE,
@@ -2355,22 +2996,22 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       p_new_value,
       coalesce(v(''APP_USER''),sys_context(''USERENV'',''OS_USER'')) );
   END;'
-                              END;
+                                END;
+    
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_header;
   
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_header;
-
-  PROCEDURE gen_row_exists_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_row_exists_fnc');
-    g_code_blocks.template := '
+    PROCEDURE gen_row_exists_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_row_exists_fnc');
+      g_code_blocks.template := '
 
   FUNCTION row_exists (
     {% LIST_PK_PARAMS %} )
   RETURN BOOLEAN;';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION row_exists (
     {% LIST_PK_PARAMS %} )
@@ -2391,20 +3032,20 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     CLOSE cur_bool;
     RETURN v_return;
   END;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_row_exists_fnc;
-
-  PROCEDURE gen_row_exists_yn_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_row_exists_yn_fnc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_row_exists_fnc;
+  
+    PROCEDURE gen_row_exists_yn_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_row_exists_yn_fnc');
+      g_code_blocks.template := '
 
   FUNCTION row_exists_yn (
     {% LIST_PK_PARAMS %} )
   RETURN VARCHAR2;';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION row_exists_yn (
     {% LIST_PK_PARAMS %} )
@@ -2416,25 +3057,25 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
              ELSE ''N''
            END;
   END;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_row_exists_yn_fnc;
-
-  PROCEDURE gen_get_pk_by_unique_cols_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_get_pk_by_unique_cols_fnc');
-    IF g_unique_constraints.count > 0
-    THEN
-      FOR i IN g_unique_constraints.first .. g_unique_constraints.last
-      LOOP
-        g_iterator.current_unique_constraint := g_unique_constraints(i).constraint_name;
-        g_code_blocks.template               := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_row_exists_yn_fnc;
+  
+    PROCEDURE gen_get_pk_by_unique_cols_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_get_pk_by_unique_cols_fnc');
+      IF g_unique_constraints.count > 0
+      THEN
+        FOR i IN g_unique_constraints.first .. g_unique_constraints.last
+        LOOP
+          g_iterator.current_unique_constraint := g_unique_constraints(i).constraint_name;
+          g_code_blocks.template               := '
 
   FUNCTION get_pk_by_unique_cols (
     {% LIST_UK_PARAMS %} )
   RETURN {{ RETURN_TYPE }};';
-        template_replace('API SPEC');
-        g_code_blocks.template := '
+          util_template_replace('API SPEC');
+          g_code_blocks.template := '
 
   FUNCTION get_pk_by_unique_cols (
     {% LIST_UK_PARAMS %} )
@@ -2444,43 +3085,43 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     v_return := read_row ( {% LIST_UK_MAP_PARAM_EQ_PARAM %} ){{ RETURN_TYPE_READ_ROW }};
     RETURN v_return;
   END get_pk_by_unique_cols;';
-        template_replace('API BODY');
-      END LOOP;
-    END IF;
-    util_debug_stop_one_step;
-  END gen_get_pk_by_unique_cols_fnc;
-
-  PROCEDURE gen_get_a_row_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
-    g_code_blocks.template := '
+          util_template_replace('API BODY');
+        END LOOP;
+      END IF;
+      util_debug_stop_one_step;
+    END gen_get_pk_by_unique_cols_fnc;
+  
+    PROCEDURE gen_get_a_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
+      g_code_blocks.template := '
 
   FUNCTION get_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION get_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
     v_row "{{ TABLE_NAME }}"%ROWTYPE;
   BEGIN
-    {% LIST_COLUMNS_W_PK_DEFAULTS %}
+    {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
     return v_row;
   END get_a_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_get_a_row_fnc;
-
-  PROCEDURE gen_create_row_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_create_row_fnc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_get_a_row_fnc;
+  
+    PROCEDURE gen_create_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_row_fnc');
+      g_code_blocks.template := '
 
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK?defaults=true %} )
   RETURN {{ RETURN_TYPE }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK?defaults=true %} )
@@ -2491,41 +3132,41 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_INSERT_COLUMNS %} )
     VALUES (
       {% LIST_INSERT_PARAMS %} )' || CASE
-                                WHEN g_status.xmltype_column_present THEN
-                                 ';
+                                  WHEN g_status.xmltype_column_present THEN
+                                   ';
     -- returning clause does not support XMLTYPE,so we do here an extra fetch
     v_return := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} ){{ RETURN_TYPE_READ_ROW }};'
-                                ELSE
-                                 '
+                                  ELSE
+                                   '
     RETURN
       {% RETURN_VALUE %}
     INTO v_return;'
-                              END || CASE
-                                WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                 '
+                                END || CASE
+                                  WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+                                   '
     create_change_log_entry (
       p_table     => ''{{ TABLE_NAME }}'',
       p_column    => ''{{ PK_COLUMN }}'',
       p_pk_id     => {{ RETURN_TYPE_PK_SINGLE_COLUMN }},
       p_old_value => ''ROW CREATED'',
       p_new_value => ''ROW CREATED'' );'
-                              END || '
+                                END || '
     RETURN v_return;
   END create_row;';
+    
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_row_fnc;
   
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_create_row_fnc;
-
-  PROCEDURE gen_create_row_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_create_row_prc');
-    g_code_blocks.template := '
+    PROCEDURE gen_create_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_row_prc');
+      g_code_blocks.template := '
 
   PROCEDURE create_row (
     {% LIST_PARAMS_W_PK?defaults=true %} );';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE create_row (
     {% LIST_PARAMS_W_PK?defaults=true %} )
@@ -2535,20 +3176,20 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     v_return := create_row (
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
   END create_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_create_row_prc;
-
-  PROCEDURE gen_create_rowtype_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_create_rowtype_fnc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_row_prc;
+  
+    PROCEDURE gen_create_rowtype_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_rowtype_fnc');
+      g_code_blocks.template := '
 
   FUNCTION create_row (
     {{ ROWTYPE_PARAM }}
   RETURN {{ RETURN_TYPE }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION create_row (
     {{ ROWTYPE_PARAM }}
@@ -2559,21 +3200,21 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
     RETURN v_return;
   END create_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_create_rowtype_fnc;
-
-  -----------------------------------------------------------------------------
-
-  PROCEDURE gen_create_rowtype_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_create_rowtype_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_rowtype_fnc;
+  
+    -----------------------------------------------------------------------------
+  
+    PROCEDURE gen_create_rowtype_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_rowtype_prc');
+      g_code_blocks.template := '
 
   PROCEDURE create_row (
     {{ ROWTYPE_PARAM }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE create_row (
     {{ ROWTYPE_PARAM }}
@@ -2583,20 +3224,20 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     v_return := create_row (
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END create_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_create_rowtype_prc;
-
-  PROCEDURE gen_create_a_row_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_create_a_row_fnc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_rowtype_prc;
+  
+    PROCEDURE gen_create_a_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_a_row_fnc');
+      g_code_blocks.template := '
 
   FUNCTION create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
   RETURN {{ RETURN_TYPE }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
@@ -2607,19 +3248,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
     RETURN v_return;
   END create_a_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_create_a_row_fnc;
-
-  PROCEDURE gen_create_a_row_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_a_row_fnc;
+  
+    PROCEDURE gen_create_a_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
+      g_code_blocks.template := '
 
   PROCEDURE create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} );';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
@@ -2629,20 +3270,20 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     v_return := create_row (
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
   END create_a_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_create_a_row_prc;
-
-  PROCEDURE gen_createorupdate_row_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_createorupdate_row_fnc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_a_row_prc;
+  
+    PROCEDURE gen_createorupdate_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_createorupdate_row_fnc');
+      g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
   RETURN {{ RETURN_TYPE }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
@@ -2659,19 +3300,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     END IF;
     RETURN v_return;
   END create_or_update_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_createorupdate_row_fnc;
-
-  PROCEDURE gen_createorupdate_row_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_createorupdate_row_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_createorupdate_row_fnc;
+  
+    PROCEDURE gen_createorupdate_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_createorupdate_row_prc');
+      g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
     {% LIST_PARAMS_W_PK %} );';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
@@ -2681,22 +3322,22 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     v_return := create_or_update_row(
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
   END create_or_update_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_createorupdate_row_prc;
-
-  -----------------------------------------------------------------------------
-
-  PROCEDURE gen_createorupdate_rowtype_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_fnc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_createorupdate_row_prc;
+  
+    -----------------------------------------------------------------------------
+  
+    PROCEDURE gen_createorupdate_rowtype_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_fnc');
+      g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
     {{ ROWTYPE_PARAM }}
   RETURN {{ RETURN_TYPE }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
     {{ ROWTYPE_PARAM }}
@@ -2707,19 +3348,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
     RETURN v_return;
   END create_or_update_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_createorupdate_rowtype_fnc;
-
-  PROCEDURE gen_createorupdate_rowtype_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_createorupdate_rowtype_fnc;
+  
+    PROCEDURE gen_createorupdate_rowtype_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_prc');
+      g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
     {{ ROWTYPE_PARAM }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
     {{ ROWTYPE_PARAM }}
@@ -2729,20 +3370,20 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     v_return := create_or_update_row(
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END create_or_update_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_createorupdate_rowtype_prc;
-
-  PROCEDURE gen_read_row_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_read_row_fnc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_createorupdate_rowtype_prc;
+  
+    PROCEDURE gen_read_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_row_fnc');
+      g_code_blocks.template := '
 
   FUNCTION read_row (
     {% LIST_PK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION read_row (
     {% LIST_PK_PARAMS %} )
@@ -2758,19 +3399,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     CLOSE cur_row;
     RETURN v_row;
   END read_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_read_row_fnc;
-
-  PROCEDURE gen_read_row_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_read_row_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_read_row_fnc;
+  
+    PROCEDURE gen_read_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_row_prc');
+      g_code_blocks.template := '
 
   PROCEDURE read_row (
     {% LIST_PARAMS_W_PK_IO %} );';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE read_row (
     {% LIST_PARAMS_W_PK_IO %} )
@@ -2782,25 +3423,25 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
     END IF;
   END read_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_read_row_prc;
-
-  PROCEDURE gen_read_row_by_uk_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_read_row_by_uk_fnc');
-    IF g_unique_constraints.count > 0
-    THEN
-      FOR i IN g_unique_constraints.first .. g_unique_constraints.last
-      LOOP
-        g_iterator.current_unique_constraint := g_unique_constraints(i).constraint_name;
-        g_code_blocks.template               := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_read_row_prc;
+  
+    PROCEDURE gen_read_row_by_uk_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_row_by_uk_fnc');
+      IF g_unique_constraints.count > 0
+      THEN
+        FOR i IN g_unique_constraints.first .. g_unique_constraints.last
+        LOOP
+          g_iterator.current_unique_constraint := g_unique_constraints(i).constraint_name;
+          g_code_blocks.template               := '
 
   FUNCTION read_row (
     {% LIST_UK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-        template_replace('API SPEC');
-        g_code_blocks.template := '
+          util_template_replace('API SPEC');
+          g_code_blocks.template := '
 
   FUNCTION read_row (
     {% LIST_UK_PARAMS %} )
@@ -2816,21 +3457,21 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     CLOSE cur_row;
     RETURN v_row;
   END;';
-        template_replace('API BODY');
-      END LOOP;
-    END IF;
-    util_debug_stop_one_step;
-  END gen_read_row_by_uk_fnc;
-
-  PROCEDURE gen_read_a_row_fnc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
-    g_code_blocks.template := '
+          util_template_replace('API BODY');
+        END LOOP;
+      END IF;
+      util_debug_stop_one_step;
+    END gen_read_row_by_uk_fnc;
+  
+    PROCEDURE gen_read_a_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
+      g_code_blocks.template := '
 
   FUNCTION read_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   FUNCTION read_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
@@ -2842,19 +3483,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     CLOSE cur_row;
     RETURN v_row;
   END read_a_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_read_a_row_fnc;
-
-  PROCEDURE gen_update_row_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_update_row_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_read_a_row_fnc;
+  
+    PROCEDURE gen_update_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_update_row_prc');
+      g_code_blocks.template := '
 
   PROCEDURE update_row (
     {% LIST_PARAMS_W_PK %} );';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE update_row (
     {% LIST_PARAMS_W_PK %} )
@@ -2873,19 +3514,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       END IF;
     END IF;
   END update_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_update_row_prc;
-
-  PROCEDURE gen_update_rowtype_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_update_rowtype_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_update_row_prc;
+  
+    PROCEDURE gen_update_rowtype_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_update_rowtype_prc');
+      g_code_blocks.template := '
 
   PROCEDURE update_row (
     {{ ROWTYPE_PARAM }};';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE update_row (
     {{ ROWTYPE_PARAM }}
@@ -2894,19 +3535,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     update_row(
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END update_row;';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_update_rowtype_prc;
-
-  PROCEDURE gen_delete_row_prc IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_delete_row_prc');
-    g_code_blocks.template := '
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_update_rowtype_prc;
+  
+    PROCEDURE gen_delete_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_delete_row_prc');
+      g_code_blocks.template := '
 
   PROCEDURE delete_row (
     {% LIST_PK_PARAMS %} );';
-    template_replace('API SPEC');
-    g_code_blocks.template := '
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
 
   PROCEDURE delete_row (
     {% LIST_PK_PARAMS %} )
@@ -2914,37 +3555,37 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
   BEGIN
     DELETE FROM {{ TABLE_NAME }}
      WHERE {% LIST_PK_COLUMN_COMPARE %};' || CASE
-                                WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                 '
+                                  WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+                                   '
     create_change_log_entry(
       p_table     => ''{{ TABLE_NAME }}'',
       p_column    => ''{{ PK_COLUMN }}'',
       p_pk_id     => {{ PARAMETER_PK_FIRST_COLUMN }},
       p_old_value => ''ROW DELETED'',
       p_new_value => ''ROW DELETED'' );'
-                              END || '
+                                END || '
   END delete_row;';
+    
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_delete_row_prc;
   
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_delete_row_prc;
-
-  PROCEDURE gen_getter_functions IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_getter_functions');
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_pk_yn = 'N'
-      THEN
-        g_iterator.column_name := g_columns(i).column_name;
-        g_iterator.method_name := util_get_method_name(g_columns(i).column_name);
-        g_code_blocks.template := '
+    PROCEDURE gen_getter_functions IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_getter_functions');
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_pk_yn = 'N'
+        THEN
+          g_iterator.column_name := g_columns(i).column_name;
+          g_iterator.method_name := util_get_method_name(g_columns(i).column_name);
+          g_code_blocks.template := '
 
   FUNCTION get_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"."{{ I_COLUMN_NAME }}"%TYPE;';
-        template_replace('API SPEC');
-        g_code_blocks.template := '
+          util_template_replace('API SPEC');
+          g_code_blocks.template := '
 
   FUNCTION get_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %} )
@@ -2954,43 +3595,43 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
     RETURN v_row."{{ I_COLUMN_NAME }}";
   END get_{{ I_METHOD_NAME }};';
-        template_replace('API BODY');
-      END IF;
-    END LOOP;
-    util_debug_stop_one_step;
-  END gen_getter_functions;
-
-  PROCEDURE gen_setter_procedures IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_setter_procedures');
-    FOR i IN g_columns.first .. g_columns.last
-    LOOP
-      IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
-      THEN
-        g_iterator.column_name    := g_columns(i).column_name;
-        g_iterator.method_name    := util_get_method_name(g_columns(i).column_name);
-        g_iterator.parameter_name := util_get_parameter_name(g_columns(i).column_name,
-                                                             g_status.rpad_columns);
-      
-        g_iterator.column_compare := util_get_attribute_compare(p_data_type         => g_columns(i).data_type,
-                                                                p_first_attribute   => 'v_row."' || g_columns(i)
-                                                                                      .column_name || '"',
-                                                                p_second_attribute  => g_iterator.parameter_name,
-                                                                p_compare_operation => '<>');
-      
-        g_iterator.old_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
-                                                            p_attribute_name => 'v_row."' || g_columns(i).column_name || '"');
-      
-        g_iterator.new_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
-                                                            p_attribute_name => g_iterator.parameter_name);
-      
-        g_code_blocks.template := '
+          util_template_replace('API BODY');
+        END IF;
+      END LOOP;
+      util_debug_stop_one_step;
+    END gen_getter_functions;
+  
+    PROCEDURE gen_setter_procedures IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_setter_procedures');
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N'
+        THEN
+          g_iterator.column_name    := g_columns(i).column_name;
+          g_iterator.method_name    := util_get_method_name(g_columns(i).column_name);
+          g_iterator.parameter_name := util_get_parameter_name(g_columns(i).column_name,
+                                                               g_status.rpad_columns);
+        
+          g_iterator.column_compare := util_get_attribute_compare(p_data_type         => g_columns(i).data_type,
+                                                                  p_first_attribute   => 'v_row."' || g_columns(i)
+                                                                                        .column_name || '"',
+                                                                  p_second_attribute  => g_iterator.parameter_name,
+                                                                  p_compare_operation => '<>');
+        
+          g_iterator.old_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
+                                                              p_attribute_name => 'v_row."' || g_columns(i).column_name || '"');
+        
+          g_iterator.new_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
+                                                              p_attribute_name => g_iterator.parameter_name);
+        
+          g_code_blocks.template := '
 
   PROCEDURE set_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %},
     {{ I_PARAMETER_NAME }} IN "{{ TABLE_NAME }}"."{{ I_COLUMN_NAME }}"%TYPE );';
-        template_replace('API SPEC');
-        g_code_blocks.template := '
+          util_template_replace('API SPEC');
+          g_code_blocks.template := '
 
   PROCEDURE set_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %},
@@ -3005,694 +3646,109 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
         UPDATE {{ TABLE_NAME }}
            SET "{{ I_COLUMN_NAME }}" = {{ I_PARAMETER_NAME }}
          WHERE {% LIST_PK_COLUMN_COMPARE %};' || CASE
-                                    WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                     '
+                                      WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+                                       '
         create_change_log_entry(
           p_table     => ''{{ TABLE_NAME }}'',
           p_column    => ''{{ I_COLUMN_NAME }}'',
           p_pk_id     => {{ PARAMETER_PK_FIRST_COLUMN }},
           p_old_value => {{ I_OLD_VALUE }},
           p_new_value => {{ I_NEW_VALUE }} );'
-                                  END || '
+                                    END || '
       END IF;
     END IF;
   END set_{{ I_METHOD_NAME }};';
-      
-        template_replace('API BODY');
-      END IF;
-    END LOOP;
-    util_debug_stop_one_step;
-  END gen_setter_procedures;
-
-  PROCEDURE gen_footer IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_footer');
-    g_code_blocks.template := CASE
-                                WHEN g_params.custom_defaults_serialized IS NOT NULL THEN
-                                 c_crlf || '
+        
+          util_template_replace('API BODY');
+        END IF;
+      END LOOP;
+      util_debug_stop_one_step;
+    END gen_setter_procedures;
+  
+    PROCEDURE gen_footer IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_footer');
+      g_code_blocks.template := CASE
+                                  WHEN g_params.custom_defaults_serialized IS NOT NULL THEN
+                                   c_crlf || '
   /**
    * Custom column defaults (&lt; = < | &gt; = > | &quot; = " | &apos; = '' | &amp; = & ):
    * {{ COLUMN_DEFAULTS_SERIALIZED }}
    */'
-                              END || '
+                                END || '
 
 END "{{ API_NAME }}";';
+    
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+END "{{ API_NAME }}";';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_footer;
   
-    template_replace('API SPEC');
-    g_code_blocks.template := '
-
-END "{{ API_NAME }}";';
-    template_replace('API BODY');
-    util_debug_stop_one_step;
-  END gen_footer;
-
-  PROCEDURE gen_dml_view IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_dml_view');
-    g_code_blocks.template := '
+    PROCEDURE gen_dml_view IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_dml_view');
+      g_code_blocks.template := '
 CREATE OR REPLACE VIEW "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_DML_V" AS
 SELECT {% LIST_COLUMNS_W_PK_FULL %}
   FROM {{ TABLE_NAME }}';
-    template_replace('VIEW');
-    util_debug_stop_one_step;
-  END gen_dml_view;
-
-  -----------------------------------------------------------------------------
-
-  PROCEDURE gen_dml_view_trigger IS
-  BEGIN
-    util_debug_start_one_step(p_action => 'gen_dml_view_trigger');
-    g_code_blocks.template := '
+      util_template_replace('VIEW');
+      util_debug_stop_one_step;
+    END gen_dml_view;
+  
+    -----------------------------------------------------------------------------
+  
+    PROCEDURE gen_dml_view_trigger IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_dml_view_trigger');
+      g_code_blocks.template := '
 CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON "{{ TABLE_NAME_MINUS_6 }}_DML_V"
   FOR EACH ROW
 BEGIN
   IF INSERTING THEN' || CASE
-                                WHEN g_params.enable_insertion_of_rows THEN
-                                 '
+                                  WHEN g_params.enable_insertion_of_rows THEN
+                                   '
     "{{ API_NAME }}".create_row (
       {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %} );'
-                                ELSE
-                                 '
+                                  ELSE
+                                   '
     raise_application_error (' || c_generator_error_number ||
-                                 ',''Insertion of a row is not allowed.'');'
-                              END || '
+                                   ',''Insertion of a row is not allowed.'');'
+                                END || '
   ELSIF UPDATING THEN' || CASE
-                                WHEN g_params.enable_update_of_rows THEN
-                                 '
+                                  WHEN g_params.enable_update_of_rows THEN
+                                   '
     "{{ API_NAME }}".update_row (
       {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %} );'
-                                ELSE
-                                 '
+                                  ELSE
+                                   '
     raise_application_error (' || c_generator_error_number ||
-                                 ',''Update of a row is not allowed.'');'
-                              END || '
+                                   ',''Update of a row is not allowed.'');'
+                                END || '
   ELSIF DELETING THEN' || CASE
-                                WHEN g_params.enable_deletion_of_rows THEN
-                                 '
+                                  WHEN g_params.enable_deletion_of_rows THEN
+                                   '
     "{{ API_NAME }}".delete_row (
       {% LIST_PK_MAP_PARAM_EQ_OLDCOL %} );'
-                                ELSE
-                                 '
+                                  ELSE
+                                   '
     raise_application_error (' || c_generator_error_number ||
-                                 ',''Deletion of a row is not allowed.'');'
-                              END || '
+                                   ',''Deletion of a row is not allowed.'');'
+                                END || '
   END IF;
 END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
+    
+      util_template_replace('TRIGGER');
+      util_debug_stop_one_step;
+    END gen_dml_view_trigger;
   
-    template_replace('TRIGGER');
-    util_debug_stop_one_step;
-  END gen_dml_view_trigger;
-
-  PROCEDURE main_generate(p_generator_action            IN VARCHAR2,
-                          p_table_name                  IN all_objects.object_name%TYPE,
-                          p_owner                       IN all_users.username%TYPE,
-                          p_reuse_existing_api_params   IN BOOLEAN,
-                          p_enable_insertion_of_rows    IN BOOLEAN,
-                          p_enable_column_defaults      IN BOOLEAN,
-                          p_enable_update_of_rows       IN BOOLEAN,
-                          p_enable_deletion_of_rows     IN BOOLEAN,
-                          p_enable_parameter_prefixes   IN BOOLEAN,
-                          p_enable_proc_with_out_params IN BOOLEAN,
-                          p_enable_getter_and_setter    IN BOOLEAN,
-                          p_col_prefix_in_method_names  IN BOOLEAN,
-                          p_return_row_instead_of_pk    IN BOOLEAN,
-                          p_enable_dml_view             IN BOOLEAN,
-                          p_enable_generic_change_log   IN BOOLEAN,
-                          p_api_name                    IN all_objects.object_name%TYPE,
-                          p_sequence_name               IN all_objects.object_name%TYPE,
-                          p_exclude_column_list         IN VARCHAR2,
-                          p_enable_custom_defaults      IN BOOLEAN,
-                          p_custom_default_values       IN xmltype) IS
-    PROCEDURE initialize IS
-      PROCEDURE reset_globals IS
-      BEGIN
-        util_debug_start_one_step(p_action => 'reset_globals');
-        -- global records
-        g_params              := NULL;
-        g_params_existing_api := NULL;
-        g_iterator            := NULL;
-        g_code_blocks         := NULL;
-        g_status              := NULL;
-      
-        -- global collections
-        g_columns.delete;
-        g_columns_index.delete;
-        g_unique_constraints.delete;
-        g_uk_columns.delete;
-        g_pk_columns.delete;
-        util_debug_stop_one_step;
-      END reset_globals;
-    
-      PROCEDURE process_parameters IS
-        PROCEDURE check_if_table_exists IS
-          v_object_name all_objects.object_name%TYPE;
-        
-          CURSOR v_cur IS
-            SELECT table_name
-              FROM all_tables
-             WHERE owner = g_params.owner
-               AND table_name = g_params.table_name;
-        BEGIN
-          util_debug_start_one_step(p_action => 'check_if_table_exists');
-          OPEN v_cur;
-          FETCH v_cur
-            INTO v_object_name;
-          CLOSE v_cur;
-          IF (v_object_name IS NULL)
-          THEN
-            raise_application_error(c_generator_error_number,
-                                    'Table "' || g_params.table_name || '" does not exist.');
-          END IF;
-          util_debug_stop_one_step;
-        END check_if_table_exists;
-      
-        PROCEDURE fetch_existing_api_params IS
-          CURSOR v_cur IS
-            SELECT *
-              FROM TABLE(view_existing_apis(p_table_name => g_params.table_name,
-                                            p_owner      => g_params.owner));
-        BEGIN
-          util_debug_start_one_step(p_action => 'fetch_existing_api_params');
-          OPEN v_cur;
-          FETCH v_cur
-            INTO g_params_existing_api;
-          IF v_cur%FOUND
-          THEN
-            g_status.api_exists := TRUE;
-          END IF;
-          CLOSE v_cur;
-          util_debug_stop_one_step;
-        END fetch_existing_api_params;
-      
-        PROCEDURE check_table_column_prefix IS
-        BEGIN
-          util_debug_start_one_step(p_action => 'check_table_column_prefix');
-          -- check,if option "col_prefix_in_method_names" is set and check then
-          -- if table's column prefix is unique
-          g_status.column_prefix := util_get_table_column_prefix(p_table_name => g_params.table_name);
-          IF g_status.column_prefix IS NULL
-          THEN
-            raise_application_error(c_generator_error_number,
-                                    'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for getter and setter method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
-          END IF;
-          util_debug_stop_one_step;
-        END check_table_column_prefix;
-      
-        PROCEDURE check_if_log_table_exists IS
-          v_count PLS_INTEGER;
-        BEGIN
-          util_debug_start_one_step(p_action => 'check_if_log_table_exists');
-          FOR i IN (SELECT 'GENERIC_CHANGE_LOG'
-                      FROM dual
-                    MINUS
-                    SELECT table_name
-                      FROM all_tables
-                     WHERE owner = g_params.owner
-                       AND table_name = 'GENERIC_CHANGE_LOG')
-          LOOP
-            -- check constraint
-            SELECT COUNT(*)
-              INTO v_count
-              FROM all_objects
-             WHERE owner = g_params.owner
-               AND object_name = 'GENERIC_CHANGE_LOG_PK';
-          
-            IF v_count > 0
-            THEN
-              raise_application_error(c_generator_error_number,
-                                      'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_PK already exists.');
-            END IF;
-          
-            -- check sequence
-            SELECT COUNT(*)
-              INTO v_count
-              FROM all_objects
-             WHERE owner = g_params.owner
-               AND object_name = 'GENERIC_CHANGE_LOG_SEQ';
-          
-            IF v_count > 0
-            THEN
-              raise_application_error(c_generator_error_number,
-                                      'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_SEQ already exists.');
-            END IF;
-          
-            -- check index
-            SELECT COUNT(*)
-              INTO v_count
-              FROM all_objects
-             WHERE owner = g_params.owner
-               AND object_name = 'GENERIC_CHANGE_LOG_IDX';
-          
-            IF v_count > 0
-            THEN
-              raise_application_error(c_generator_error_number,
-                                      'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_IDX already exists.');
-            END IF;
-          
-            EXECUTE IMMEDIATE q'[
-create table generic_change_log (
-  gcl_id        NUMBER not null,
-  gcl_table     VARCHAR2(128 CHAR) not null,
-  gcl_column    VARCHAR2(128 CHAR) not null,
-  gcl_pk_id     VARCHAR2(128 CHAR) not null,
-  gcl_old_value VARCHAR2(4000 CHAR),
-  gcl_new_value VARCHAR2(4000 CHAR),
-  gcl_user      VARCHAR2(30 CHAR),
-  gcl_timestamp TIMESTAMP(6) default systimestamp,
-  constraint generic_change_log_pk primary key (gcl_id)
-)
-]';
-          
-            EXECUTE IMMEDIATE q'[
-create sequence generic_change_log_seq nocache noorder nocycle]';
-            EXECUTE IMMEDIATE q'[
-create index generic_change_log_idx on generic_change_log (gcl_table,gcl_column,gcl_pk_id)]';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_id is 'Primary key of the table']';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_table is 'Table on which the change occured']';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_column is 'Column on which the change occured']';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_pk_id is 'We assume that the pk column of the changed table has a number type']';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_old_value is 'The old value before the change']';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_new_value is 'The new value after the change']';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_user is 'The user,who changed the data']';
-            EXECUTE IMMEDIATE q'[
-comment on column generic_change_log.gcl_timestamp is 'The time when the change occured']';
-          END LOOP;
-          util_debug_stop_one_step;
-        END check_if_log_table_exists;
-      
-        PROCEDURE check_if_api_name_exists IS
-          v_object_type all_objects.object_type%TYPE;
-        
-          CURSOR v_cur IS
-            SELECT object_type
-              FROM all_objects
-             WHERE owner = g_params.owner
-               AND object_name = g_params.api_name
-               AND object_type NOT IN ('PACKAGE',
-                                       'PACKAGE BODY');
-        BEGIN
-          util_debug_start_one_step(p_action => 'check_if_api_name_exists');
-          OPEN v_cur;
-          FETCH v_cur
-            INTO v_object_type;
-          CLOSE v_cur;
-          IF (v_object_type IS NOT NULL)
-          THEN
-            raise_application_error(c_generator_error_number,
-                                    'API name "' || g_params.api_name || '" does already exist as an object type "' ||
-                                    v_object_type || '". Please provide a different API name.');
-          END IF;
-          util_debug_stop_one_step;
-        END check_if_api_name_exists;
-      
-        PROCEDURE check_if_sequence_exists IS
-          v_object_name all_objects.object_name%TYPE;
-        
-          CURSOR v_cur IS
-            SELECT sequence_name
-              FROM all_sequences
-             WHERE sequence_owner = g_params.owner
-               AND sequence_name = g_params.sequence_name;
-        BEGIN
-          util_debug_start_one_step(p_action => 'check_if_sequence_exists');
-          OPEN v_cur;
-          FETCH v_cur
-            INTO v_object_name;
-          CLOSE v_cur;
-          IF (v_object_name IS NULL)
-          THEN
-            raise_application_error(c_generator_error_number,
-                                    'Sequence ' || g_params.sequence_name ||
-                                    ' does not exist. Please provide correct sequence name or create missing sequence.');
-          END IF;
-          util_debug_stop_one_step;
-        END check_if_sequence_exists;
-      
-        PROCEDURE fetch_custom_default_values IS
-        BEGIN
-          util_debug_start_one_step(p_action => 'fetch_custom_default_values');
-          g_params.custom_default_values := CASE
-                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                              -- g_status.api_exists contains only placeholder 
-                                              -- to signal that defaults exists. We have to 
-                                              -- fetch the defaults from the spec
-                                               CASE
-                                                 WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
-                                                 -- get the xml defaults from the end of the package spec
-                                                  util_get_spec_custom_defaults(g_params.api_name)
-                                               END
-                                              ELSE
-                                               p_custom_default_values
-                                            END;
-        
-          IF g_params.custom_default_values IS NOT NULL
-          THEN
-            g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
-          END IF;
-        
-          -- check for empty XML element
-          IF g_params.custom_defaults_serialized = '<defaults/>'
-          THEN
-            g_params.custom_default_values      := NULL;
-            g_params.custom_defaults_serialized := NULL;
-          END IF;
-          util_debug_stop_one_step;
-        END fetch_custom_default_values;
-      
-      BEGIN
-        -- meta
-        g_status.generator_action := p_generator_action;
-      
-        -- process table name dependend globals
-        g_params.owner      := p_owner;
-        g_params.table_name := p_table_name;
-        check_if_table_exists;
-      
-        -- process existing API params
-        g_params.reuse_existing_api_params := p_reuse_existing_api_params;
-        g_status.api_exists                := FALSE;
-        IF g_params.reuse_existing_api_params
-        THEN
-          fetch_existing_api_params;
-        END IF;
-      
-        -- process rest of parameters 
-        g_params.enable_insertion_of_rows := CASE
-                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_insertion_of_rows),
-                                                         c_enable_insertion_of_rows)
-                                               ELSE
-                                                p_enable_insertion_of_rows
-                                             END;
-      
-        g_params.enable_column_defaults := CASE
-                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_column_defaults),
-                                                       c_enable_column_defaults)
-                                             ELSE
-                                              p_enable_column_defaults
-                                           END;
-      
-        g_params.enable_update_of_rows := CASE
-                                            WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                             coalesce(util_string_to_bool(g_params_existing_api.p_enable_update_of_rows),
-                                                      c_enable_update_of_rows)
-                                            ELSE
-                                             p_enable_update_of_rows
-                                          END;
-      
-        g_params.enable_deletion_of_rows := CASE
-                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_deletion_of_rows),
-                                                        c_enable_deletion_of_rows)
-                                              ELSE
-                                               p_enable_deletion_of_rows
-                                            END;
-      
-        g_params.enable_parameter_prefixes := CASE
-                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_parameter_prefixes),
-                                                          c_enable_parameter_prefixes)
-                                                ELSE
-                                                 p_enable_parameter_prefixes
-                                              END;
-      
-        g_params.enable_proc_with_out_params := CASE
-                                                  WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                   coalesce(util_string_to_bool(g_params_existing_api.p_enable_proc_with_out_params),
-                                                            c_enable_proc_with_out_params)
-                                                  ELSE
-                                                   p_enable_proc_with_out_params
-                                                END;
-      
-        g_params.enable_getter_and_setter := CASE
-                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_getter_and_setter),
-                                                         c_enable_getter_and_setter)
-                                               ELSE
-                                                p_enable_getter_and_setter
-                                             END;
-      
-        g_params.col_prefix_in_method_names := CASE
-                                                 WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                  coalesce(util_string_to_bool(g_params_existing_api.p_col_prefix_in_method_names),
-                                                           c_col_prefix_in_method_names)
-                                                 ELSE
-                                                  p_col_prefix_in_method_names
-                                               END;
-        IF g_params.col_prefix_in_method_names = FALSE
-        THEN
-          check_table_column_prefix;
-        END IF;
-      
-        g_params.return_row_instead_of_pk := CASE
-                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                coalesce(util_string_to_bool(g_params_existing_api.p_return_row_instead_of_pk),
-                                                         c_return_row_instead_of_pk)
-                                               ELSE
-                                                p_return_row_instead_of_pk
-                                             END;
-      
-        g_params.enable_dml_view := CASE
-                                      WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                       coalesce(util_string_to_bool(g_params_existing_api.p_enable_dml_view),
-                                                c_enable_dml_view)
-                                      ELSE
-                                       p_enable_dml_view
-                                    END;
-      
-        g_params.enable_generic_change_log := CASE
-                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_generic_change_log),
-                                                          c_enable_generic_change_log)
-                                                ELSE
-                                                 p_enable_generic_change_log
-                                              END;
-        IF g_params.enable_generic_change_log
-        THEN
-          check_if_log_table_exists;
-        END IF;
-      
-        g_params.api_name := CASE
-                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists AND
-                                    g_params_existing_api.p_api_name IS NOT NULL THEN
-                                g_params_existing_api.p_api_name
-                               ELSE
-                                util_get_substituted_name(nvl(p_api_name,
-                                                              '#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'))
-                             END;
-        IF g_params.api_name IS NOT NULL
-        THEN
-          check_if_api_name_exists;
-        END IF;
-      
-        g_params.sequence_name := CASE
-                                    WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                     g_params_existing_api.p_sequence_name
-                                    ELSE
-                                     CASE
-                                       WHEN p_sequence_name IS NOT NULL THEN
-                                        util_get_substituted_name(p_sequence_name)
-                                       ELSE
-                                        NULL
-                                     END
-                                  END;
-        IF g_params.sequence_name IS NOT NULL
-        THEN
-          check_if_sequence_exists;
-        END IF;
-      
-        g_params.exclude_column_list := CASE
-                                          WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                           g_params_existing_api.p_exclude_column_list
-                                          ELSE
-                                           p_exclude_column_list
-                                        END;
-      
-        g_params.enable_custom_defaults := CASE
-                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_custom_defaults),
-                                                       c_enable_custom_defaults)
-                                             ELSE
-                                              p_enable_custom_defaults
-                                           END;
-        IF g_params.enable_custom_defaults
-        THEN
-          fetch_custom_default_values;
-        END IF;
-      
-      END process_parameters;
-    
-      PROCEDURE create_temporary_lobs IS
-      BEGIN
-        util_debug_start_one_step(p_action => 'create_temporary_lobs');
-        dbms_lob.createtemporary(lob_loc => g_code_blocks.api_spec,
-                                 cache   => FALSE);
-        dbms_lob.createtemporary(lob_loc => g_code_blocks.api_body,
-                                 cache   => FALSE);
-        dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view,
-                                 cache   => FALSE);
-        dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view_trigger,
-                                 cache   => FALSE);
-        util_debug_stop_one_step;
-      END create_temporary_lobs;
-    
-      PROCEDURE fetch_columns IS
-      BEGIN
-        util_debug_start_one_step(p_action => 'fetch_columns');
-        OPEN g_cur_columns;
-        FETCH g_cur_columns BULK COLLECT
-          INTO g_columns LIMIT c_bulk_collect_limit;
-        CLOSE g_cur_columns;
-        util_debug_stop_one_step;
-      END fetch_columns;
-    
-      PROCEDURE fetch_unique_constraints IS
-      BEGIN
-        util_debug_start_one_step(p_action => 'fetch_unique_constraints');
-        OPEN g_cur_unique_constraints;
-        FETCH g_cur_unique_constraints BULK COLLECT
-          INTO g_unique_constraints LIMIT c_bulk_collect_limit;
-        CLOSE g_cur_unique_constraints;
-        util_debug_stop_one_step;
-      END fetch_unique_constraints;
-    
-      PROCEDURE fetch_unique_cons_columns IS
-      BEGIN
-        util_debug_start_one_step(p_action => 'fetch_unique_cons_columns');
-        OPEN g_cur_uk_columns;
-        FETCH g_cur_uk_columns BULK COLLECT
-          INTO g_uk_columns LIMIT c_bulk_collect_limit;
-        CLOSE g_cur_uk_columns;
-        util_debug_stop_one_step;
-      END fetch_unique_cons_columns;
-    
-      PROCEDURE fetch_pk_cons_columns IS
-      BEGIN
-        util_debug_start_one_step(p_action => 'fetch_pk_cons_columns');
-        OPEN g_cur_pk_columns;
-        FETCH g_cur_pk_columns BULK COLLECT
-          INTO g_pk_columns LIMIT c_bulk_collect_limit;
-        CLOSE g_cur_pk_columns;
-        util_debug_stop_one_step;
-      END fetch_pk_cons_columns;
-    
-      PROCEDURE process_columns IS
-      BEGIN
-        util_debug_start_one_step(p_action => 'process_columns');
-        -- init rpad
-        g_status.rpad_columns := 0;
-        FOR i IN g_columns.first .. g_columns.last
-        LOOP
-          -- calc rpad length
-          IF g_columns(i).column_name_length > g_status.rpad_columns
-          THEN
-            g_status.rpad_columns := g_columns(i).column_name_length;
-          END IF;
-          -- set initial pk info (will be refined in process_pk_columns)        
-          g_columns(i).is_pk_yn := 'N';
-          -- create reverse index to get collection id by column name
-          g_columns_index(g_columns(i).column_name) := i;
-          -- check,if we have a xmltype column present (we have then to provide a XML compare function)
-          IF g_columns(i).data_type = 'XMLTYPE'
-          THEN
-            g_status.xmltype_column_present := TRUE;
-          END IF;
-        END LOOP;
-        util_debug_stop_one_step;
-      END process_columns;
-    
-      PROCEDURE process_pk_columns IS
-        v_count PLS_INTEGER;
-      BEGIN
-        util_debug_start_one_step(p_action => 'process_pk_columns');
-        -- check pk
-        v_count := g_pk_columns.count;
-        IF v_count = 0
-        THEN
-          raise_application_error(c_generator_error_number,
-                                  'Unable to generate API - no primary key present for table ' || g_params.table_name);
-        ELSIF v_count = 1
-        THEN
-          g_status.pk_is_multi_column := FALSE;
-        ELSIF v_count > 1
-        THEN
-          g_status.pk_is_multi_column := TRUE;
-        END IF;
-        -- check validity of generic change log parameter      
-        IF g_params.enable_generic_change_log AND g_status.pk_is_multi_column
-        THEN
-          raise_application_error(c_generator_error_number,
-                                  'Unable to generate API - you requested to use the generic change log and your table "' ||
-                                  g_params.table_name ||
-                                  '" has a multi column primary key. This combination is not supported.');
-        END IF;
-        -- init rpad      
-        g_status.rpad_pk_columns := 0;
-        FOR i IN g_pk_columns.first .. g_pk_columns.last
-        LOOP
-          -- mark column as pk
-          g_columns(g_columns_index(g_pk_columns(i).column_name)).is_pk_yn := 'Y';
-        
-          -- mark column as not nullable
-          g_columns(g_columns_index(g_pk_columns(i).column_name)).is_nullable_yn := 'N';
-        
-          -- calc rpad length
-          IF g_pk_columns(i).column_name_length > g_status.rpad_pk_columns
-          THEN
-            g_status.rpad_pk_columns := g_pk_columns(i).column_name_length;
-          END IF;
-        END LOOP;
-        util_debug_stop_one_step;
-      END process_pk_columns;
-    
-      PROCEDURE process_uk_columns IS
-        v_count PLS_INTEGER;
-      BEGIN
-        util_debug_start_one_step(p_action => 'process_uk_columns');
-        -- check uk
-        v_count := g_uk_columns.count;
-        IF v_count > 0
-        THEN
-          -- init rpad
-          g_status.rpad_uk_columns := 0;
-          FOR i IN g_uk_columns.first .. g_uk_columns.last
-          LOOP
-            -- calc rpad length
-            IF g_uk_columns(i).column_name_length > g_status.rpad_uk_columns
-            THEN
-              g_status.rpad_uk_columns := g_uk_columns(i).column_name_length;
-            END IF;
-          END LOOP;
-        END IF;
-        util_debug_stop_one_step;
-      END process_uk_columns;
+    PROCEDURE gen_finalize_clob_vc2_caching IS
     BEGIN
-      reset_globals;
-      process_parameters;
-      create_temporary_lobs;
-      fetch_columns;
-      fetch_unique_constraints;
-      fetch_unique_cons_columns;
-      fetch_pk_cons_columns;
-      process_columns;
-      process_pk_columns;
-      process_uk_columns;
-    END initialize;
-  
-    PROCEDURE finalize_clob_vc2_caching IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'finalize_clob_vc2_caching');
-      -- finalize CLOB varchar caches
+      util_debug_start_one_step(p_action => 'gen_finalize_clob_vc2_caching');
       util_clob_append(p_clob               => g_code_blocks.api_spec,
                        p_clob_varchar_cache => g_code_blocks.api_spec_varchar_cache,
                        p_varchar_to_append  => NULL,
@@ -3716,9 +3772,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                          p_final_call         => TRUE);
       END IF;
       util_debug_stop_one_step;
-    END finalize_clob_vc2_caching;
+    END gen_finalize_clob_vc2_caching;
   BEGIN
-    initialize;
     gen_header;
     gen_row_exists_fnc;
     gen_row_exists_yn_fnc;
@@ -3781,8 +3836,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       gen_createorupdate_rowtype_prc;
     END IF;
   
-    -- GETTER procedures/functions always
-  
+    -- GETTER procedures/functions always  
     IF g_params.enable_getter_and_setter
     THEN
       gen_getter_functions;
@@ -3803,10 +3857,11 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       gen_dml_view_trigger;
     END IF;
   
-    finalize_clob_vc2_caching;
-  END main_generate;
+    gen_finalize_clob_vc2_caching;
+  
+  END main_generate_code;
 
-  PROCEDURE main_compile IS
+  PROCEDURE main_compile_code IS
   BEGIN
     -- compile package spec
     util_debug_start_one_step(p_action => 'compile_spec');
@@ -3852,13 +3907,13 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       util_debug_stop_one_step;
     
     END IF;
-  END main_compile;
+  END main_compile_code;
 
-  FUNCTION main_return RETURN CLOB IS
+  FUNCTION main_return_code RETURN CLOB IS
     terminator VARCHAR2(10 CHAR) := c_crlf || '/' || c_crlflf;
   BEGIN
     RETURN g_code_blocks.api_spec || terminator || g_code_blocks.api_body || terminator || CASE WHEN g_params.enable_dml_view THEN g_code_blocks.dml_view || terminator || g_code_blocks.dml_view_trigger || terminator ELSE NULL END;
-  END main_return;
+  END main_return_code;
 
   PROCEDURE compile_api(p_table_name                IN all_objects.object_name%TYPE,
                         p_owner                     IN all_users.username%TYPE DEFAULT USER,
@@ -3884,27 +3939,28 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     util_debug_start_one_run(p_generator_action => 'compile API',
                              p_table_name       => p_table_name,
                              p_owner            => p_owner);
-    main_generate(p_generator_action            => 'COMPILE_API',
-                  p_table_name                  => p_table_name,
-                  p_owner                       => p_owner,
-                  p_reuse_existing_api_params   => p_reuse_existing_api_params,
-                  p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
-                  p_enable_column_defaults      => p_enable_column_defaults,
-                  p_enable_update_of_rows       => p_enable_update_of_rows,
-                  p_enable_deletion_of_rows     => p_enable_deletion_of_rows,
-                  p_enable_parameter_prefixes   => p_enable_parameter_prefixes,
-                  p_enable_proc_with_out_params => p_enable_proc_with_out_params,
-                  p_enable_getter_and_setter    => p_enable_getter_and_setter,
-                  p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
-                  p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
-                  p_enable_dml_view             => p_enable_dml_view,
-                  p_enable_generic_change_log   => p_enable_generic_change_log,
-                  p_api_name                    => p_api_name,
-                  p_sequence_name               => p_sequence_name,
-                  p_exclude_column_list         => p_exclude_column_list,
-                  p_enable_custom_defaults      => p_enable_custom_defaults,
-                  p_custom_default_values       => p_custom_default_values);
-    main_compile;
+    main_init(p_generator_action            => 'COMPILE_API',
+              p_table_name                  => p_table_name,
+              p_owner                       => p_owner,
+              p_reuse_existing_api_params   => p_reuse_existing_api_params,
+              p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
+              p_enable_column_defaults      => p_enable_column_defaults,
+              p_enable_update_of_rows       => p_enable_update_of_rows,
+              p_enable_deletion_of_rows     => p_enable_deletion_of_rows,
+              p_enable_parameter_prefixes   => p_enable_parameter_prefixes,
+              p_enable_proc_with_out_params => p_enable_proc_with_out_params,
+              p_enable_getter_and_setter    => p_enable_getter_and_setter,
+              p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
+              p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
+              p_enable_dml_view             => p_enable_dml_view,
+              p_enable_generic_change_log   => p_enable_generic_change_log,
+              p_api_name                    => p_api_name,
+              p_sequence_name               => p_sequence_name,
+              p_exclude_column_list         => p_exclude_column_list,
+              p_enable_custom_defaults      => p_enable_custom_defaults,
+              p_custom_default_values       => p_custom_default_values);
+    main_generate_code;
+    main_compile_code;
     util_debug_stop_one_run;
   END compile_api;
 
@@ -3933,29 +3989,30 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     util_debug_start_one_run(p_generator_action => 'compile API, get code',
                              p_table_name       => p_table_name,
                              p_owner            => p_owner);
-    main_generate(p_generator_action            => 'COMPILE_API_AND_GET_CODE',
-                  p_table_name                  => p_table_name,
-                  p_owner                       => p_owner,
-                  p_reuse_existing_api_params   => p_reuse_existing_api_params,
-                  p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
-                  p_enable_column_defaults      => p_enable_column_defaults,
-                  p_enable_update_of_rows       => p_enable_update_of_rows,
-                  p_enable_deletion_of_rows     => p_enable_deletion_of_rows,
-                  p_enable_parameter_prefixes   => p_enable_parameter_prefixes,
-                  p_enable_proc_with_out_params => p_enable_proc_with_out_params,
-                  p_enable_getter_and_setter    => p_enable_getter_and_setter,
-                  p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
-                  p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
-                  p_enable_dml_view             => p_enable_dml_view,
-                  p_enable_generic_change_log   => p_enable_generic_change_log,
-                  p_api_name                    => p_api_name,
-                  p_sequence_name               => p_sequence_name,
-                  p_exclude_column_list         => p_exclude_column_list,
-                  p_enable_custom_defaults      => p_enable_custom_defaults,
-                  p_custom_default_values       => p_custom_default_values);
-    main_compile;
+    main_init(p_generator_action            => 'COMPILE_API_AND_GET_CODE',
+              p_table_name                  => p_table_name,
+              p_owner                       => p_owner,
+              p_reuse_existing_api_params   => p_reuse_existing_api_params,
+              p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
+              p_enable_column_defaults      => p_enable_column_defaults,
+              p_enable_update_of_rows       => p_enable_update_of_rows,
+              p_enable_deletion_of_rows     => p_enable_deletion_of_rows,
+              p_enable_parameter_prefixes   => p_enable_parameter_prefixes,
+              p_enable_proc_with_out_params => p_enable_proc_with_out_params,
+              p_enable_getter_and_setter    => p_enable_getter_and_setter,
+              p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
+              p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
+              p_enable_dml_view             => p_enable_dml_view,
+              p_enable_generic_change_log   => p_enable_generic_change_log,
+              p_api_name                    => p_api_name,
+              p_sequence_name               => p_sequence_name,
+              p_exclude_column_list         => p_exclude_column_list,
+              p_enable_custom_defaults      => p_enable_custom_defaults,
+              p_custom_default_values       => p_custom_default_values);
+    main_generate_code;
+    main_compile_code;
     util_debug_stop_one_run;
-    RETURN main_return;
+    RETURN main_return_code;
   END compile_api_and_get_code;
 
   FUNCTION get_code(p_table_name                IN all_objects.object_name%TYPE,
@@ -3982,28 +4039,29 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     util_debug_start_one_run(p_generator_action => 'get code',
                              p_table_name       => p_table_name,
                              p_owner            => p_owner);
-    main_generate(p_generator_action            => 'GET_CODE',
-                  p_table_name                  => p_table_name,
-                  p_owner                       => p_owner,
-                  p_reuse_existing_api_params   => p_reuse_existing_api_params,
-                  p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
-                  p_enable_column_defaults      => p_enable_column_defaults,
-                  p_enable_update_of_rows       => p_enable_update_of_rows,
-                  p_enable_deletion_of_rows     => p_enable_deletion_of_rows,
-                  p_enable_parameter_prefixes   => p_enable_parameter_prefixes,
-                  p_enable_proc_with_out_params => p_enable_proc_with_out_params,
-                  p_enable_getter_and_setter    => p_enable_getter_and_setter,
-                  p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
-                  p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
-                  p_enable_dml_view             => p_enable_dml_view,
-                  p_enable_generic_change_log   => p_enable_generic_change_log,
-                  p_api_name                    => p_api_name,
-                  p_sequence_name               => p_sequence_name,
-                  p_exclude_column_list         => p_exclude_column_list,
-                  p_enable_custom_defaults      => p_enable_custom_defaults,
-                  p_custom_default_values       => p_custom_default_values);
+    main_init(p_generator_action            => 'GET_CODE',
+              p_table_name                  => p_table_name,
+              p_owner                       => p_owner,
+              p_reuse_existing_api_params   => p_reuse_existing_api_params,
+              p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
+              p_enable_column_defaults      => p_enable_column_defaults,
+              p_enable_update_of_rows       => p_enable_update_of_rows,
+              p_enable_deletion_of_rows     => p_enable_deletion_of_rows,
+              p_enable_parameter_prefixes   => p_enable_parameter_prefixes,
+              p_enable_proc_with_out_params => p_enable_proc_with_out_params,
+              p_enable_getter_and_setter    => p_enable_getter_and_setter,
+              p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
+              p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
+              p_enable_dml_view             => p_enable_dml_view,
+              p_enable_generic_change_log   => p_enable_generic_change_log,
+              p_api_name                    => p_api_name,
+              p_sequence_name               => p_sequence_name,
+              p_exclude_column_list         => p_exclude_column_list,
+              p_enable_custom_defaults      => p_enable_custom_defaults,
+              p_custom_default_values       => p_custom_default_values);
+    main_generate_code;
     util_debug_stop_one_run;
-    RETURN main_return;
+    RETURN main_return_code;
   END get_code;
 
   PROCEDURE recreate_existing_apis(p_owner IN all_users.username%TYPE DEFAULT USER) IS
@@ -4041,100 +4099,100 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 -- ATTENTION: query columns need to match the global row definition om_tapigen.g_row_existing_apis.
 -- Creating a cursor was not possible - database throws an error
 
-WITH api_names
-     AS (SELECT owner,NAME AS api_name
+WITH api_names AS (
+         SELECT owner,NAME AS api_name
            FROM all_source
           WHERE     owner = :p_owner
                 AND TYPE = ''PACKAGE''
                 AND line BETWEEN :spec_options_min_line
                              AND :spec_options_max_line
-                AND INSTR (text,''generator="OM_TAPIGEN"'') > 0) -- select * from apis
-                                                         ,
-     sources
-     AS (  SELECT owner,
-                  package_name,
-                  xmltype (
-                     NVL (REGEXP_SUBSTR (REPLACE (source_code,''*'',NULL),
-                                         ''<options.*>'',
-                                         1,
-                                         1,
-                                         ''ni''),
-                          ''<no_data_found/>''))
-                     AS options
-             FROM (SELECT owner,
-                          NAME AS package_name,
-                          LISTAGG (text,'' '')
-                             WITHIN GROUP (ORDER BY NAME,line)
-                             OVER (PARTITION BY NAME)
-                             AS source_code
-                     FROM all_source
-                    WHERE     owner = :p_owner
-                          AND name IN (SELECT api_name FROM api_names)
-                          AND TYPE = ''PACKAGE''
-                          AND line BETWEEN :spec_options_min_line
-                                       AND :spec_options_max_line)
-         GROUP BY owner,package_name,source_code)  -- select * from sources;
-                                             ,
-     apis
-     AS (                        SELECT t.owner,
-                                        x.p_table_name AS table_name,
-                                        t.package_name,
-                                        x.generator,
-                                        x.generator_version,
-                                        x.generator_action,
-                                        TO_DATE (x.generated_at,''yyyy-mm-dd hh24:mi:ss'') AS generated_at,
-                                        x.generated_by,
-                                        x.p_owner,
-                                        x.p_table_name,
-                                        x.p_reuse_existing_api_params,
-                                        x.p_enable_insertion_of_rows,
-                                        x.p_enable_column_defaults,
-                                        x.p_enable_update_of_rows,
-                                        x.p_enable_deletion_of_rows,
-                                        x.p_enable_parameter_prefixes,
-                                        x.p_enable_proc_with_out_params,
-                                        x.p_enable_getter_and_setter,
-                                        x.p_col_prefix_in_method_names,
-                                        x.p_return_row_instead_of_pk,
-                                        x.p_enable_dml_view,
-                                        x.p_enable_generic_change_log,
-                                        x.p_api_name,
-                                        x.p_sequence_name,
-                                        x.p_exclude_column_list,
-                                        x.p_enable_custom_defaults,
-                                        x.p_custom_default_values
-                                   FROM sources t
-                                        CROSS JOIN
-                                        XMLTABLE (
-                                           ''/options''
-                                           PASSING options
-                                           COLUMNS generator                     VARCHAR2 (30 CHAR)   PATH ''@generator'',
-                                                   generator_version             VARCHAR2 (10 CHAR)   PATH ''@generator_version'',
-                                                   generator_action              VARCHAR2 (30 CHAR)   PATH ''@generator_action'',
-                                                   generated_at                  VARCHAR2 (30 CHAR)   PATH ''@generated_at'',
-                                                   generated_by                  VARCHAR2 (128 CHAR)  PATH ''@generated_by'',
-                                                   p_owner                       VARCHAR2 (128 CHAR)  PATH ''@p_owner'',
-                                                   p_table_name                  VARCHAR2 (128 CHAR)  PATH ''@p_table_name'',
-                                                   p_reuse_existing_api_params   VARCHAR2 (5 CHAR)    PATH ''@p_reuse_existing_api_params'',
-                                                   p_enable_insertion_of_rows    VARCHAR2 (5 CHAR)    PATH ''@p_enable_insertion_of_rows'',
-                                                   p_enable_column_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_column_defaults'',
-                                                   p_enable_update_of_rows       VARCHAR2 (5 CHAR)    PATH ''@p_enable_update_of_rows'',
-                                                   p_enable_deletion_of_rows     VARCHAR2 (5 CHAR)    PATH ''@p_enable_deletion_of_rows'',
-                                                   p_enable_parameter_prefixes   VARCHAR2 (5 CHAR)    PATH ''@p_enable_parameter_prefixes'',
-                                                   p_enable_proc_with_out_params VARCHAR2 (5 CHAR)    PATH ''@p_enable_proc_with_out_params'',
-                                                   p_enable_getter_and_setter    VARCHAR2 (5 CHAR)    PATH ''@p_enable_getter_and_setter'',
-                                                   p_col_prefix_in_method_names  VARCHAR2 (5 CHAR)    PATH ''@p_col_prefix_in_method_names'',
-                                                   p_return_row_instead_of_pk    VARCHAR2 (5 CHAR)    PATH ''@p_return_row_instead_of_pk'',
-                                                   p_enable_dml_view             VARCHAR2 (5 CHAR)    PATH ''@p_enable_dml_view'',
-                                                   p_enable_generic_change_log   VARCHAR2 (5 CHAR)    PATH ''@p_enable_generic_change_log'',
-                                                   p_api_name                    VARCHAR2 (128 CHAR)  PATH ''@p_api_name'',
-                                                   p_sequence_name               VARCHAR2 (128 CHAR)  PATH ''@p_sequence_name'',
-                                                   p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH ''@p_exclude_column_list'',
-                                                   p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_custom_defaults'',                                                      
-                                                   p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'') x) -- SELECT * FROM apis;
-                                                                             ,
-     objects
-     AS (SELECT specs.object_name AS package_name,
+                AND INSTR (text,''generator="OM_TAPIGEN"'') > 0
+     ) -- select * from api_names;
+     , sources AS (  
+         SELECT owner,
+                package_name,
+                xmltype (
+                   NVL (REGEXP_SUBSTR (REPLACE (source_code,''*'',NULL),
+                                       ''<options.*>'',
+                                       1,
+                                       1,
+                                       ''ni''),
+                        ''<no_data_found/>''))
+                   AS options
+           FROM (SELECT owner,
+                        NAME AS package_name,
+                        LISTAGG (text,'' '')
+                           WITHIN GROUP (ORDER BY NAME,line)
+                           OVER (PARTITION BY NAME)
+                           AS source_code
+                   FROM all_source
+                  WHERE     owner = :p_owner
+                        AND name IN (SELECT api_name FROM api_names)
+                        AND TYPE = ''PACKAGE''
+                        AND line BETWEEN :spec_options_min_line
+                                     AND :spec_options_max_line)
+          GROUP BY owner,package_name,source_code
+     ) -- select * from sources;
+     , apis AS (
+         SELECT t.owner,
+                x.p_table_name AS table_name,
+                t.package_name,
+                x.generator,
+                x.generator_version,
+                x.generator_action,
+                TO_DATE (x.generated_at,''yyyy-mm-dd hh24:mi:ss'') AS generated_at,
+                x.generated_by,
+                x.p_owner,
+                x.p_table_name,
+                x.p_reuse_existing_api_params,
+                x.p_enable_insertion_of_rows,
+                x.p_enable_column_defaults,
+                x.p_enable_update_of_rows,
+                x.p_enable_deletion_of_rows,
+                x.p_enable_parameter_prefixes,
+                x.p_enable_proc_with_out_params,
+                x.p_enable_getter_and_setter,
+                x.p_col_prefix_in_method_names,
+                x.p_return_row_instead_of_pk,
+                x.p_enable_dml_view,
+                x.p_enable_generic_change_log,
+                x.p_api_name,
+                x.p_sequence_name,
+                x.p_exclude_column_list,
+                x.p_enable_custom_defaults,
+                x.p_custom_default_values
+           FROM sources t
+                CROSS JOIN
+                XMLTABLE (
+                   ''/options''
+                   PASSING options
+                   COLUMNS generator                     VARCHAR2 (30 CHAR)   PATH ''@generator'',
+                           generator_version             VARCHAR2 (10 CHAR)   PATH ''@generator_version'',
+                           generator_action              VARCHAR2 (30 CHAR)   PATH ''@generator_action'',
+                           generated_at                  VARCHAR2 (30 CHAR)   PATH ''@generated_at'',
+                           generated_by                  VARCHAR2 (128 CHAR)  PATH ''@generated_by'',
+                           p_owner                       VARCHAR2 (128 CHAR)  PATH ''@p_owner'',
+                           p_table_name                  VARCHAR2 (128 CHAR)  PATH ''@p_table_name'',
+                           p_reuse_existing_api_params   VARCHAR2 (5 CHAR)    PATH ''@p_reuse_existing_api_params'',
+                           p_enable_insertion_of_rows    VARCHAR2 (5 CHAR)    PATH ''@p_enable_insertion_of_rows'',
+                           p_enable_column_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_column_defaults'',
+                           p_enable_update_of_rows       VARCHAR2 (5 CHAR)    PATH ''@p_enable_update_of_rows'',
+                           p_enable_deletion_of_rows     VARCHAR2 (5 CHAR)    PATH ''@p_enable_deletion_of_rows'',
+                           p_enable_parameter_prefixes   VARCHAR2 (5 CHAR)    PATH ''@p_enable_parameter_prefixes'',
+                           p_enable_proc_with_out_params VARCHAR2 (5 CHAR)    PATH ''@p_enable_proc_with_out_params'',
+                           p_enable_getter_and_setter    VARCHAR2 (5 CHAR)    PATH ''@p_enable_getter_and_setter'',
+                           p_col_prefix_in_method_names  VARCHAR2 (5 CHAR)    PATH ''@p_col_prefix_in_method_names'',
+                           p_return_row_instead_of_pk    VARCHAR2 (5 CHAR)    PATH ''@p_return_row_instead_of_pk'',
+                           p_enable_dml_view             VARCHAR2 (5 CHAR)    PATH ''@p_enable_dml_view'',
+                           p_enable_generic_change_log   VARCHAR2 (5 CHAR)    PATH ''@p_enable_generic_change_log'',
+                           p_api_name                    VARCHAR2 (128 CHAR)  PATH ''@p_api_name'',
+                           p_sequence_name               VARCHAR2 (128 CHAR)  PATH ''@p_sequence_name'',
+                           p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH ''@p_exclude_column_list'',
+                           p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_custom_defaults'',                                                      
+                           p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'') x
+     ) -- select * from apis;
+     , objects AS (
+         SELECT specs.object_name AS package_name,
                 specs.status AS spec_status,
                 specs.last_ddl_time AS spec_last_ddl_time,
                 bodys.status AS body_status,
@@ -4159,7 +4217,8 @@ WITH api_names
                         AND object_name IN (SELECT api_name FROM api_names))
                 bodys
                    ON     specs.object_name = bodys.object_name
-                      AND specs.object_type || '' BODY'' = bodys.object_type)
+                      AND specs.object_type || '' BODY'' = bodys.object_type
+     ) -- select * from objects;
 SELECT NULL AS errors,
        apis.owner,
        apis.table_name,

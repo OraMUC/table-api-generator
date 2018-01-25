@@ -283,7 +283,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- A procedure to view the debug details. Maximum 999 API creations are captured
   -- for memory reasons. You can reset the debugging by calling om_tapigen.util_set_debug_on.
   -- Example: SELECT * FROM TABLE(om_tapigen.util_view_debug);
-  FUNCTION util_view_debug RETURN t_tab_debug_data
+  FUNCTION util_view_debug_log RETURN t_tab_debug_data
     PIPELINED;
 
 END om_tapigen;
