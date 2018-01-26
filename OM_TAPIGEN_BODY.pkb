@@ -58,18 +58,19 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     rpad_uk_columns        INTEGER);
 
   TYPE t_rec_columns IS RECORD(
-    column_name         user_tab_columns.column_name%TYPE,
-    char_length         user_tab_cols.char_length%TYPE,
-    data_type           user_tab_cols.data_type%TYPE,
-    data_length         user_tab_cols.data_length%TYPE,
-    data_precision      user_tab_cols.data_precision%TYPE,
-    data_scale          user_tab_cols.data_scale%TYPE,
-    data_default        VARCHAR2(4000 CHAR),
-    data_custom_default VARCHAR2(4000 CHAR),
-    is_pk_yn            VARCHAR2(1 CHAR),
-    is_uk_yn            VARCHAR2(1 CHAR),
-    is_nullable_yn      VARCHAR2(1 CHAR),
-    is_excluded_yn      VARCHAR2(1 CHAR));
+    column_name               user_tab_columns.column_name%TYPE,
+    char_length               user_tab_cols.char_length%TYPE,
+    data_type                 user_tab_cols.data_type%TYPE,
+    data_length               user_tab_cols.data_length%TYPE,
+    data_precision            user_tab_cols.data_precision%TYPE,
+    data_scale                user_tab_cols.data_scale%TYPE,
+    data_default              VARCHAR2(4000 CHAR),
+    data_custom_default       VARCHAR2(4000 CHAR),
+    is_pk_yn                  VARCHAR2(1 CHAR),
+    is_uk_yn                  VARCHAR2(1 CHAR),
+    is_nullable_yn            VARCHAR2(1 CHAR),
+    is_excluded_yn            VARCHAR2(1 CHAR),
+    is_user_custom_default_yn VARCHAR2(1 CHAR));
 
   TYPE t_rec_constraints IS RECORD(
     constraint_name user_constraints.constraint_name%TYPE);
@@ -102,7 +103,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
   TYPE t_tab_cons_columns IS TABLE OF t_rec_cons_columns INDEX BY BINARY_INTEGER;
 
-  TYPE t_tab_result_list IS TABLE OF VARCHAR2(5000) INDEX BY BINARY_INTEGER;
+  TYPE t_tab_vc2_5k IS TABLE OF VARCHAR2(5000) INDEX BY BINARY_INTEGER;
 
   TYPE t_tab_columns_index IS TABLE OF INTEGER INDEX BY user_tab_columns.column_name%TYPE;
 
@@ -242,7 +243,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
            'N' AS is_pk_yn,
            'N' AS is_uk_yn,
            is_nullable_yn,
-           is_excluded_yn
+           is_excluded_yn,
+           'N' AS is_user_custom_default_yn
       FROM t;
 
   CURSOR g_cur_pk_columns IS
@@ -632,35 +634,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
   -----------------------------------------------------------------------------
 
-  FUNCTION util_get_spec_custom_defaults(p_api_name VARCHAR2) RETURN xmltype IS
-    v_return    VARCHAR2(32767);
-    v_xml_begin VARCHAR2(20) := '<defaults>';
-    v_xml_end   VARCHAR2(20) := '</defaults>';
-  BEGIN
-    FOR i IN (SELECT text
-                FROM all_source
-               WHERE owner = g_params.owner
-                 AND NAME = p_api_name
-                 AND TYPE = 'PACKAGE'
-                 AND line >= (SELECT MIN(line) AS line
-                                FROM all_source
-                               WHERE owner = g_params.owner
-                                 AND NAME = p_api_name
-                                 AND TYPE = 'PACKAGE'
-                                 AND instr(text,
-                                           v_xml_begin) > 0))
-    LOOP
-      v_return := v_return || regexp_replace(i.text,
-                                             '^   \* ');
-      EXIT WHEN instr(i.text,
-                      v_xml_end) > 0;
-    END LOOP;
-  
-    RETURN CASE WHEN v_return IS NULL THEN NULL ELSE xmltype(v_return) END;
-  END util_get_spec_custom_defaults;
-
-  -----------------------------------------------------------------------------
-
   FUNCTION util_get_column_data_default(p_table_name  IN VARCHAR2,
                                         p_column_name IN VARCHAR2,
                                         p_owner       VARCHAR2 DEFAULT USER) RETURN VARCHAR2 AS
@@ -760,263 +733,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_serialize_xml;
 
   --------------------------------------------------------------------------------
-
-  FUNCTION util_table_row_to_xml(p_table_name VARCHAR2,
-                                 p_owner      VARCHAR2 DEFAULT USER) RETURN xmltype IS
-    v_return xmltype;
-    v_code   VARCHAR2(32767);
-  BEGIN
-    v_code := REPLACE('
-DECLARE
-  v_row  "{{ TABLE_NAME }}"%ROWTYPE;
-  CURSOR v_cur IS SELECT * FROM {{ TABLE_NAME }};
-BEGIN
-  OPEN v_cur;
-  FETCH v_cur INTO v_row;
-  CLOSE v_cur;
-  WITH t AS (',
-                      '{{ TABLE_NAME }}',
-                      p_table_name);
-  
-    FOR i IN (SELECT column_name,
-                     data_type
-                FROM all_tab_cols
-               WHERE owner = p_owner
-                 AND table_name = p_table_name
-                 AND hidden_column = 'NO'
-                 AND (virtual_column = 'NO' OR (virtual_column = 'YES' AND data_type = 'XMLTYPE'))
-               ORDER BY column_id)
-    LOOP
-      v_code := v_code || REPLACE('
-    SELECT ''{{ COLUMN_NAME }}'' AS c,CASE WHEN v_row."{{ COLUMN_NAME }}" IS NOT NULL THEN ' || CASE
-                                    WHEN i.data_type IN ('NUMBER',
-                                                         'INTEGER',
-                                                         'FLOAT') THEN
-                                     ' to_char(v_row."{{ COLUMN_NAME }}") '
-                                    WHEN i.data_type LIKE '%CHAR%' THEN
-                                     ' '''''''' || v_row."{{ COLUMN_NAME }}" || '''''''' '
-                                    WHEN i.data_type = 'DATE' THEN
-                                     ' ''to_date('''''' || to_char(v_row."{{ COLUMN_NAME }}",''yyyy-mm-dd hh24:mi:ss'') || '''''',''''yyyy-mm-dd hh24:mi:ss'''')'' '
-                                    WHEN i.data_type LIKE 'TIMESTAMP%' THEN
-                                     ' ''to_timestamp('''''' || to_char(v_row."{{ COLUMN_NAME }}",''yyyy-mm-dd hh24:mi:ss.ff'') || '''''',''''yyyy.mm.dd hh24:mi:ss.ff'''')'' '
-                                    WHEN i.data_type = 'CLOB' THEN
-                                     ' ''to_clob(''''Dummy clob for API method get_a_row.'''')'' '
-                                    WHEN i.data_type = 'BLOB' THEN
-                                     ' ''to_blob(utl_raw.cast_to_raw(''''Dummy blob for API method get_a_row.''''))'' '
-                                    WHEN i.data_type = 'XMLTYPE' THEN
-                                     ' ''XMLTYPE(''''<dummy>Dummy XML for API method get_a_row.</dummy>'''')'' '
-                                    ELSE
-                                     ' ''unsupported data type'' '
-                                  END || ' ELSE NULL END AS v FROM DUAL UNION ALL',
-                                  '{{ COLUMN_NAME }}',
-                                  i.column_name);
-    END LOOP;
-  
-    v_code := regexp_replace(v_code,
-                             'UNION ALL$') || '
-  )
-  SELECT XMLELEMENT( "rowset",
-           XMLAGG(
-             XMLELEMENT( "row",
-               XMLELEMENT( "col",c ),
-               XMLELEMENT( "val",v ) )))
-    INTO :out
-    FROM t;
-END;';
-  
-    --dbms_output.put_line(v_code);
-    EXECUTE IMMEDIATE v_code
-      USING OUT v_return;
-  
-    RETURN v_return;
-  END;
-
-  -----------------------------------------------------------------------------
-
-  FUNCTION util_get_custom_col_defaults(p_table_name VARCHAR2,
-                                        p_owner      VARCHAR2 DEFAULT USER) RETURN xmltype IS
-    v_return xmltype;
-  BEGIN
-    -- I was not able to compile without execute immediate - got a strange ORA-22905.
-    -- Direct execution of the statement in SQL tool works :-(
-    EXECUTE IMMEDIATE '
-    WITH cons
-         AS (SELECT owner,
-                    constraint_name,
-                    constraint_type,
-                    TABLE_NAME,
-                    CASE
-                       WHEN search_condition IS NOT NULL
-                       THEN
-                          (SELECT om_tapigen.util_get_cons_search_condition (
-                                     p_owner             => :owner,
-                                     p_constraint_name   => constraint_name)
-                             FROM DUAL)
-                    END
-                       AS search_condition,
-                    r_owner,
-                    r_constraint_name,
-                    delete_rule,
-                    STATUS
-               FROM all_constraints
-              WHERE owner = :owner AND TABLE_NAME = :table_name),
-         con_cols
-         AS (SELECT owner,
-                    constraint_name,
-                    TABLE_NAME,
-                    column_name,
-                    POSITION
-               FROM all_cons_columns
-              WHERE        owner = :owner
-                       AND constraint_name IN (SELECT constraint_name FROM cons)
-                    OR constraint_name IN (SELECT r_constraint_name
-                                             FROM cons
-                                            WHERE r_constraint_name IS NOT NULL)),
-         con_nn
-         AS ( --> because of primary keys and not null check constraints we have to select distinct here
-             SELECT DISTINCT table_name,column_name,''N'' AS nullable_table_level
-               FROM con_cols
-              WHERE constraint_name IN (SELECT constraint_name
-                                          FROM cons
-                                         WHERE     status = ''ENABLED''
-                                               AND (   constraint_type = ''P''
-                                                    OR     constraint_type = ''C''
-                                                       AND REGEXP_COUNT (
-                                                              TRIM (
-                                                                 search_condition),
-                                                                 ''^"{0,1}''
-                                                              || column_name
-                                                              || ''"{0,1}\s+is\s+not\s+null$'',
-                                                              1,
-                                                              ''i'') = 1))),
-         con_pk
-         AS (SELECT table_name,column_name,''Y'' AS is_pk
-               FROM con_cols
-              WHERE constraint_name IN (SELECT constraint_name
-                                          FROM cons
-                                         WHERE     status = ''ENABLED''
-                                               AND constraint_type = ''P'')),
-         con_uq
-         AS (SELECT table_name,column_name,''Y'' AS has_to_be_unique
-               FROM con_cols
-              WHERE constraint_name IN (SELECT constraint_name
-                                          FROM cons
-                                         WHERE     status = ''ENABLED''
-                                               AND constraint_type = ''U'')),
-         con_fk
-         AS (SELECT fk_source.table_name,
-                    fk_source.column_name,
-                    cons.r_owner AS fk_owner,
-                    fk_target.table_name AS fk_table_name,
-                    fk_target.column_name AS fk_column_name
-               FROM cons
-                    JOIN con_cols fk_source
-                       ON cons.constraint_name = fk_source.constraint_name
-                    JOIN con_cols fk_target
-                       ON cons.r_constraint_name = fk_target.constraint_name
-              WHERE status = ''ENABLED'' AND constraint_type = ''R''),
-         tab_data
-         AS (         SELECT x.column_name,x.data_random_row
-                        FROM XMLTABLE (
-                                ''/rowset/row''
-                                PASSING OM_TAPIGEN.util_table_row_to_xml (
-                                           p_table_name   => :table_name,
-                                           p_owner        => :owner)
-                                COLUMNS column_name VARCHAR2 (128) PATH ''./col'',
-                                        data_random_row VARCHAR2 (4000) PATH ''./val'') x),
-         tab_cols
-         AS (  SELECT t.table_name,
-                      t.column_id,
-                      t.column_name,
-                      t.char_length,
-                      t.data_type,
-                      t.data_length,
-                      t.data_precision,
-                      t.data_scale,
-                      CASE
-                         WHEN data_default IS NOT NULL
-                         THEN
-                            (SELECT om_tapigen.util_get_column_data_default (
-                                       p_owner         => :owner,
-                                       p_table_name    => t.table_name,
-                                       p_column_name   => t.column_name)
-                               FROM DUAL)
-                      END
-                         AS data_default,
-                      d.data_random_row,
-                      --> Dictionary does not recognize table level not null constraints
-                      t.nullable AS nullable_column_level,
-                      NVL (n.nullable_table_level,''Y'') AS nullable_table_level,
-                      NVL (p.is_pk,''N'') AS is_pk,
-                      NVL (u.has_to_be_unique,''N'') AS has_to_be_unique,
-                      f.fk_owner,
-                      f.fk_table_name,
-                      f.fk_column_name
-                 FROM all_tab_columns T
-                      LEFT JOIN con_nn n
-                         ON     t.table_name = n.table_name
-                            AND t.column_name = n.column_name
-                      LEFT JOIN con_pk p
-                         ON     t.table_name = p.table_name
-                            AND t.column_name = p.column_name
-                      LEFT JOIN con_uq u
-                         ON     t.table_name = u.table_name
-                            AND t.column_name = u.column_name
-                      LEFT JOIN con_fk f
-                         ON     t.table_name = f.table_name
-                            AND t.column_name = f.column_name
-                      LEFT JOIN tab_data d ON t.column_name = d.column_name
-                WHERE T.OWNER = :owner AND t.table_name = :table_name
-             ORDER BY COLUMN_ID),
-         result
-         AS (SELECT column_name,
-                    CASE
-                       WHEN is_pk = ''Y''
-                       THEN
-                          NULL
-                       WHEN data_random_row IS NOT NULL
-                       THEN
-                          CASE
-                             WHEN has_to_be_unique = ''N''
-                             THEN
-                                data_random_row
-                             ELSE
-                                CASE
-                                   WHEN data_type IN (''NUMBER'',''INTEGER'',''FLOAT'')
-                                   THEN
-                                      ''to_char(systimestamp,''''yyyymmddhh24missff'''')''
-                                   WHEN data_type LIKE ''%CHAR%''
-                                   THEN
-                                      ''substr(sys_guid(),1,'' || char_length || '')''
-                                   WHEN data_type = ''CLOB''
-                                   THEN
-                                      ''to_clob(''''Dummy clob for API method get_a_row: '''' || sys_guid())''
-                                   WHEN data_type = ''BLOB''
-                                   THEN
-                                      ''to_blob(utl_raw.cast_to_raw(''''Dummy clob for API method get_a_row: '''' || sys_guid()))''
-                                   WHEN data_type = ''XMLTYPE''
-                                   THEN
-                                      ''xmltype(''''<dummy>Dummy XML for API method get_a_row: '''' || sys_guid() || ''''</dummy>'''')''
-                                   ELSE
-                                      NULL
-                                END
-                          END
-                    END
-                       AS data_default
-               FROM tab_cols)
-    SELECT XMLELEMENT ("defaults",
-              XMLAGG (
-                 XMLELEMENT ("item",
-                    XMLELEMENT ("col",column_name),
-                    XMLELEMENT ("val",data_default) )))
-      FROM result
-     WHERE data_default IS NOT NULL
-            '
-      INTO v_return
-      USING p_owner, p_owner, p_table_name, p_owner, p_table_name, p_owner, p_owner, p_owner, p_table_name;
-  
-    RETURN v_return;
-  END util_get_custom_col_defaults;
 
   PROCEDURE util_set_debug_on IS
   BEGIN
@@ -1124,7 +840,7 @@ END;';
   
   END;
 
-  FUNCTION util_generate_list(p_list_name VARCHAR2) RETURN t_tab_result_list IS
+  FUNCTION util_generate_list(p_list_name VARCHAR2) RETURN t_tab_vc2_5k IS
   
     -----------------------------------------------------------------------------
     -- Columns as flat list for insert - without p_column_exclude_list:
@@ -1136,8 +852,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_insert_columns RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_insert_columns RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1164,8 +880,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_insert_params RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_insert_params RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1199,8 +915,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_columns_w_pk_full RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_columns_w_pk_full RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1238,8 +954,8 @@ END;';
     --    ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_columns_wo_pk_compare RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_columns_wo_pk_compare RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1312,8 +1028,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_params_w_pk RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_params_w_pk RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1369,8 +1085,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_params_w_pk_cust_defaults RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_params_w_pk_cust_defaults RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1405,8 +1121,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_params_w_pk_io RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_params_w_pk_io RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1440,8 +1156,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_map_par_eq_newcol_w_pk RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_map_par_eq_newcol_w_pk RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1470,8 +1186,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_map_par_eq_param_w_pk RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_map_par_eq_param_w_pk RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1501,8 +1217,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_map_par_eq_rowtypcol_w_pk RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_map_par_eq_rowtypcol_w_pk RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1530,8 +1246,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_set_col_eq_param_wo_pk RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_set_col_eq_param_wo_pk RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1560,8 +1276,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_set_par_eq_rowtycol_wo_pk RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_set_par_eq_rowtycol_wo_pk RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last
       LOOP
@@ -1590,8 +1306,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_pk_params RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_pk_params RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_pk_columns.first .. g_pk_columns.last
       LOOP
@@ -1617,8 +1333,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_pk_column_compare RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_pk_column_compare RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_pk_columns.first .. g_pk_columns.last
       LOOP
@@ -1650,8 +1366,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_pk_map_param_eq_param RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_pk_map_param_eq_param RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_pk_columns.first .. g_pk_columns.last
       LOOP
@@ -1682,8 +1398,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_pk_map_param_eq_oldcol RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_pk_map_param_eq_oldcol RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_pk_columns.first .. g_pk_columns.last
       LOOP
@@ -1714,8 +1430,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_uk_params RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_uk_params RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_uk_columns.first .. g_uk_columns.last
       LOOP
@@ -1744,8 +1460,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_uk_column_compare RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_uk_column_compare RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_uk_columns.first .. g_uk_columns.last
       LOOP
@@ -1780,8 +1496,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_uk_map_param_eq_param RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_uk_map_param_eq_param RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_uk_columns.first .. g_uk_columns.last
       LOOP
@@ -1816,8 +1532,8 @@ END;';
     --   ...
     -----------------------------------------------------------------------------
   
-    FUNCTION list_rowcols_w_cust_defaults RETURN t_tab_result_list IS
-      v_result t_tab_result_list;
+    FUNCTION list_rowcols_w_cust_defaults RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
     BEGIN
     
       FOR i IN g_columns.first .. g_columns.last
@@ -1841,6 +1557,42 @@ END;';
     
       RETURN v_result;
     END list_rowcols_w_cust_defaults;
+  
+    -----------------------------------------------------------------------------
+    -- A list of custom column defaults - used to save the defaults in the spec:
+    -- {% LIST_SPEC_CUSTOM_DEFAULTS %}
+    -- Example:
+    --   v_row.employee_id := employees_seq.nextval; --generated from SEQ
+    --   v_row.first_name  := 'Rowan';
+    --   v_row.last_name   := 'Atkinson';
+    --   ...
+    -----------------------------------------------------------------------------
+  
+    FUNCTION list_spec_custom_defaults RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      v_result(v_result.count + 1) := '<custom_defaults>' || c_crlf;
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).data_custom_default IS NOT NULL
+        THEN
+          v_result(v_result.count + 1) := '   *   <column name="' || g_columns(i).column_name || '"><![CDATA[' || g_columns(i)
+                                         .data_custom_default || ']]></column>' || c_crlf;
+        END IF;
+      END LOOP;
+      v_result(v_result.count + 1) := '   * </custom_defaults>' || c_crlf;
+    
+      IF v_result.count > 2
+      THEN
+        v_result(v_result.last) := rtrim(v_result(v_result.last),
+                                         c_crlf);
+      ELSE
+        -- no data available, only the empty <custom_defaults> element
+        v_result.delete;
+      END IF;
+    
+      RETURN v_result;
+    END list_spec_custom_defaults;
   BEGIN
     CASE p_list_name
       WHEN 'LIST_INSERT_COLUMNS' THEN
@@ -1883,6 +1635,8 @@ END;';
         RETURN list_uk_column_compare;
       WHEN 'LIST_UK_MAP_PARAM_EQ_PARAM' THEN
         RETURN list_uk_map_param_eq_param;
+      WHEN 'LIST_SPEC_CUSTOM_DEFAULTS' THEN
+        RETURN list_spec_custom_defaults;
       ELSE
         raise_application_error(c_generator_error_number,
                                 'FIXME: Bug - list ' || p_list_name || ' not defined');
@@ -1952,7 +1706,7 @@ END;';
     v_match_len         PLS_INTEGER := 0;
     v_match             VARCHAR2(256 CHAR);
     v_tpl_len           PLS_INTEGER;
-    v_dynamic_result    t_tab_result_list;
+    v_dynamic_result    t_tab_vc2_5k;
   
     PROCEDURE get_match_pos IS
       -- finds the first position of a substitution string like
@@ -2609,37 +2363,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       util_debug_stop_one_step;
     END init_check_if_sequence_exists;
   
-    PROCEDURE init_fetch_custom_defaults IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'init_fetch_custom_defaults');
-      g_params.custom_default_values := CASE
-                                          WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                          -- g_status.api_exists contains only placeholder 
-                                          -- to signal that defaults exists. We have to 
-                                          -- fetch the defaults from the spec
-                                           CASE
-                                             WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
-                                             -- get the xml defaults from the end of the package spec
-                                              util_get_spec_custom_defaults(g_params.api_name)
-                                           END
-                                          ELSE
-                                           p_custom_default_values
-                                        END;
-    
-      IF g_params.custom_default_values IS NOT NULL
-      THEN
-        g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
-      END IF;
-    
-      -- check for empty XML element
-      IF g_params.custom_defaults_serialized = '<defaults/>'
-      THEN
-        g_params.custom_default_values      := NULL;
-        g_params.custom_defaults_serialized := NULL;
-      END IF;
-      util_debug_stop_one_step;
-    END init_fetch_custom_defaults;
-  
     PROCEDURE init_create_temporary_lobs IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_create_temporary_lobs');
@@ -2788,58 +2511,117 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       util_debug_stop_one_step;
     END init_process_uk_columns;
   
-    PROCEDURE init_generate_custom_defaults IS
-      v_index INTEGER;
+    PROCEDURE init_fetch_custom_defaults IS
+      FUNCTION get_spec_custom_defaults RETURN xmltype IS
+        v_return    VARCHAR2(32767);
+        v_xml_begin VARCHAR2(20) := '<custom_defaults>';
+        v_xml_end   VARCHAR2(20) := '</custom_defaults>';
+      BEGIN
+        FOR i IN (SELECT text
+                    FROM all_source
+                   WHERE owner = g_params.owner
+                     AND NAME = g_params.api_name
+                     AND TYPE = 'PACKAGE'
+                     AND line >= (SELECT MIN(line) AS line
+                                    FROM all_source
+                                   WHERE owner = g_params.owner
+                                     AND NAME = g_params.api_name
+                                     AND TYPE = 'PACKAGE'
+                                     AND instr(text,
+                                               v_xml_begin) > 0))
+        LOOP
+          v_return := v_return || substr(i.text,
+                                         5);
+          EXIT WHEN instr(i.text,
+                          v_xml_end) > 0;
+        END LOOP;
+      
+        RETURN CASE WHEN v_return IS NULL THEN NULL ELSE xmltype(v_return) END;
+      END;
+    
     BEGIN
-      util_debug_start_one_step(p_action => 'init_generate_custom_defaults');
-      -- generate standard custom defaults for the users convenience...
-      FOR i IN g_columns.first .. g_columns.last
-      LOOP
-        g_columns(i).data_custom_default := CASE
-                                              WHEN g_columns(i).is_pk_yn = 'Y' --
-                                                   OR g_columns(i).is_excluded_yn = 'Y' --
-                                                   OR (g_columns(i).is_nullable_yn = 'Y' --
-                                                       AND g_columns(i).data_default IS NULL) THEN
-                                               NULL
-                                              ELSE
-                                               nvl(g_columns(i).data_default,
-                                                   CASE
-                                                     WHEN g_columns(i).data_type IN ('NUMBER',
-                                                                         'INTEGER',
-                                                                         'FLOAT') THEN
-                                                      'to_char(systimestamp,''yyyymmddhh24missff'')'
-                                                     WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
-                                                      'substr(sys_guid(),1,' || g_columns(i).char_length || ')'
-                                                     WHEN g_columns(i).data_type = 'CLOB' THEN
-                                                      'to_clob(''Dummy clob for API method get_a_row: '' || sys_guid())'
-                                                     WHEN g_columns(i).data_type = 'BLOB' THEN
-                                                      'to_blob(utl_raw.cast_to_raw(''Dummy clob for API method get_a_row: '' || sys_guid()))'
-                                                     WHEN g_columns(i).data_type = 'XMLTYPE' THEN
-                                                      'xmltype(''<dummy>Dummy XML for API method get_a_row: '' || sys_guid() || ''</dummy>'')'
-                                                     ELSE
-                                                      NULL
-                                                   END)
-                                            END;
-      END LOOP;
-      -- overwrite standard custom default value with user provided ones
+      util_debug_start_one_step(p_action => 'init_fetch_custom_defaults');
+      g_params.custom_default_values := CASE
+                                          WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
+                                           CASE
+                                             WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
+                                             -- g_params_existing_api.p_custom_default_values contains only a
+                                             -- placeholder to signal that custom defaults exists, because the 
+                                             -- defaults could be very large. We have to fetch the xml encoded 
+                                             -- custom defaults from the end of the package spec.
+                                              get_spec_custom_defaults
+                                           END
+                                          ELSE
+                                           p_custom_default_values
+                                        END;
+    
       IF g_params.custom_default_values IS NOT NULL
       THEN
-        FOR i IN (SELECT x.column_name,
-                         x.data_default
-                    FROM xmltable('/defaults/item' passing g_params.custom_default_values --
+        g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
+      END IF;
+    
+      -- check for empty XML element
+      IF g_params.custom_defaults_serialized = '<defaults/>'
+      THEN
+        g_params.custom_default_values      := NULL;
+        g_params.custom_defaults_serialized := NULL;
+      END IF;
+      util_debug_stop_one_step;
+    END init_fetch_custom_defaults;
+  
+    PROCEDURE init_process_custom_defaults IS
+      v_index INTEGER;
+    BEGIN
+      util_debug_start_one_step(p_action => 'init_process_custom_defaults');
+      -- process user provided custom defaults
+      IF g_params.custom_default_values IS NOT NULL
+      THEN
+        FOR i IN (SELECT x.column_name  AS column_name,
+                         x.data_default AS data_default
+                    FROM xmltable('for $i in /custom_defaults/column return $i' passing g_params.custom_default_values
                                   columns --
-                                  column_name VARCHAR2(128) path './col',
-                                  data_default VARCHAR2(4000) path './val') x)
+                                  column_name VARCHAR2(200) path '@name', --
+                                  data_default VARCHAR2(4000) path 'text()' --
+                                  ) x)
         LOOP
           v_index := g_columns_reverse_index(i.column_name);
           IF v_index IS NOT NULL
           THEN
             g_columns(v_index).data_custom_default := i.data_default;
+            g_columns(v_index).is_user_custom_default_yn := 'Y';
           END IF;
         END LOOP;
       END IF;
+      -- generate standard custom defaults for the users convenience...
+      FOR i IN g_columns.first .. g_columns.last
+      LOOP
+        IF NOT (g_columns(i).is_user_custom_default_yn = 'Y' --
+            OR g_columns(i).is_pk_yn = 'Y' --
+            OR g_columns(i).is_excluded_yn = 'Y' --
+            OR (g_columns(i).is_nullable_yn = 'Y' --
+             AND g_columns(i).data_default IS NULL))
+        THEN
+          g_columns(i).data_custom_default := nvl(g_columns(i).data_default,
+                                                  CASE
+                                                    WHEN g_columns(i).data_type IN ('NUMBER',
+                                                                        'INTEGER',
+                                                                        'FLOAT') THEN
+                                                     'to_char(systimestamp,''yyyymmddhh24missff'')'
+                                                    WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
+                                                     'substr(sys_guid(),1,' || g_columns(i).char_length || ')'
+                                                    WHEN g_columns(i).data_type = 'CLOB' THEN
+                                                     'to_clob(''Dummy clob for API method get_a_row: '' || sys_guid())'
+                                                    WHEN g_columns(i).data_type = 'BLOB' THEN
+                                                     'to_blob(utl_raw.cast_to_raw(''Dummy clob for API method get_a_row: '' || sys_guid()))'
+                                                    WHEN g_columns(i).data_type = 'XMLTYPE' THEN
+                                                     'xmltype(''<dummy>Dummy XML for API method get_a_row: '' || sys_guid() || ''</dummy>'')'
+                                                    ELSE
+                                                     NULL
+                                                  END);
+        END IF;
+      END LOOP;
       util_debug_stop_one_step;
-    END init_generate_custom_defaults;
+    END init_process_custom_defaults;
   BEGIN
     init_reset_globals;
     --
@@ -2879,11 +2661,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       init_check_if_sequence_exists;
     END IF;
     --
-    IF g_params.enable_custom_defaults
-    THEN
-      init_fetch_custom_defaults;
-    END IF;
-    --
     init_create_temporary_lobs;
     init_fetch_columns;
     init_fetch_unique_constraints;
@@ -2892,7 +2669,12 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     init_process_columns;
     init_process_pk_columns;
     init_process_uk_columns;
-    init_generate_custom_defaults;
+    --
+    IF g_params.enable_custom_defaults
+    THEN
+      init_fetch_custom_defaults;
+      init_process_custom_defaults;
+    END IF;
   END main_init;
 
   PROCEDURE main_generate_code IS
@@ -3669,11 +3451,10 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
     BEGIN
       util_debug_start_one_step(p_action => 'gen_footer');
       g_code_blocks.template := CASE
-                                  WHEN g_params.custom_defaults_serialized IS NOT NULL THEN
+                                  WHEN g_params.enable_custom_defaults THEN
                                    c_crlf || '
   /**
-   * Custom column defaults (&lt; = < | &gt; = > | &quot; = " | &apos; = '' | &amp; = & ):
-   * {{ COLUMN_DEFAULTS_SERIALIZED }}
+   * {% LIST_SPEC_CUSTOM_DEFAULTS %}
    */'
                                 END || '
 
@@ -3812,7 +3593,10 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     THEN
       gen_read_row_prc;
     END IF;
-    gen_read_a_row_fnc;
+    IF g_params.enable_custom_defaults
+    THEN
+      gen_read_a_row_fnc;
+    END IF;
   
     -- UPDATE procedures/functions only if allowed
     IF g_params.enable_update_of_rows
@@ -4100,7 +3884,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 -- Creating a cursor was not possible - database throws an error
 
 WITH api_names AS (
-         SELECT owner,NAME AS api_name
+         SELECT owner,
+                NAME AS api_name
            FROM all_source
           WHERE     owner = :p_owner
                 AND TYPE = ''PACKAGE''
@@ -4112,7 +3897,7 @@ WITH api_names AS (
          SELECT owner,
                 package_name,
                 xmltype (
-                   NVL (REGEXP_SUBSTR (REPLACE (source_code,''*'',NULL),
+                   NVL (REGEXP_SUBSTR (REPLACE (source_code, ''*'', NULL),
                                        ''<options.*>'',
                                        1,
                                        1,
@@ -4121,17 +3906,17 @@ WITH api_names AS (
                    AS options
            FROM (SELECT owner,
                         NAME AS package_name,
-                        LISTAGG (text,'' '')
-                           WITHIN GROUP (ORDER BY NAME,line)
+                        LISTAGG (text, '' '')
+                           WITHIN GROUP (ORDER BY NAME, line)
                            OVER (PARTITION BY NAME)
                            AS source_code
                    FROM all_source
                   WHERE     owner = :p_owner
-                        AND name IN (SELECT api_name FROM api_names)
-                        AND TYPE = ''PACKAGE''
-                        AND line BETWEEN :spec_options_min_line
-                                     AND :spec_options_max_line)
-          GROUP BY owner,package_name,source_code
+                        AND name  IN (SELECT api_name FROM api_names)
+                        AND TYPE  = ''PACKAGE''
+                        AND line  BETWEEN :spec_options_min_line
+                                      AND :spec_options_max_line)
+          GROUP BY owner, package_name, source_code
      ) -- select * from sources;
      , apis AS (
          SELECT t.owner,
@@ -4192,17 +3977,17 @@ WITH api_names AS (
                            p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'') x
      ) -- select * from apis;
      , objects AS (
-         SELECT specs.object_name AS package_name,
-                specs.status AS spec_status,
+         SELECT specs.object_name   AS package_name,
+                specs.status        AS spec_status,
                 specs.last_ddl_time AS spec_last_ddl_time,
-                bodys.status AS body_status,
+                bodys.status        AS body_status,
                 bodys.last_ddl_time AS body_last_ddl_time
            FROM (SELECT object_name,
                         object_type,
                         status,
                         last_ddl_time
                    FROM all_objects
-                  WHERE     owner = :p_owner
+                  WHERE     owner       = :p_owner
                         AND object_type = ''PACKAGE''
                         AND object_name IN (SELECT api_name FROM api_names))
                 specs
@@ -4212,11 +3997,11 @@ WITH api_names AS (
                         status,
                         last_ddl_time
                    FROM all_objects
-                  WHERE     owner = :p_owner
+                  WHERE     owner       = :p_owner
                         AND object_type = ''PACKAGE BODY''
                         AND object_name IN (SELECT api_name FROM api_names))
                 bodys
-                   ON     specs.object_name = bodys.object_name
+                   ON     specs.object_name              = bodys.object_name
                       AND specs.object_type || '' BODY'' = bodys.object_type
      ) -- select * from objects;
 SELECT NULL AS errors,

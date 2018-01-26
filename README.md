@@ -2,20 +2,23 @@
 
 ## To Do
 
+- `init_check_table_column_prefix` runs sometimes long, do this with the help of the columns array
 - New parameter `p_enable_custom_defaults BOOLEAN DEFAULT FALSE`:
-  - To do: create_a_row with single column pk and given sequence name
-  - New method `create_a_row` with (custom) default parameters
-    - If new parameter `p_custom_column_defaults xmltype default null` is null then the table column defaults are used, otherwise the provided custom defaults
-    - XMLTYPE because we need to save this parameter in the API spec for parameterless recreation and also this gives us the possibility to define some dynamic content like in the example below (the XML is very simple and since JSON is commonly used these days this xml should not be a problem for a developer
-    - Additional reason is the SQL Developer integration - there we have only a reduced set of input types
-    - Two new helper functions to retrieve automatically useful defaults:
-    - `util_get_custom_col_defaults`
-    - `util_table_row_to_xml`
-    - The second one is used in the first one and the first one is a incomplete first implementation which could be used as a template for your own business needs - please see also the spec and body for implementation details; For the table EMPLOYEES the result works fine - see usage example below;
+  - If set to true, this will create a set of new methods mainly for testing and dummy data generation purposes
+    - `get_a_row` function returns a row with (hopefully) complete default data
+    - `create_a_row` function (returning pk) and procedure to create a new row without (hopefully) providing any parameters
+    - `read_a_row` function to fetch one row (the first the database delivers) without providing a  primary key parameter
+    - The default values are provided by the generator and can be overwritten by passing data to the new parameter `p_custom_column_defaults xmltype default null` - see example below:
+
+```xml
+FIXME: provide example for table employees
+```
+
 - Move generic change log table creation to a utility function? To be discussed; The problem here was the support of varchar2 natural primary keys like an ISO currency code, which could not be saved in a number based pk_id column; Maybe be we should let the users create the generic change log table and they should decide, if the pk_id column should be of type number or varchar2, and if varchar2 how many characters should be stored in the id column - this depends heavily on the data model
 - Align oddgen wrapper package for SQL Developer integration
 - When using `p_col_prefix_in_method_names => false` then do NOT throw an exception when no unique column prefix is found for a table? To be discussed
 - List also dml_v and trigger status in all apis view
+  - Put generator meta data in the view and trigger to be recognizable
 - Delete_row (by uk) functions ?
 - Update documentation
 - Create tests with utplsql, Travis and SonarQube

@@ -56,24 +56,28 @@ BEGIN
                          p_enable_dml_view           => TRUE,
                          p_sequence_name             => 'TEST_2_SEQ');
 
-  om_tapigen.compile_api(p_table_name                  => 'TEST_TABLE',
-                         p_reuse_existing_api_params   => FALSE,
-                         p_enable_insertion_of_rows    => TRUE,
-                         p_enable_column_defaults      => false,
-                         p_enable_update_of_rows       => TRUE,
-                         p_enable_deletion_of_rows     => TRUE,
-                         p_enable_generic_change_log   => TRUE,
-                         p_enable_dml_view             => TRUE,
-                         p_sequence_name               => 'TEST_TABLE_SEQ',
-                         p_api_name                    => 'TEST_TABLE_API',
-                         p_exclude_column_list         => 'HIREDATE',
-                         p_enable_getter_and_setter    => TRUE,
-                         p_col_prefix_in_method_names  => false,
-                         p_enable_proc_with_out_params => TRUE,
-                         p_enable_parameter_prefixes   => TRUE,
-                         p_return_row_instead_of_pk    => FALSE,
-                         p_enable_custom_defaults      => true
-                         --,p_custom_default_values               => om_tapigen.util_get_custom_col_defaults ('TEST_TABLE')
+  om_tapigen.compile_api(
+    p_table_name                  => 'TEST_TABLE',
+    p_reuse_existing_api_params   => FALSE,
+    p_enable_insertion_of_rows    => TRUE,
+    p_enable_column_defaults      => false,
+    p_enable_update_of_rows       => TRUE,
+    p_enable_deletion_of_rows     => TRUE,
+    p_enable_generic_change_log   => TRUE,
+    p_enable_dml_view             => TRUE,
+    p_sequence_name               => 'TEST_TABLE_SEQ',
+    p_api_name                    => null, --'TEST_TABLE_API',
+    p_exclude_column_list         => 'HIREDATE',
+    p_enable_getter_and_setter    => TRUE,
+    p_col_prefix_in_method_names  => false,
+    p_enable_proc_with_out_params => TRUE,
+    p_enable_parameter_prefixes   => TRUE,
+    p_return_row_instead_of_pk    => FALSE,
+    p_enable_custom_defaults      => true,
+    p_custom_default_values       => xmltype(q'{
+        <custom_defaults>
+          <column name="TEST_NUMBER"><![CDATA[99]]></column>
+        </custom_defaults>}')
                          );
 
   om_tapigen.compile_api(p_table_name                  => 'TEST_TABLE_2',

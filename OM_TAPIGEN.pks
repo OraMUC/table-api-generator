@@ -5,7 +5,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   
   The MIT License (MIT)
   
-  Copyright (c) 2015-2017 André Borngräber, Ottmar Gobrecht
+  Copyright (c) 2015-2018 André Borngräber, Ottmar Gobrecht
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -39,7 +39,8 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   ;
 
   -- parameter defaults
-  c_reuse_existing_api_params   CONSTANT BOOLEAN := TRUE; -- if true, all other parameters are ignored
+  c_reuse_existing_api_params CONSTANT BOOLEAN := TRUE;
+  --^ if true, all other parameters except p_owner and p_table_name are ignored when API package is already existing and params are extractable from spec source
   c_enable_insertion_of_rows    CONSTANT BOOLEAN := TRUE;
   c_enable_column_defaults      CONSTANT BOOLEAN := FALSE;
   c_enable_update_of_rows       CONSTANT BOOLEAN := TRUE;
@@ -129,7 +130,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   PROCEDURE compile_api(p_table_name                IN all_objects.object_name%TYPE,
                         p_owner                     IN all_users.username%TYPE DEFAULT USER,
                         p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
-                        --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
+                        --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
                         p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
                         p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
                         p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
@@ -149,9 +150,10 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 
   --------------------------------------------------------------------------------
 
-  FUNCTION compile_api_and_get_code(p_table_name                  IN all_objects.object_name%TYPE,
-                                    p_owner                       IN all_users.username%TYPE DEFAULT USER,
-                                    p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
+  FUNCTION compile_api_and_get_code(p_table_name                IN all_objects.object_name%TYPE,
+                                    p_owner                     IN all_users.username%TYPE DEFAULT USER,
+                                    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+                                    --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
                                     p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
                                     p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
                                     p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
@@ -172,9 +174,10 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 
   --------------------------------------------------------------------------------
 
-  FUNCTION get_code(p_table_name                  IN all_objects.object_name%TYPE,
-                    p_owner                       IN all_users.username%TYPE DEFAULT USER,
-                    p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params, --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
+  FUNCTION get_code(p_table_name                IN all_objects.object_name%TYPE,
+                    p_owner                     IN all_users.username%TYPE DEFAULT USER,
+                    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+                    --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
                     p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
                     p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
                     p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
@@ -230,33 +233,6 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 
   FUNCTION util_get_cons_search_condition(p_constraint_name IN VARCHAR2,
                                           p_owner           IN VARCHAR2 DEFAULT USER) RETURN VARCHAR2;
-
-  --------------------------------------------------------------------------------
-  -- A helper function for util_get_custom_col_defaults which reads a random row
-  -- from a table and converts (transpose) the data so that it is joinable to
-  -- user_tab_columns whith the help of the xmltable function. See also the
-  -- source of util_get_custom_col_defaults for a usage example.
-  -- SELECT XMLSERIALIZE (DOCUMENT om_tapigen.util_table_row_to_xml ('EMPLOYEES') INDENT) FROM DUAL;
-  -- SELECT x.column_name,
-  --        x.data_random_row
-  --   FROM XMLTABLE ('/rowset/row' PASSING om_tapigen.util_table_row_to_xml ('EMPLOYEES') COLUMNS
-  --           column_name     VARCHAR2  (128) PATH './col',
-  --           data_random_row VARCHAR2 (4000) PATH './val') x;
-
-  FUNCTION util_table_row_to_xml(p_table_name VARCHAR2,
-                                 p_owner      VARCHAR2 DEFAULT USER) RETURN xmltype;
-
-  --------------------------------------------------------------------------------
-  -- A standalone function to get hopefully useful custom column defaults. This
-  -- is always work in progress, because it is impossible to create logic,
-  -- that meets the requirements of all possible use cases. You can grab this
-  -- code as base for your own implementation ;-)
-  -- If you want to check the output in a readable format then try this:
-  -- SELECT XMLSERIALIZE (DOCUMENT om_tapigen.util_get_custom_col_defaults ('EMPLOYEES') INDENT) FROM DUAL;
-  -- Yes, it is slow because of heavy use of the dictionary. If you have a better idea, please let us know...
-
-  FUNCTION util_get_custom_col_defaults(p_table_name VARCHAR2,
-                                        p_owner      VARCHAR2 DEFAULT USER) RETURN xmltype;
 
   --------------------------------------------------------------------------------
   -- A table function to split a string to a selectable table
