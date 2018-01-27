@@ -6,7 +6,7 @@ exec OM_TAPIGEN.RECREATE_EXISTING_APIS;
 @simple-tests.sql;
 
 -- checks API status
-SELECT * FROM TABLE(om_tapigen.view_existing_apis);
+SELECT * FROM TABLE(om_tapigen.view_existing_apis) order by spec_last_ddl_time desc;
 
 -- some debug checks
 SELECT * FROM TABLE(om_tapigen.util_view_debug_log);

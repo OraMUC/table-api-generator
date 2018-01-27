@@ -1576,11 +1576,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       LOOP
         IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).data_custom_default IS NOT NULL
         THEN
-          v_result(v_result.count + 1) := '   *   <column name="' || g_columns(i).column_name || '"><![CDATA[' || g_columns(i)
+          v_result(v_result.count + 1) := '    <column name="' || g_columns(i).column_name || '"><![CDATA[' || g_columns(i)
                                          .data_custom_default || ']]></column>' || c_crlf;
         END IF;
       END LOOP;
-      v_result(v_result.count + 1) := '   * </custom_defaults>' || c_crlf;
+      v_result(v_result.count + 1) := '  </custom_defaults>' || c_crlf;
     
       IF v_result.count > 2
       THEN
@@ -2530,8 +2530,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                      AND instr(text,
                                                v_xml_begin) > 0))
         LOOP
-          v_return := v_return || substr(i.text,
-                                         5);
+          v_return := v_return || ltrim(i.text, -- needed for backward compatibility of old comment style
+                                        ' *');
           EXIT WHEN instr(i.text,
                           v_xml_end) > 0;
         END LOOP;
@@ -2608,7 +2608,14 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                                                         'FLOAT') THEN
                                                      'to_char(systimestamp,''yyyymmddhh24missff'')'
                                                     WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
-                                                     'substr(sys_guid(),1,' || g_columns(i).char_length || ')'
+                                                     CASE
+                                                       WHEN lower(g_columns(i).column_name) LIKE '%mail%' THEN
+                                                        'substr(sys_guid(),1,' || to_char(g_columns(i).char_length - 10) || ') || ''@dummy.com'''
+                                                       ELSE
+                                                        'substr(sys_guid(),1,' || to_char(g_columns(i).char_length) || ')'
+                                                     END
+                                                    WHEN g_columns(i).data_type = 'DATE' THEN
+                                                     'to_date(trunc(dbms_random.value(to_char(date''1900-01-01'',''j''),to_char(date''2099-12-31'',''j''))),''j'')'
                                                     WHEN g_columns(i).data_type = 'CLOB' THEN
                                                      'to_clob(''Dummy clob for API method get_a_row: '' || sys_guid())'
                                                     WHEN g_columns(i).data_type = 'BLOB' THEN
@@ -2684,48 +2691,49 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       util_debug_start_one_step(p_action => 'gen_header');
       g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
-  /**
-   * This is the API for the table "{{ TABLE_NAME }}".
-   *
-   * GENERATION OPTIONS
-   * - Must be in the lines {{ SPEC_OPTIONS_MIN_LINE }}-{{ SPEC_OPTIONS_MAX_LINE }} to be reusable by the generator
-   * - DO NOT TOUCH THIS until you know what you do
-   * - Read the docs under github.com/OraMUC/table-api-generator ;-)
-   * <options
-   *   generator="{{ GENERATOR }}"
-   *   generator_version="{{ GENERATOR_VERSION }}"
-   *   generator_action="{{ GENERATOR_ACTION }}"
-   *   generated_at="{{ GENERATED_AT }}"
-   *   generated_by="{{ GENERATED_BY }}"
-   *   p_owner="{{ OWNER }}"
-   *   p_table_name="{{ TABLE_NAME }}"
-   *   p_reuse_existing_api_params="{{ REUSE_EXISTING_API_PARAMS }}"
-   *   p_enable_insertion_of_rows="{{ ENABLE_INSERTION_OF_ROWS }}"
-   *   p_enable_column_defaults="{{ ENABLE_COLUMN_DEFAULTS }}"
-   *   p_enable_update_of_rows="{{ ENABLE_UPDATE_OF_ROWS }}"
-   *   p_enable_deletion_of_rows="{{ ENABLE_DELETION_OF_ROWS }}"
-   *   p_enable_parameter_prefixes="{{ ENABLE_PARAMETER_PREFIXES }}"
-   *   p_enable_proc_with_out_params="{{ ENABLE_PROC_WITH_OUT_PARAMS }}"
-   *   p_enable_getter_and_setter="{{ ENABLE_GETTER_AND_SETTER }}"
-   *   p_col_prefix_in_method_names="{{ COL_PREFIX_IN_METHOD_NAMES }}"
-   *   p_return_row_instead_of_pk="{{ RETURN_ROW_INSTEAD_OF_PK }}"
-   *   p_enable_dml_view="{{ ENABLE_DML_VIEW }}"
-   *   p_enable_generic_change_log="{{ ENABLE_GENERIC_CHANGE_LOG }}"
-   *   p_api_name="{{ API_NAME }}"
-   *   p_sequence_name="{{ SEQUENCE_NAME }}"
-   *   p_exclude_column_list="{{ EXCLUDE_COLUMN_LIST }}"
-   *   p_enable_custom_defaults="{{ ENABLE_CUSTOM_DEFAULTS }}"
-   *   p_custom_default_values="{{ CUSTOM_DEFAULTS }}"/>
-   *
-   * This API provides DML functionality that can be easily called from APEX.
-   * Target of the table API is to encapsulate the table DML source code for
-   * security (UI schema needs only the execute right for the API and the
-   * read/write right for the {{ TABLE_NAME_MINUS_6 }}_DML_V, tables can be hidden in
-   * extra data schema) and easy readability of the business logic (all DML is
-   * then written in the same style). For APEX automatic row processing like
-   * tabular forms you can optionally use the {{ TABLE_NAME_MINUS_6 }}_DML_V,which has
-   * an instead of trigger who is also calling this "{{ API_NAME }}".
-   */';
+  /*
+  This is the API for the table "{{ TABLE_NAME }}".
+
+  GENERATION OPTIONS
+  - Must be in the lines {{ SPEC_OPTIONS_MIN_LINE }}-{{ SPEC_OPTIONS_MAX_LINE }} to be reusable by the generator
+  - DO NOT TOUCH THIS until you know what you do
+  - Read the docs under github.com/OraMUC/table-api-generator ;-)
+  <options
+    generator="{{ GENERATOR }}"
+    generator_version="{{ GENERATOR_VERSION }}"
+    generator_action="{{ GENERATOR_ACTION }}"
+    generated_at="{{ GENERATED_AT }}"
+    generated_by="{{ GENERATED_BY }}"
+    p_table_name="{{ TABLE_NAME }}"
+    p_owner="{{ OWNER }}"
+    p_reuse_existing_api_params="{{ REUSE_EXISTING_API_PARAMS }}"
+    p_enable_insertion_of_rows="{{ ENABLE_INSERTION_OF_ROWS }}"
+    p_enable_column_defaults="{{ ENABLE_COLUMN_DEFAULTS }}"
+    p_enable_update_of_rows="{{ ENABLE_UPDATE_OF_ROWS }}"
+    p_enable_deletion_of_rows="{{ ENABLE_DELETION_OF_ROWS }}"
+    p_enable_parameter_prefixes="{{ ENABLE_PARAMETER_PREFIXES }}"
+    p_enable_proc_with_out_params="{{ ENABLE_PROC_WITH_OUT_PARAMS }}"
+    p_enable_getter_and_setter="{{ ENABLE_GETTER_AND_SETTER }}"
+    p_col_prefix_in_method_names="{{ COL_PREFIX_IN_METHOD_NAMES }}"
+    p_return_row_instead_of_pk="{{ RETURN_ROW_INSTEAD_OF_PK }}"
+    p_enable_dml_view="{{ ENABLE_DML_VIEW }}"
+    p_enable_generic_change_log="{{ ENABLE_GENERIC_CHANGE_LOG }}"
+    p_api_name="{{ API_NAME }}"
+    p_sequence_name="{{ SEQUENCE_NAME }}"
+    p_exclude_column_list="{{ EXCLUDE_COLUMN_LIST }}"
+    p_enable_custom_defaults="{{ ENABLE_CUSTOM_DEFAULTS }}"
+    p_custom_default_values="{{ CUSTOM_DEFAULTS }}"/>
+
+  This API provides DML functionality that can be easily called from APEX.
+  Target of the table API is to encapsulate the table DML source code for
+  security (UI schema needs only the execute right for the API and the 
+  read/write right for the {{ TABLE_NAME_MINUS_6 }}_DML_V, tables can be 
+  hidden in extra data schema) and easy readability of the business logic 
+  (all DML is then written in the same style). For APEX automatic row 
+  processing like tabular forms you can optionally use the 
+  {{ TABLE_NAME_MINUS_6 }}_DML_V. The instead of trigger for this view
+  is calling simply this "{{ API_NAME }}".
+  */';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
@@ -2873,27 +2881,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       util_debug_stop_one_step;
     END gen_get_pk_by_unique_cols_fnc;
   
-    PROCEDURE gen_get_a_row_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION get_a_row
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  FUNCTION get_a_row
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
-    v_row "{{ TABLE_NAME }}"%ROWTYPE;
-  BEGIN
-    {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
-    return v_row;
-  END get_a_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_get_a_row_fnc;
-  
     PROCEDURE gen_create_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_row_fnc');
@@ -3009,52 +2996,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_rowtype_prc;
-  
-    PROCEDURE gen_create_a_row_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_create_a_row_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
-  RETURN {{ RETURN_TYPE }};';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  FUNCTION create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
-  RETURN {{ RETURN_TYPE }} IS
-    v_return {{ RETURN_TYPE }};
-  BEGIN
-    v_return := create_row (
-      {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
-    RETURN v_return;
-  END create_a_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_create_a_row_fnc;
-  
-    PROCEDURE gen_create_a_row_prc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
-      g_code_blocks.template := '
-
-  PROCEDURE create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} );';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  PROCEDURE create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
-  IS
-    v_return {{ RETURN_TYPE }};
-  BEGIN
-    v_return := create_row (
-      {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
-  END create_a_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_create_a_row_prc;
   
     PROCEDURE gen_createorupdate_row_fnc IS
     BEGIN
@@ -3245,30 +3186,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       util_debug_stop_one_step;
     END gen_read_row_by_uk_fnc;
   
-    PROCEDURE gen_read_a_row_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION read_a_row
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  FUNCTION read_a_row
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
-    v_row  "{{ TABLE_NAME }}"%ROWTYPE;
-    CURSOR cur_row IS SELECT * FROM {{ TABLE_NAME }};
-  BEGIN
-    OPEN cur_row;
-    FETCH cur_row INTO v_row;
-    CLOSE cur_row;
-    RETURN v_row;
-  END read_a_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_read_a_row_fnc;
-  
     PROCEDURE gen_update_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_update_row_prc');
@@ -3447,15 +3364,106 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS' || CASE
       util_debug_stop_one_step;
     END gen_setter_procedures;
   
+    PROCEDURE gen_get_a_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION get_a_row
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  FUNCTION get_a_row
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
+    v_row "{{ TABLE_NAME }}"%ROWTYPE;
+  BEGIN
+    {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
+    return v_row;
+  END get_a_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_get_a_row_fnc;
+  
+    PROCEDURE gen_create_a_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_a_row_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION create_a_row (
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
+  RETURN {{ RETURN_TYPE }};';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  FUNCTION create_a_row (
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
+  RETURN {{ RETURN_TYPE }} IS
+    v_return {{ RETURN_TYPE }};
+  BEGIN
+    v_return := create_row (
+      {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
+    RETURN v_return;
+  END create_a_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_a_row_fnc;
+  
+    PROCEDURE gen_create_a_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
+      g_code_blocks.template := '
+
+  PROCEDURE create_a_row (
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} );';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  PROCEDURE create_a_row (
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
+  IS
+    v_return {{ RETURN_TYPE }};
+  BEGIN
+    v_return := create_row (
+      {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
+  END create_a_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_create_a_row_prc;
+  
+    PROCEDURE gen_read_a_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION read_a_row
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  FUNCTION read_a_row
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
+    v_row  "{{ TABLE_NAME }}"%ROWTYPE;
+    CURSOR cur_row IS SELECT * FROM {{ TABLE_NAME }};
+  BEGIN
+    OPEN cur_row;
+    FETCH cur_row INTO v_row;
+    CLOSE cur_row;
+    RETURN v_row;
+  END read_a_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_read_a_row_fnc;
+  
     PROCEDURE gen_footer IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_footer');
       g_code_blocks.template := CASE
                                   WHEN g_params.enable_custom_defaults THEN
                                    c_crlf || '
-  /**
-   * {% LIST_SPEC_CUSTOM_DEFAULTS %}
-   */'
+  /*
+  {% LIST_SPEC_CUSTOM_DEFAULTS %}
+  */'
                                 END || '
 
 END "{{ API_NAME }}";';
@@ -3566,12 +3574,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       gen_get_pk_by_unique_cols_fnc;
     END IF;
   
-    -- helper for creating a row without (hopefully) any parameter (useful for creating testing data)
-    IF g_params.enable_custom_defaults
-    THEN
-      gen_get_a_row_fnc;
-    END IF;
-  
     -- CREATE procedures/functions only if allowed
     IF g_params.enable_insertion_of_rows
     THEN
@@ -3579,11 +3581,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       gen_create_row_prc;
       gen_create_rowtype_fnc;
       gen_create_rowtype_prc;
-      IF g_params.enable_custom_defaults
-      THEN
-        gen_create_a_row_fnc; -- with custom defaults
-        gen_create_a_row_prc; -- with custom defaults
-      END IF;
     END IF;
   
     -- READ procedures
@@ -3592,10 +3589,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     IF g_params.enable_proc_with_out_params
     THEN
       gen_read_row_prc;
-    END IF;
-    IF g_params.enable_custom_defaults
-    THEN
-      gen_read_a_row_fnc;
     END IF;
   
     -- UPDATE procedures/functions only if allowed
@@ -3630,6 +3623,15 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     IF g_params.enable_update_of_rows AND g_params.enable_getter_and_setter
     THEN
       gen_setter_procedures;
+    END IF;
+  
+    -- Some special stuff for the testing folks - thanks to Jacek Gębal ;-)
+    IF g_params.enable_custom_defaults
+    THEN
+      gen_get_a_row_fnc;
+      gen_create_a_row_fnc;
+      gen_create_a_row_prc;
+      gen_read_a_row_fnc;
     END IF;
   
     gen_footer;
@@ -3897,7 +3899,7 @@ WITH api_names AS (
          SELECT owner,
                 package_name,
                 xmltype (
-                   NVL (REGEXP_SUBSTR (REPLACE (source_code, ''*'', NULL),
+                   NVL (REGEXP_SUBSTR (REPLACE (source_code, ''*'', NULL), -- replace needed for backward compatibility of old comment style
                                        ''<options.*>'',
                                        1,
                                        1,

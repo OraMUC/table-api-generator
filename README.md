@@ -2,18 +2,7 @@
 
 ## To Do
 
-- `init_check_table_column_prefix` runs sometimes long, do this with the help of the columns array
-- New parameter `p_enable_custom_defaults BOOLEAN DEFAULT FALSE`:
-  - If set to true, this will create a set of new methods mainly for testing and dummy data generation purposes
-    - `get_a_row` function returns a row with (hopefully) complete default data
-    - `create_a_row` function (returning pk) and procedure to create a new row without (hopefully) providing any parameters
-    - `read_a_row` function to fetch one row (the first the database delivers) without providing a  primary key parameter
-    - The default values are provided by the generator and can be overwritten by passing data to the new parameter `p_custom_column_defaults xmltype default null` - see example below:
-
-```xml
-FIXME: provide example for table employees
-```
-
+- For new parameter `p_enable_custom_defaults`: detect not null foreign keys and try to fetch valid values from an existing record for the generation of sensible custom defaults
 - Move generic change log table creation to a utility function? To be discussed; The problem here was the support of varchar2 natural primary keys like an ISO currency code, which could not be saved in a number based pk_id column; Maybe be we should let the users create the generic change log table and they should decide, if the pk_id column should be of type number or varchar2, and if varchar2 how many characters should be stored in the id column - this depends heavily on the data model
 - Align oddgen wrapper package for SQL Developer integration
 - When using `p_col_prefix_in_method_names => false` then do NOT throw an exception when no unique column prefix is found for a table? To be discussed
@@ -45,69 +34,94 @@ Special thanks to Jacek Gębal (github.com/jgebal), Peter Ettinger (github.com/p
   - `#TABLE_NAME_17#` is treated as substr(1, 17)
   - `#TABLE_NAME_4_20#` is treated as substr(4, 20)
   - Negative positions also possible like `#TABLE_NAME_-20_20#` (length can NOT be ommitted because of use case with one number and backward compatibility, we had only `#TABLE_NAME_26#`, `#TABLE_NAME_28#`...)
-- New method `read_a_row` without any parameter to read the first record from the table (one cursor fetch)
-- New parameter `enable_getter_and_setter boolean default true`
-- New parameter `enable_parameter_prefixes boolean default true`
-- New parameter `return_row_instead_of_pk boolean default false`
-- New parameter `enable_proc_with_out_params boolean default true`: these procedures are created mainly for APEX to directly bind page items to the API without any other code - since not anyone is using APEX this can now be disabled
-- New Parameter `p_owner all_users.username%type default user` to be able to create APIs in other schemas
+- New parameter `enable_getter_and_setter BOOLEAN DEFAULT TRUE`
+- New parameter `enable_parameter_prefixes BOOLEAN DEFAULT TRUE`
+- New parameter `return_row_instead_of_pk BOOLEAN DEFAULT FALSE`
+- New parameter `enable_proc_with_out_params BOOLEAN DEFAULT TRUE`: these procedures are created mainly for APEX to directly bind page items to the API without any other code - since not anyone is using APEX this can now be disabled
+- New Parameter `p_owner ALL_USERS.USERNAME%TYPE DEFAULT USER` to be able to create APIs in other schemas
 - Rework pipelined table function `view_existing_apis` to be able to find also APIs with names other then `<TABLE_NAME>_API` since the API name is now changeable with the parameter `p_api_name`
 - Additional supported data types by the helper functions `util_get_custom_col_defaults` and `util_table_row_to_xml` - now the following data types should working: `NUMBER`, `INTEGER`, `FLOAT`, `%CHAR%`, `DATE`, `TIMESTAMP` and with Dummy data `CLOB`, `BLOB`, `XMLTYPE`
-- Changed signatur of the helper method create_change_log_entry with column type parameters to support also varchar2 pk_id values (needed for natural pk's like an ISO currency code)
+- Changed signatur of the helper method `create_change_log_entry` with column type parameters to support also varchar2 pk_id values (needed for natural pk's like an ISO currency code)
 - Enhanced template engine - Supports now dynamic substitutions:
   - Changed template placeholder from `#EXAMPLE_STATIC#` to `{{ EXAMPLE_STATIC }}` and `{% EXAMPLE_DYNAMIC %}`, because `#` is a valid character in a column name
   - This was needed for the column compare list, which can be easily grow over 32k with only slightly more then one hundred columns
   - Switched all column lists to dynamic substitutions, because since DB release 12 we have 128 chars for a column, so normal column lists could also easily grow over 32k
   - Nicer output: lowercase paramaters and method names, lists with one entry per line and we tried to align the parameter definitions and mappings...
 - New code instrumentation (debugging):
-  - Capture run time statistics for all steps in the API generation 
+  - Capture run time statistics for all steps in the API generation
   - Write session module and action for DB administration
-  - Debug can be enabled so: `BEGIN om_tapigen.util_set_debug_on; END;`
-  - Debug log can be inspected like so: `SELECT * FROM TABLE(om_tapigen.util_view_debug);`
+  - Enable debugging: `BEGIN om_tapigen.util_set_debug_on; END;`
+  - Disabled debugging: `BEGIN om_tapigen.util_set_debug_off; END;`
+  - View debug log: `SELECT * FROM TABLE(om_tapigen.util_view_debug_log);`
   - Maximum 1000 API creations will be captured for memory reasons (debug log is saved in memory)
   - Debug log collection can be resetted by calling again `BEGIN om_tapigen.util_set_debug_on; END;`
 - Many rework in the background - mainly for the multi column primary keys; Thank you Peter ;-)
 
-```xml
-<defaults>
-  <item><col>LAST_NAME</col><val>'Atkinson'</val></item>
-  ...
-</defaults>
-```
+And lastly some special stuff for the testing folks - thanks to Jacek Gębal (github.com/jgebal) for the idea:
+
+- New parameter `p_enable_custom_defaults BOOLEAN DEFAULT FALSE`
+  - If set to true, this will create a set of new methods mainly for testing and dummy data generation purposes:
+    - `get_a_row` function returns a row with (hopefully) complete default data
+    - `create_a_row` function (returning pk or row depending on the parameter `return_row_instead_of_pk`) and procedure to create a new row without (hopefully) providing any parameters
+    - `read_a_row` function to fetch one row (the first the database delivers) without providing a primary key parameter
+    - The default values are provided by the generator and can be overwritten by passing data to the new parameter `p_custom_column_defaults xmltype default null` - you can grab the defaults from the end of the package spec - see example below:
 
 ```sql
--- usage of the helper om_tapigen.util_get_custom_col_defaults:
+om_tapigen.compile_api(
+  p_table_name                    => 'EMPLOYEES',
+  p_reuse_existing_api_params     => false,
+  p_enable_proc_with_out_params   => false,
+  p_enable_getter_and_setter      => false,
+  p_return_row_instead_of_pk      => true,
+  p_enable_dml_view               => false,
+  p_enable_generic_change_log     => false,
+  p_api_name                      => 'EMPLOYEES_API',
+  p_sequence_name                 => 'EMPLOYEES_SEQ',
+  p_exclude_column_list           => 'SALARY,COMMISSION_PCT',
+  p_enable_custom_defaults        => true,
+  p_custom_default_values         => xmltype(q'#
+    <custom_defaults>
+      <column name="JOB_ID"><![CDATA[1]]></column>
+    </custom_defaults>#')
+);
+```
+
+The custom defaults are saved as a comment at the end of the package spec to be reusable by the generator in case of a parameterless recreation with the help of the package procedure `recreate_existing_apis` - here an example from the `EMPLOYEES_API` above:
+
+```sql
+  -- end of package spec --
+  /*
+  <custom_defaults>
+    <column name="LAST_NAME"><![CDATA[substr(sys_guid(),1,25)]]></column>
+    <column name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
+    <column name="HIRE_DATE"><![CDATA[to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j')]]></column>
+    <column name="JOB_ID"><![CDATA[1]]></column>
+  </custom_defaults>
+  */
+
+END "EMPLOYEES_API";
+```
+
+You can let the generator do the work to generate defaults, grab the XML from the spec, modify it to your needs and use it in your generator call. In the example above I would modify the `HIRE_DATE` because the generator provided only a default random date between 1900-01-01 and 2099-12-31 for this column.
+
+After all you are able now to the following thing:
+
+```sql
+-- create 100 rows without providing any data...
 BEGIN
-  om_tapigen.compile_api(
-    p_table_name                  => 'EMPLOYEES',
-    p_owner                       => USER,
-    p_reuse_existing_api_params   => FALSE,
-    --^ if true, the following params are ignored when API package are already existing and params are extractable from spec source
-    p_enable_insertion_of_rows    => TRUE,
-    p_enable_column_defaults      => TRUE,
-    p_enable_update_of_rows       => TRUE,
-    p_enable_deletion_of_rows     => FALSE,
-    p_enable_parameter_prefixes   => TRUE,
-    p_enable_proc_with_out_params => TRUE,
-    p_enable_getter_and_setter    => TRUE,
-    p_col_prefix_in_method_names  => TRUE,
-    p_return_row_instead_of_pk    => TRUE,
-    p_enable_dml_view             => TRUE,
-    p_enable_generic_change_log   => TRUE,
-    p_api_name                    => 'EMPLOYEES_API',
-    p_sequence_name               => 'EMPLOYEES_SEQ',
-    p_exclude_column_list         => 'SALARY,COMMISSION_PCT',
-    p_enable_custom_defaults      => TRUE,
-    p_custom_default_values       => om_tapigen.util_get_custom_col_defaults('EMPLOYEES')
-    );
+  FOR i IN 1..100 LOOP
+    employees_api.create_a_row;
+  END LOOP;
 END;
 /
 
--- inspect the result of the helper
-SELECT XMLSERIALIZE (
-          DOCUMENT OM_TAPIGEN.UTIL_GET_CUSTOM_COL_DEFAULTS ('EMPLOYEES')
-          INDENT)
-  FROM DUAL;
+-- of course, you can use the parameters if you like...
+BEGIN
+  FOR i IN 1..100 LOOP
+    employees_api.create_a_row(p_job_id => 2);
+  END LOOP;
+END;
+/
 ```
 
 ---

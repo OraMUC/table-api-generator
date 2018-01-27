@@ -6,7 +6,7 @@ This API was generated with the following code - we assume that the om_tapigen i
 
 ```sql
 BEGIN
-    hr.om_tapigen.compile_api(
+    om_tapigen.compile_api(
         p_table_name                   => 'EMPLOYEES',
         p_reuse_existing_api_params    => true,
         p_col_prefix_in_method_names   => true,
@@ -19,7 +19,6 @@ BEGIN
     );
 END;
 ```
-
 
 ## Table Structure
 
@@ -56,7 +55,6 @@ CREATE TABLE "HR"."EMPLOYEES" (
     ENABLE
 );
 ```
-
 
 ## Package Specification
 
