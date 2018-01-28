@@ -1,4 +1,4 @@
-# Table API Generator - Development Branch 0.5-dev - Current Status
+# Table API Generator - Development Branch 0.5 - Current Status
 
 ## To Do
 
