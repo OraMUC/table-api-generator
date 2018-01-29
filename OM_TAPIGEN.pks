@@ -30,11 +30,19 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- public global constants c_*
   -----------------------------------------------------------------------------
   c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b2';
-  c_ora_max_name_len  CONSTANT INTEGER :=$IF dbms_db_version.ver_le_12_1 $THEN
+  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b3';
+  c_ora_max_name_len  CONSTANT INTEGER :=$IF dbms_db_version.ver_le_11_1 $THEN
    30
                                          $ELSE
+                                         $IF dbms_db_version.ver_le_11_2 $THEN
+                                          30
+                                         $ELSE
+                                         $IF dbms_db_version.ver_le_12_1 $THEN
+                                          30
+                                         $ELSE
                                           ora_max_name_len
+  $END
+  $END
   $END
   ;
 
@@ -59,16 +67,14 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   c_custom_default_values       CONSTANT xmltype := NULL;
 
   -----------------------------------------------------------------------------
-  -- Subtypes
+  -- Subtypes (st_*)
   -----------------------------------------------------------------------------
-  SUBTYPE session_module IS VARCHAR2(48); --MODULE is limited to 48 bytes - see also: https://mwidlake.wordpress.com/2012/09/03/dbms_application_info-for-instrumentation/
-  SUBTYPE session_action IS VARCHAR2(32); --ACTION is limited to 32 bytes
+  SUBTYPE st_session_module IS VARCHAR2(48); --MODULE is limited to 48 bytes - see also: https://mwidlake.wordpress.com/2012/09/03/dbms_application_info-for-instrumentation/
+  SUBTYPE st_session_action IS VARCHAR2(32); --ACTION is limited to 32 bytes
 
   -----------------------------------------------------------------------------
-  -- public record (t_rec_*) and collection (tab_*) types
-  -----------------------------------------------------------------------------
-  TYPE t_tab_vc2 IS TABLE OF VARCHAR2(4000);
-
+  -- public record (t_rec_*) and collection (t_tab_*) types
+  -----------------------------------------------------------------------------  
   TYPE t_rec_existing_apis IS RECORD(
     errors                        VARCHAR2(4000 CHAR),
     owner                         all_users.username%TYPE,
@@ -105,6 +111,8 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 
   TYPE t_tab_existing_apis IS TABLE OF t_rec_existing_apis;
 
+  --
+
   TYPE t_rec_naming_conflicts IS RECORD(
     object_name   all_objects.object_name%TYPE,
     object_type   all_objects.object_type%TYPE,
@@ -112,6 +120,8 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
     last_ddl_time all_objects.last_ddl_time%TYPE);
 
   TYPE t_tab_naming_conflicts IS TABLE OF t_rec_naming_conflicts;
+
+  --    
 
   TYPE t_rec_debug_data IS RECORD(
     run        INTEGER,
@@ -121,12 +131,39 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
     step       INTEGER,
     elapsed    NUMBER,
     execution  NUMBER,
-    action     session_action,
+    action     st_session_action,
     start_time TIMESTAMP(6));
 
   TYPE t_tab_debug_data IS TABLE OF t_rec_debug_data;
 
-  --------------------------------------------------------------------------------
+  --    
+
+  TYPE t_rec_columns IS RECORD(
+    column_name           user_tab_columns.column_name%TYPE,
+    data_type             user_tab_cols.data_type%TYPE,
+    data_length           user_tab_cols.data_length%TYPE,
+    data_precision        user_tab_cols.data_precision%TYPE,
+    data_scale            user_tab_cols.data_scale%TYPE,
+    data_default          VARCHAR2(4000 CHAR),
+    char_length           user_tab_cols.char_length%TYPE,
+    data_custom_default   VARCHAR2(4000 CHAR),
+    custom_default_source VARCHAR2(7 CHAR),
+    is_pk_yn              VARCHAR2(1 CHAR),
+    is_uk_yn              VARCHAR2(1 CHAR),
+    is_nullable_yn        VARCHAR2(1 CHAR),
+    is_excluded_yn        VARCHAR2(1 CHAR));
+
+  -- We use t_tab_columns as a private array/collection inside the package body indexed by binary_intager.
+  -- For the pipelined function util_view_columns_array we need this additional table type
+  TYPE t_tab_debug_columns IS TABLE OF t_rec_columns;
+
+  --     
+
+  TYPE t_tab_vc2_4k IS TABLE OF VARCHAR2(4000);
+
+  -----------------------------------------------------------------------------
+  -- public table API generation methods: see also the docs under https://github.com/OraMUC/table-api-generator
+  -----------------------------------------------------------------------------
   PROCEDURE compile_api(p_table_name                IN all_objects.object_name%TYPE,
                         p_owner                     IN all_users.username%TYPE DEFAULT USER,
                         p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
@@ -147,8 +184,6 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
                         p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
                         p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
                         p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values);
-
-  --------------------------------------------------------------------------------
 
   FUNCTION compile_api_and_get_code(p_table_name                IN all_objects.object_name%TYPE,
                                     p_owner                     IN all_users.username%TYPE DEFAULT USER,
@@ -171,8 +206,6 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
                                     p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
                                     p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values)
     RETURN CLOB;
-
-  --------------------------------------------------------------------------------
 
   FUNCTION get_code(p_table_name                IN all_objects.object_name%TYPE,
                     p_owner                     IN all_users.username%TYPE DEFAULT USER,
@@ -199,13 +232,13 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- A one liner to recreate all APIs in the current (or another) schema with
   -- the original call parameters (read from the package specs):
   -- EXEC om_tapigen.recreate_existing_apis;
-
+  --------------------------------------------------------------------------------
   PROCEDURE recreate_existing_apis(p_owner IN all_users.username%TYPE DEFAULT USER);
 
   --------------------------------------------------------------------------------
   -- A helper function (pipelined) to list all APIs generated by om_tapigen:
   -- SELECT * FROM TABLE (om_tapigen.view_existing_apis);
-
+  --------------------------------------------------------------------------------
   FUNCTION view_existing_apis(p_table_name all_tables.table_name%TYPE DEFAULT NULL,
                               p_owner      all_users.username%TYPE DEFAULT USER) RETURN t_tab_existing_apis
     PIPELINED;
@@ -214,14 +247,14 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- A helper to ckeck possible naming conflicts before the first usage of the API generator:
   -- SELECT * FROM TABLE (om_tapigen.view_naming_conflicts);
   -- No rows expected. After you generated some APIs there will be results ;-)
-
+  --------------------------------------------------------------------------------
   FUNCTION view_naming_conflicts(p_owner all_users.username%TYPE DEFAULT USER) RETURN t_tab_naming_conflicts
     PIPELINED;
 
   --------------------------------------------------------------------------------
   -- Working with long columns: http://www.oracle-developer.net/display.php?id=430
   -- The following helper function is needed to read a column data default from the dictionary:
-
+  --------------------------------------------------------------------------------
   FUNCTION util_get_column_data_default(p_table_name  IN VARCHAR2,
                                         p_column_name IN VARCHAR2,
                                         p_owner       VARCHAR2 DEFAULT USER) RETURN VARCHAR2;
@@ -230,36 +263,48 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- Working with long columns: http://www.oracle-developer.net/display.php?id=430
   -- The following helper function is needed to read a constraint search condition from the dictionary:
   -- (not needed in 12cR1 and above, there we have a column search_condition_vc in user_constraints)
-
+  --------------------------------------------------------------------------------
   FUNCTION util_get_cons_search_condition(p_constraint_name IN VARCHAR2,
                                           p_owner           IN VARCHAR2 DEFAULT USER) RETURN VARCHAR2;
 
   --------------------------------------------------------------------------------
   -- A table function to split a string to a selectable table
   -- Usage: SELECT COLUMN_VALUE FROM TABLE (om_tapigen.util_split_to_table('1,2,3,test'));
-
+  --------------------------------------------------------------------------------
   FUNCTION util_split_to_table(p_string    IN VARCHAR2,
-                               p_delimiter IN VARCHAR2 DEFAULT ',') RETURN t_tab_vc2
+                               p_delimiter IN VARCHAR2 DEFAULT ',') RETURN t_tab_vc2_4k
     PIPELINED;
 
   --------------------------------------------------------------------------------
   -- A function to determine the maximum length for an identifier name (e.g. column name) 
-
+  --------------------------------------------------------------------------------
   FUNCTION util_get_ora_max_name_len RETURN INTEGER;
 
   --------------------------------------------------------------------------------
   -- A procedure to enable (and reset) the debugging (previous debug data will be lost)
+  --------------------------------------------------------------------------------
   PROCEDURE util_set_debug_on;
 
   --------------------------------------------------------------------------------
   -- A procedure to disable debugging
+  --------------------------------------------------------------------------------
   PROCEDURE util_set_debug_off;
 
   --------------------------------------------------------------------------------
-  -- A procedure to view the debug details. Maximum 999 API creations are captured
+  -- A function to view the debug details. Maximum 999 API creations are captured
   -- for memory reasons. You can reset the debugging by calling om_tapigen.util_set_debug_on.
   -- Example: SELECT * FROM TABLE(om_tapigen.util_view_debug);
+  --------------------------------------------------------------------------------
   FUNCTION util_view_debug_log RETURN t_tab_debug_data
+    PIPELINED;
+
+  --------------------------------------------------------------------------------
+  -- A function to view the internal columns array from the last API generation. 
+  -- This view is independend from the debug mode, because this array is resetted 
+  -- for each API generation.
+  -- Example: SELECT * FROM TABLE(om_tapigen.util_view_columns_array);
+  --------------------------------------------------------------------------------
+  FUNCTION util_view_columns_array RETURN t_tab_debug_columns
     PIPELINED;
 
 END om_tapigen;

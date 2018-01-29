@@ -8,6 +8,9 @@ exec OM_TAPIGEN.RECREATE_EXISTING_APIS;
 -- checks API status
 SELECT * FROM TABLE(om_tapigen.view_existing_apis) order by spec_last_ddl_time desc;
 
+-- check internal columns array
+SELECT * FROM TABLE(om_tapigen.util_view_columns_array);
+
 -- some debug checks
 SELECT * FROM TABLE(om_tapigen.util_view_debug_log);
 SELECT * FROM TABLE(om_tapigen.util_view_debug_log) WHERE run = 6;
