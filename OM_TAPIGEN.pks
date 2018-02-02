@@ -30,7 +30,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- public global constants c_*
   -----------------------------------------------------------------------------
   c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b3';
+  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b4';
   c_ora_max_name_len  CONSTANT INTEGER :=$IF dbms_db_version.ver_le_11_1 $THEN
    30
                                          $ELSE
@@ -147,9 +147,11 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
     data_default          VARCHAR2(4000 CHAR),
     char_length           user_tab_cols.char_length%TYPE,
     data_custom_default   VARCHAR2(4000 CHAR),
-    custom_default_source VARCHAR2(7 CHAR),
+    custom_default_source VARCHAR2(15 CHAR),
+    identity_type         VARCHAR2(15 CHAR),
     is_pk_yn              VARCHAR2(1 CHAR),
     is_uk_yn              VARCHAR2(1 CHAR),
+    is_fk_yn              VARCHAR2(1 CHAR),
     is_nullable_yn        VARCHAR2(1 CHAR),
     is_excluded_yn        VARCHAR2(1 CHAR));
 

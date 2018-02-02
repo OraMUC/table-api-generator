@@ -1,9 +1,13 @@
--- regenerate
-exec OM_TAPIGEN.UTIL_SET_DEBUG_ON;
-exec OM_TAPIGEN.RECREATE_EXISTING_APIS;
+-- Standard test - runs all script files with the prefix "test-" 
+-- and outputs the API to files for inspection in other editors.
+@_test-run-all.sql;
 
--- run tests (should take around 2 seconds on a warmed up system)
-@simple-tests.sql;
+-- Regenerate all APIs in the current schema
+BEGIN
+  om_tapigen.util_set_debug_on;
+  om_tapigen.recreate_existing_apis;
+END;
+/
 
 -- checks API status
 SELECT * FROM TABLE(om_tapigen.view_existing_apis) order by spec_last_ddl_time desc;

@@ -7,7 +7,7 @@ This API was generated with the following code:
 ```sql
 BEGIN
     om_tapigen.compile_api(p_table_name => 'EMPLOYEES');
-    --> for all options see 
+    --> for all options see README in project root
 END;
 ```
 
