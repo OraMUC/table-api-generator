@@ -1,6 +1,6 @@
-set termout off heading off pagesize 0
+set termout off heading off pagesize 0 
 
-SPOOL "employees.pks" replace
+SPOOL "hr/employees.pks" replace
 
 SELECT
   text
@@ -14,7 +14,7 @@ ORDER BY
 
 SPOOL OFF
 
-SPOOL "employees.pkb" replace
+SPOOL "hr/employees.pkb" replace
 
 SELECT
   text
@@ -28,4 +28,4 @@ ORDER BY
 
 SPOOL OFF
 
-set termout on heading on pagesize 20
+set termout on heading on pagesize 100

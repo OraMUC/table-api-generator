@@ -1,7 +1,3 @@
--- Standard test - runs all script files with the prefix "test-" 
--- and outputs the API to files for inspection in other editors.
-@_test-run-all.sql;
-
 -- Regenerate all APIs in the current schema
 BEGIN
   om_tapigen.util_set_debug_on;

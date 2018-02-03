@@ -2789,9 +2789,11 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       -- generate standard custom defaults for the users convenience...
       FOR i IN g_columns.first .. g_columns.last
       LOOP
-        IF g_columns(i)
-         .data_custom_default IS NULL -- do not override users defaults from the processing step above
-           AND (g_columns(i).is_pk_yn = 'N' OR (g_columns(i).is_pk_yn = 'Y' AND g_status.pk_is_multi_column)) --
+        IF g_columns(i).data_custom_default IS NULL -- do not override users defaults from the processing step above
+           AND (g_columns(i).is_pk_yn = 'N' OR (g_columns(i).is_pk_yn = 'Y' AND g_status.pk_is_multi_column) OR
+                 (g_columns(i).is_pk_yn = 'Y' AND g_columns(i)
+                  .data_type NOT IN ('NUMBER',
+                                     'INTEGER'))) --
            AND g_columns(i).is_excluded_yn = 'N' --            
         THEN
           IF g_columns(i).data_default IS NOT NULL
@@ -2804,24 +2806,28 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                                                       'INTEGER',
                                                                       'FLOAT') THEN
                                                   
-                                                   'round(dbms_random.value(0,' ||
-                                                   rpad('9',
-                                                        g_columns(i).data_precision - g_columns(i).data_scale,
-                                                        '9') || CASE
-                                                     WHEN g_columns(i).data_scale > 0 THEN
+                                                   'round(dbms_random.value(0,' || rpad('9',
+                                                                                        nvl(g_columns(i).data_precision,
+                                                                                            9) - nvl(g_columns(i).data_scale,
+                                                                                                     0),
+                                                                                        '9') || CASE
+                                                     WHEN nvl(g_columns(i).data_scale,
+                                                              0) > 0 THEN
                                                       '.' || rpad('9',
-                                                                  g_columns(i).data_scale,
+                                                                  nvl(g_columns(i).data_scale,
+                                                                      0),
                                                                   '9')
                                                      ELSE
                                                       NULL
-                                                   END || '),' || to_char(g_columns(i).data_scale) || ')'
+                                                   END || '),' || to_char(nvl(g_columns(i).data_scale,
+                                                                              0)) || ')'
                                                   WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
                                                    CASE
                                                      WHEN lower(g_columns(i).column_name) LIKE '%mail%' THEN
                                                       'substr(sys_guid(),1,' || to_char(g_columns(i).char_length - 10) ||
                                                       ') || ''@dummy.com'''
                                                      WHEN lower(g_columns(i).column_name) LIKE '%phone%' THEN
-                                                      'substr(''+1.''||lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'')||''.''||lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'')||''.''||lpad(to_char(trunc(dbms_random.value(1,9999))),4,''0''),1,' ||
+                                                      'substr(''+1.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,''0''),1,' ||
                                                       to_char(g_columns(i).char_length) || ')'
                                                      ELSE
                                                       'substr(sys_guid(),1,' || to_char(g_columns(i).char_length) || ')'

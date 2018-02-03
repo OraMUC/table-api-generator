@@ -197,7 +197,7 @@ PACKAGE BODY      "EMPLOYEES_API" IS
     p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ )
   IS
     v_row   "EMPLOYEES"%ROWTYPE;
-    
+
   BEGIN
     IF row_exists ( p_employee_id => p_employee_id ) THEN
       v_row := read_row ( p_employee_id => p_employee_id );
@@ -369,7 +369,7 @@ PACKAGE BODY      "EMPLOYEES_API" IS
     v_row."FIRST_NAME"     := substr(sys_guid(),1,20);
     v_row."LAST_NAME"      := substr(sys_guid(),1,25);
     v_row."EMAIL"          := substr(sys_guid(),1,15) || '@dummy.com';
-    v_row."PHONE_NUMBER"   := substr('+1.'||lpad(to_char(trunc(dbms_random.value(1,999))),3,'0')||'.'||lpad(to_char(trunc(dbms_random.value(1,999))),3,'0')||'.'||lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20);
+    v_row."PHONE_NUMBER"   := substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20);
     v_row."HIRE_DATE"      := to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j');
     v_row."JOB_ID"         := 'IT_PROG';
     v_row."SALARY"         := round(dbms_random.value(1000,10000),2);

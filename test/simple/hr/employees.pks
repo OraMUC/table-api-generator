@@ -10,7 +10,7 @@ PACKAGE      "EMPLOYEES_API" IS
     generator="OM_TAPIGEN"
     generator_version="0.5.0_b4"
     generator_action="COMPILE_API"
-    generated_at="2018-02-02 22:24:48"
+    generated_at="2018-02-03 17:14:30"
     generated_by="DECAF4"
     p_table_name="EMPLOYEES"
     p_owner="HR"
@@ -34,11 +34,11 @@ PACKAGE      "EMPLOYEES_API" IS
 
   This API provides DML functionality that can be easily called from APEX.
   Target of the table API is to encapsulate the table DML source code for
-  security (UI schema needs only the execute right for the API and the 
-  read/write right for the EMPLOYEES_DML_V, tables can be 
-  hidden in extra data schema) and easy readability of the business logic 
-  (all DML is then written in the same style). For APEX automatic row 
-  processing like tabular forms you can optionally use the 
+  security (UI schema needs only the execute right for the API and the
+  read/write right for the EMPLOYEES_DML_V, tables can be
+  hidden in extra data schema) and easy readability of the business logic
+  (all DML is then written in the same style). For APEX automatic row
+  processing like tabular forms you can optionally use the
   EMPLOYEES_DML_V. The instead of trigger for this view
   is calling simply this "EMPLOYEES_API".
   */
@@ -188,7 +188,7 @@ PACKAGE      "EMPLOYEES_API" IS
     <column source="TAPIGEN" name="FIRST_NAME"><![CDATA[substr(sys_guid(),1,20)]]></column>
     <column source="TAPIGEN" name="LAST_NAME"><![CDATA[substr(sys_guid(),1,25)]]></column>
     <column source="TAPIGEN" name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
-    <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.'||lpad(to_char(trunc(dbms_random.value(1,999))),3,'0')||'.'||lpad(to_char(trunc(dbms_random.value(1,999))),3,'0')||'.'||lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
+    <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
     <column source="TAPIGEN" name="HIRE_DATE"><![CDATA[to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j')]]></column>
     <column source="USER"    name="JOB_ID"><![CDATA['IT_PROG']]></column>
     <column source="USER"    name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
