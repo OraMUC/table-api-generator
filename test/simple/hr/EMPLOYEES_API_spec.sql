@@ -1,4 +1,4 @@
-PACKAGE      "EMPLOYEES_API" IS
+CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
   /*
   This is the API for the table "EMPLOYEES".
 
@@ -10,7 +10,7 @@ PACKAGE      "EMPLOYEES_API" IS
     generator="OM_TAPIGEN"
     generator_version="0.5.0_b4"
     generator_action="COMPILE_API"
-    generated_at="2018-02-03 17:14:30"
+    generated_at="2018-02-04 20:46:19"
     generated_by="DECAF4"
     p_table_name="EMPLOYEES"
     p_owner="HR"
@@ -24,7 +24,7 @@ PACKAGE      "EMPLOYEES_API" IS
     p_enable_getter_and_setter="FALSE"
     p_col_prefix_in_method_names="TRUE"
     p_return_row_instead_of_pk="FALSE"
-    p_enable_dml_view="FALSE"
+    p_enable_dml_view="TRUE"
     p_enable_generic_change_log="FALSE"
     p_api_name="EMPLOYEES_API"
     p_sequence_name="EMPLOYEES_SEQ"
@@ -185,6 +185,7 @@ PACKAGE      "EMPLOYEES_API" IS
   All other custom defaults are only listed for convenience and determined at runtime by the generator.
   You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
   <custom_defaults>
+    <column source="TAPIGEN" name="EMPLOYEE_ID"><![CDATA[EMPLOYEES_SEQ.nextval]]></column>
     <column source="TAPIGEN" name="FIRST_NAME"><![CDATA[substr(sys_guid(),1,20)]]></column>
     <column source="TAPIGEN" name="LAST_NAME"><![CDATA[substr(sys_guid(),1,25)]]></column>
     <column source="TAPIGEN" name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
@@ -199,3 +200,6 @@ PACKAGE      "EMPLOYEES_API" IS
   */
 
 END "EMPLOYEES_API";
+/
+
+

@@ -1,4 +1,4 @@
-PACKAGE      "COUNTRIES_API" IS
+CREATE OR REPLACE PACKAGE "HR"."COUNTRIES_API" IS
   /*
   This is the API for the table "COUNTRIES".
 
@@ -10,7 +10,7 @@ PACKAGE      "COUNTRIES_API" IS
     generator="OM_TAPIGEN"
     generator_version="0.5.0_b4"
     generator_action="COMPILE_API"
-    generated_at="2018-02-03 17:14:29"
+    generated_at="2018-02-04 20:46:18"
     generated_by="DECAF4"
     p_table_name="COUNTRIES"
     p_owner="HR"
@@ -24,7 +24,7 @@ PACKAGE      "COUNTRIES_API" IS
     p_enable_getter_and_setter="FALSE"
     p_col_prefix_in_method_names="TRUE"
     p_return_row_instead_of_pk="FALSE"
-    p_enable_dml_view="FALSE"
+    p_enable_dml_view="TRUE"
     p_enable_generic_change_log="FALSE"
     p_api_name="COUNTRIES_API"
     p_sequence_name=""
@@ -128,3 +128,6 @@ PACKAGE      "COUNTRIES_API" IS
   */
 
 END "COUNTRIES_API";
+/
+
+

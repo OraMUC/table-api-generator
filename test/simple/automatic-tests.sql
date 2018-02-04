@@ -1,5 +1,11 @@
-set define off verify off feedback off pagesize 100 linesize 5000 wrap off trimout on trimspool on
+set define off verify off feedback off trimout on trimspool on pagesize 100 linesize 5000 long 1000000 longchunksize 1000000
 whenever sqlerror exit sql.sqlcode rollback
+
+BEGIN
+   DBMS_METADATA.set_transform_param (DBMS_METADATA.session_transform, 'SQLTERMINATOR', true);
+   DBMS_METADATA.set_transform_param (DBMS_METADATA.session_transform, 'PRETTY', true);
+END;
+/
 
 prompt
 prompt

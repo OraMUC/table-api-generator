@@ -1,4 +1,4 @@
-PACKAGE BODY      "DEPARTMENTS_API" IS
+CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
 
   FUNCTION row_exists (
     p_department_id   IN "DEPARTMENTS"."DEPARTMENT_ID"%TYPE /*PK*/ )
@@ -45,7 +45,7 @@ PACKAGE BODY      "DEPARTMENTS_API" IS
       "MANAGER_ID",
       "LOCATION_ID" )
     VALUES (
-      COALESCE( p_department_id,"DEPARTMENTS_SEQ".nextval ),
+      COALESCE( p_department_id, "DEPARTMENTS_SEQ".nextval ),
       p_department_name,
       p_manager_id,
       p_location_id )
@@ -216,6 +216,7 @@ PACKAGE BODY      "DEPARTMENTS_API" IS
   RETURN "DEPARTMENTS"%ROWTYPE IS
     v_row "DEPARTMENTS"%ROWTYPE;
   BEGIN
+    v_row."DEPARTMENT_ID"   := DEPARTMENTS_SEQ.nextval;
     v_row."DEPARTMENT_NAME" := substr(sys_guid(),1,30);
     v_row."MANAGER_ID"      := 100;
     v_row."LOCATION_ID"     := 1500;
@@ -265,3 +266,5 @@ PACKAGE BODY      "DEPARTMENTS_API" IS
   END read_a_row;
 
 END "DEPARTMENTS_API";
+/
+

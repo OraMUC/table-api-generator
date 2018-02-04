@@ -3,6 +3,7 @@
 ## To Do
 
 - For new parameter `p_enable_custom_defaults`: detect not null foreign keys and try to fetch valid values from an existing record for the generation of sensible custom defaults
+  - After implemention and test make function private
 - Move generic change log table creation to a utility function? To be discussed; The problem here was the support of varchar2 natural primary keys like an ISO currency code, which could not be saved in a number based pk_id column; Maybe be we should let the users create the generic change log table and they should decide, if the pk_id column should be of type number or varchar2, and if varchar2 how many characters should be stored in the id column - this depends heavily on the data model
 - Align oddgen wrapper package for SQL Developer integration
 - List also dml_v and trigger status in all apis view

@@ -159,7 +159,14 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- For the pipelined function util_view_columns_array we need this additional table type
   TYPE t_tab_debug_columns IS TABLE OF t_rec_columns;
 
-  --     
+  --
+
+  TYPE t_rec_clob_line_by_line IS RECORD(
+    text VARCHAR2(4000));
+
+  TYPE t_tab_clob_line_by_line IS TABLE OF t_rec_clob_line_by_line;
+
+  --
 
   TYPE t_tab_vc2_4k IS TABLE OF VARCHAR2(4000);
 
@@ -308,6 +315,14 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   --------------------------------------------------------------------------------
   FUNCTION util_view_columns_array RETURN t_tab_debug_columns
     PIPELINED;
+
+  FUNCTION util_get_ddl(p_object_type VARCHAR2,
+                        p_object_name VARCHAR2,
+                        p_owner       VARCHAR2 DEFAULT USER) RETURN CLOB;
+
+  FUNCTION util_fetch_fk_value(p_table_name  VARCHAR2,
+                               p_column_name VARCHAR2,
+                               p_owner       VARCHAR2 DEFAULT USER) RETURN VARCHAR2;
 
 END om_tapigen;
 /

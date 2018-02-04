@@ -1,4 +1,4 @@
-PACKAGE BODY      "EMPLOYEES_API" IS
+CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
 
   FUNCTION row_exists (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
@@ -68,7 +68,7 @@ PACKAGE BODY      "EMPLOYEES_API" IS
       "MANAGER_ID",
       "DEPARTMENT_ID" )
     VALUES (
-      COALESCE( p_employee_id,"EMPLOYEES_SEQ".nextval ),
+      COALESCE( p_employee_id, "EMPLOYEES_SEQ".nextval ),
       p_first_name,
       p_last_name,
       p_email,
@@ -366,6 +366,7 @@ PACKAGE BODY      "EMPLOYEES_API" IS
   RETURN "EMPLOYEES"%ROWTYPE IS
     v_row "EMPLOYEES"%ROWTYPE;
   BEGIN
+    v_row."EMPLOYEE_ID"    := EMPLOYEES_SEQ.nextval;
     v_row."FIRST_NAME"     := substr(sys_guid(),1,20);
     v_row."LAST_NAME"      := substr(sys_guid(),1,25);
     v_row."EMAIL"          := substr(sys_guid(),1,15) || '@dummy.com';
@@ -450,3 +451,5 @@ PACKAGE BODY      "EMPLOYEES_API" IS
   END read_a_row;
 
 END "EMPLOYEES_API";
+/
+

@@ -10,7 +10,7 @@ BEGIN
     p_enable_proc_with_out_params   => false,
     p_enable_getter_and_setter      => false,
     p_return_row_instead_of_pk      => false,
-    p_enable_dml_view               => false,
+    p_enable_dml_view               => true,
     p_enable_generic_change_log     => false,
     p_api_name                      => 'EMPLOYEES_API',
     p_sequence_name                 => 'EMPLOYEES_SEQ',
@@ -44,7 +44,7 @@ BEGIN
   THEN
     raise_application_error(
       -20000,
-      'Package invalid'
+      'Package is invalid'
     );
   END IF;
 END;
