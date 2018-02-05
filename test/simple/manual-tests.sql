@@ -1,3 +1,9 @@
+-- Run automatic test
+-- ATTENTION: 
+-- In SQL Developer you can see no errors like in sqlplus - the script will simply NOT run until the end which is marked with "Done :-)"
+-- We recommend to use sqlplus - however, if you like to inspect the internal columns array or look into the debug info it is easier with SQL Developer
+@automatic-tests.sql;
+
 -- Regenerate all APIs in the current schema
 BEGIN
   om_tapigen.util_set_debug_on;

@@ -17,8 +17,6 @@ BEGIN
     p_enable_custom_defaults        => true,
     p_custom_default_values         => xmltype(q'[
       <custom_defaults>
-        <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
-        <column source="TAPIGEN" name="LOCATION_ID"><![CDATA[1500]]></column>
       </custom_defaults>
     ]')
   );

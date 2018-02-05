@@ -1,4 +1,11 @@
 CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
+  /**
+   * generator="OM_TAPIGEN"
+   * generator_version="0.5.0_b4"
+   * generator_action="COMPILE_API"
+   * generated_at="2018-02-05 20:26:38"
+   * generated_by="DECAF4"
+   */
 
   FUNCTION row_exists (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
@@ -56,17 +63,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     INSERT INTO "EMPLOYEES" (
-      "EMPLOYEE_ID",
+      "EMPLOYEE_ID" /*PK*/,
       "FIRST_NAME",
       "LAST_NAME",
-      "EMAIL",
+      "EMAIL" /*UK*/,
       "PHONE_NUMBER",
       "HIRE_DATE",
-      "JOB_ID",
+      "JOB_ID" /*FK*/,
       "SALARY",
       "COMMISSION_PCT",
-      "MANAGER_ID",
-      "DEPARTMENT_ID" )
+      "MANAGER_ID" /*FK*/,
+      "DEPARTMENT_ID" /*FK*/ )
     VALUES (
       COALESCE( p_employee_id, "EMPLOYEES_SEQ".nextval ),
       p_first_name,
@@ -101,17 +108,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_employee_id    => p_employee_id,
+      p_employee_id    => p_employee_id /*PK*/,
       p_first_name     => p_first_name,
       p_last_name      => p_last_name,
-      p_email          => p_email,
+      p_email          => p_email /*UK*/,
       p_phone_number   => p_phone_number,
       p_hire_date      => p_hire_date,
-      p_job_id         => p_job_id,
+      p_job_id         => p_job_id /*FK*/,
       p_salary         => p_salary,
       p_commission_pct => p_commission_pct,
-      p_manager_id     => p_manager_id,
-      p_department_id  => p_department_id );
+      p_manager_id     => p_manager_id /*FK*/,
+      p_department_id  => p_department_id /*FK*/ );
   END create_row;
 
   FUNCTION create_row (
@@ -120,17 +127,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_employee_id    => p_row."EMPLOYEE_ID",
+      p_employee_id    => p_row."EMPLOYEE_ID" /*PK*/,
       p_first_name     => p_row."FIRST_NAME",
       p_last_name      => p_row."LAST_NAME",
-      p_email          => p_row."EMAIL",
+      p_email          => p_row."EMAIL" /*UK*/,
       p_phone_number   => p_row."PHONE_NUMBER",
       p_hire_date      => p_row."HIRE_DATE",
-      p_job_id         => p_row."JOB_ID",
+      p_job_id         => p_row."JOB_ID" /*FK*/,
       p_salary         => p_row."SALARY",
       p_commission_pct => p_row."COMMISSION_PCT",
-      p_manager_id     => p_row."MANAGER_ID",
-      p_department_id  => p_row."DEPARTMENT_ID" );
+      p_manager_id     => p_row."MANAGER_ID" /*FK*/,
+      p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
     RETURN v_return;
   END create_row;
 
@@ -140,17 +147,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_employee_id    => p_row."EMPLOYEE_ID",
+      p_employee_id    => p_row."EMPLOYEE_ID" /*PK*/,
       p_first_name     => p_row."FIRST_NAME",
       p_last_name      => p_row."LAST_NAME",
-      p_email          => p_row."EMAIL",
+      p_email          => p_row."EMAIL" /*UK*/,
       p_phone_number   => p_row."PHONE_NUMBER",
       p_hire_date      => p_row."HIRE_DATE",
-      p_job_id         => p_row."JOB_ID",
+      p_job_id         => p_row."JOB_ID" /*FK*/,
       p_salary         => p_row."SALARY",
       p_commission_pct => p_row."COMMISSION_PCT",
-      p_manager_id     => p_row."MANAGER_ID",
-      p_department_id  => p_row."DEPARTMENT_ID" );
+      p_manager_id     => p_row."MANAGER_ID" /*FK*/,
+      p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
   END create_row;
 
   FUNCTION read_row (
@@ -217,14 +224,14 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
         UPDATE EMPLOYEES
            SET "FIRST_NAME"     = p_first_name,
                "LAST_NAME"      = p_last_name,
-               "EMAIL"          = p_email,
+               "EMAIL"          = p_email /*UK*/,
                "PHONE_NUMBER"   = p_phone_number,
                "HIRE_DATE"      = p_hire_date,
-               "JOB_ID"         = p_job_id,
+               "JOB_ID"         = p_job_id /*FK*/,
                "SALARY"         = p_salary,
                "COMMISSION_PCT" = p_commission_pct,
-               "MANAGER_ID"     = p_manager_id,
-               "DEPARTMENT_ID"  = p_department_id
+               "MANAGER_ID"     = p_manager_id /*FK*/,
+               "DEPARTMENT_ID"  = p_department_id /*FK*/
          WHERE COALESCE( "EMPLOYEE_ID",-999999999999999.999999999999999 ) = COALESCE( p_employee_id,-999999999999999.999999999999999 );
       END IF;
     END IF;
@@ -235,17 +242,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
   IS
   BEGIN
     update_row(
-      p_employee_id    => p_row."EMPLOYEE_ID",
+      p_employee_id    => p_row."EMPLOYEE_ID" /*PK*/,
       p_first_name     => p_row."FIRST_NAME",
       p_last_name      => p_row."LAST_NAME",
-      p_email          => p_row."EMAIL",
+      p_email          => p_row."EMAIL" /*UK*/,
       p_phone_number   => p_row."PHONE_NUMBER",
       p_hire_date      => p_row."HIRE_DATE",
-      p_job_id         => p_row."JOB_ID",
+      p_job_id         => p_row."JOB_ID" /*FK*/,
       p_salary         => p_row."SALARY",
       p_commission_pct => p_row."COMMISSION_PCT",
-      p_manager_id     => p_row."MANAGER_ID",
-      p_department_id  => p_row."DEPARTMENT_ID" );
+      p_manager_id     => p_row."MANAGER_ID" /*FK*/,
+      p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
   END update_row;
 
   FUNCTION create_or_update_row (
@@ -265,31 +272,31 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
   BEGIN
     IF row_exists( p_employee_id => p_employee_id ) THEN
       update_row(
-        p_employee_id    => p_employee_id,
+        p_employee_id    => p_employee_id /*PK*/,
         p_first_name     => p_first_name,
         p_last_name      => p_last_name,
-        p_email          => p_email,
+        p_email          => p_email /*UK*/,
         p_phone_number   => p_phone_number,
         p_hire_date      => p_hire_date,
-        p_job_id         => p_job_id,
+        p_job_id         => p_job_id /*FK*/,
         p_salary         => p_salary,
         p_commission_pct => p_commission_pct,
-        p_manager_id     => p_manager_id,
-        p_department_id  => p_department_id );
+        p_manager_id     => p_manager_id /*FK*/,
+        p_department_id  => p_department_id /*FK*/ );
       v_return := read_row ( p_employee_id => p_employee_id )."EMPLOYEE_ID";
     ELSE
       v_return := create_row (
-        p_employee_id    => p_employee_id,
+        p_employee_id    => p_employee_id /*PK*/,
         p_first_name     => p_first_name,
         p_last_name      => p_last_name,
-        p_email          => p_email,
+        p_email          => p_email /*UK*/,
         p_phone_number   => p_phone_number,
         p_hire_date      => p_hire_date,
-        p_job_id         => p_job_id,
+        p_job_id         => p_job_id /*FK*/,
         p_salary         => p_salary,
         p_commission_pct => p_commission_pct,
-        p_manager_id     => p_manager_id,
-        p_department_id  => p_department_id );
+        p_manager_id     => p_manager_id /*FK*/,
+        p_department_id  => p_department_id /*FK*/ );
     END IF;
     RETURN v_return;
   END create_or_update_row;
@@ -310,17 +317,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_employee_id    => p_employee_id,
+      p_employee_id    => p_employee_id /*PK*/,
       p_first_name     => p_first_name,
       p_last_name      => p_last_name,
-      p_email          => p_email,
+      p_email          => p_email /*UK*/,
       p_phone_number   => p_phone_number,
       p_hire_date      => p_hire_date,
-      p_job_id         => p_job_id,
+      p_job_id         => p_job_id /*FK*/,
       p_salary         => p_salary,
       p_commission_pct => p_commission_pct,
-      p_manager_id     => p_manager_id,
-      p_department_id  => p_department_id );
+      p_manager_id     => p_manager_id /*FK*/,
+      p_department_id  => p_department_id /*FK*/ );
   END create_or_update_row;
 
   FUNCTION create_or_update_row (
@@ -329,17 +336,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_employee_id    => p_row."EMPLOYEE_ID",
+      p_employee_id    => p_row."EMPLOYEE_ID" /*PK*/,
       p_first_name     => p_row."FIRST_NAME",
       p_last_name      => p_row."LAST_NAME",
-      p_email          => p_row."EMAIL",
+      p_email          => p_row."EMAIL" /*UK*/,
       p_phone_number   => p_row."PHONE_NUMBER",
       p_hire_date      => p_row."HIRE_DATE",
-      p_job_id         => p_row."JOB_ID",
+      p_job_id         => p_row."JOB_ID" /*FK*/,
       p_salary         => p_row."SALARY",
       p_commission_pct => p_row."COMMISSION_PCT",
-      p_manager_id     => p_row."MANAGER_ID",
-      p_department_id  => p_row."DEPARTMENT_ID" );
+      p_manager_id     => p_row."MANAGER_ID" /*FK*/,
+      p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
     RETURN v_return;
   END create_or_update_row;
 
@@ -349,34 +356,34 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_employee_id    => p_row."EMPLOYEE_ID",
+      p_employee_id    => p_row."EMPLOYEE_ID" /*PK*/,
       p_first_name     => p_row."FIRST_NAME",
       p_last_name      => p_row."LAST_NAME",
-      p_email          => p_row."EMAIL",
+      p_email          => p_row."EMAIL" /*UK*/,
       p_phone_number   => p_row."PHONE_NUMBER",
       p_hire_date      => p_row."HIRE_DATE",
-      p_job_id         => p_row."JOB_ID",
+      p_job_id         => p_row."JOB_ID" /*FK*/,
       p_salary         => p_row."SALARY",
       p_commission_pct => p_row."COMMISSION_PCT",
-      p_manager_id     => p_row."MANAGER_ID",
-      p_department_id  => p_row."DEPARTMENT_ID" );
+      p_manager_id     => p_row."MANAGER_ID" /*FK*/,
+      p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
   END create_or_update_row;
 
   FUNCTION get_a_row
   RETURN "EMPLOYEES"%ROWTYPE IS
     v_row "EMPLOYEES"%ROWTYPE;
   BEGIN
-    v_row."EMPLOYEE_ID"    := EMPLOYEES_SEQ.nextval;
+    v_row."EMPLOYEE_ID"    := "EMPLOYEES_SEQ".nextval /*PK*/;
     v_row."FIRST_NAME"     := substr(sys_guid(),1,20);
     v_row."LAST_NAME"      := substr(sys_guid(),1,25);
-    v_row."EMAIL"          := substr(sys_guid(),1,15) || '@dummy.com';
+    v_row."EMAIL"          := substr(sys_guid(),1,15) || '@dummy.com' /*UK*/;
     v_row."PHONE_NUMBER"   := substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20);
     v_row."HIRE_DATE"      := to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j');
-    v_row."JOB_ID"         := 'IT_PROG';
+    v_row."JOB_ID"         := 'AC_ACCOUNT' /*FK*/;
     v_row."SALARY"         := round(dbms_random.value(1000,10000),2);
     v_row."COMMISSION_PCT" := round(dbms_random.value(0,.99),2);
-    v_row."MANAGER_ID"     := 100;
-    v_row."DEPARTMENT_ID"  := 90;
+    v_row."MANAGER_ID"     := 100 /*FK*/;
+    v_row."DEPARTMENT_ID"  := 10 /*FK*/;
     return v_row;
   END get_a_row;
 
@@ -396,17 +403,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_employee_id    => p_employee_id,
+      p_employee_id    => p_employee_id /*PK*/,
       p_first_name     => p_first_name,
       p_last_name      => p_last_name,
-      p_email          => p_email,
+      p_email          => p_email /*UK*/,
       p_phone_number   => p_phone_number,
       p_hire_date      => p_hire_date,
-      p_job_id         => p_job_id,
+      p_job_id         => p_job_id /*FK*/,
       p_salary         => p_salary,
       p_commission_pct => p_commission_pct,
-      p_manager_id     => p_manager_id,
-      p_department_id  => p_department_id );
+      p_manager_id     => p_manager_id /*FK*/,
+      p_department_id  => p_department_id /*FK*/ );
     RETURN v_return;
   END create_a_row;
 
@@ -426,17 +433,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_employee_id    => p_employee_id,
+      p_employee_id    => p_employee_id /*PK*/,
       p_first_name     => p_first_name,
       p_last_name      => p_last_name,
-      p_email          => p_email,
+      p_email          => p_email /*UK*/,
       p_phone_number   => p_phone_number,
       p_hire_date      => p_hire_date,
-      p_job_id         => p_job_id,
+      p_job_id         => p_job_id /*FK*/,
       p_salary         => p_salary,
       p_commission_pct => p_commission_pct,
-      p_manager_id     => p_manager_id,
-      p_department_id  => p_department_id );
+      p_manager_id     => p_manager_id /*FK*/,
+      p_department_id  => p_department_id /*FK*/ );
   END create_a_row;
 
   FUNCTION read_a_row

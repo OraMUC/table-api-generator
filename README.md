@@ -2,12 +2,8 @@
 
 ## To Do
 
-- For new parameter `p_enable_custom_defaults`: detect not null foreign keys and try to fetch valid values from an existing record for the generation of sensible custom defaults
-  - After implemention and test make function private
-- Move generic change log table creation to a utility function? To be discussed; The problem here was the support of varchar2 natural primary keys like an ISO currency code, which could not be saved in a number based pk_id column; Maybe be we should let the users create the generic change log table and they should decide, if the pk_id column should be of type number or varchar2, and if varchar2 how many characters should be stored in the id column - this depends heavily on the data model
 - Align oddgen wrapper package for SQL Developer integration
 - List also dml_v and trigger status in all apis view
-  - Put generator meta data in the view and trigger to be recognizable
 - Update documentation 
   - README.md: new parameters
   - SQL Dev Screenshot
@@ -15,6 +11,7 @@
 - Delete_row (by uk) functions ?
 - Create tests with utplsql, Travis and SonarQube
   - Provide a stable set of test tables and data
+    - hr/departments and hr/locations tables: provide a script to reset the sequence numbers - they are limited and exceeding their max values during testing
   - Test all combinations of column defaults
   - ...
 - Something else?
@@ -83,7 +80,7 @@ om_tapigen.compile_api(
   p_enable_custom_defaults        => true,
   p_custom_default_values         => xmltype(q'#
     <custom_defaults>
-      <column name="JOB_ID"><![CDATA['AD_VP']]></column>
+      <column name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
     </custom_defaults>#')
 );
 ```
@@ -93,39 +90,31 @@ The custom defaults are saved as a comment at the end of the package spec to be 
 ```sql
   -- end of package spec --
 
-  /* 
-  Only custom defaults with the source "USER" are used when "c_reuse_existing_api_params" is set to true.
+  /*
+  Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
   All other custom defaults are only listed for convenience and determined at runtime by the generator.
+  You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
   <custom_defaults>
+    <column source="TAPIGEN" name="EMPLOYEE_ID"><![CDATA["EMPLOYEES_SEQ".nextval]]></column>
     <column source="TAPIGEN" name="FIRST_NAME"><![CDATA[substr(sys_guid(),1,20)]]></column>
     <column source="TAPIGEN" name="LAST_NAME"><![CDATA[substr(sys_guid(),1,25)]]></column>
     <column source="TAPIGEN" name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
-    <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.'||lpad(to_char(trunc(dbms_random.value(1,999))),3,'0')||'.'||lpad(to_char(trunc(dbms_random.value(1,999))),3,'0')||'.'||lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
+    <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
     <column source="TAPIGEN" name="HIRE_DATE"><![CDATA[to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j')]]></column>
-    <column source="USER"    name="JOB_ID"><![CDATA['AD_VP']]></column>
-    <column source="TAPIGEN" name="SALARY"><![CDATA[round(dbms_random.value(0,999999.99),2)]]></column>
+    <column source="TAPIGEN" name="JOB_ID"><![CDATA['AC_ACCOUNT']]></column>
+    <column source="USER"    name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
     <column source="TAPIGEN" name="COMMISSION_PCT"><![CDATA[round(dbms_random.value(0,.99),2)]]></column>
-    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[round(dbms_random.value(0,999999),0)]]></column>
-    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[round(dbms_random.value(0,9999),0)]]></column>
+    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
+    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[10]]></column>
   </custom_defaults>
   */
-
 END "EMPLOYEES_API";
+/
 ```
 
-You can let the generator do the work to generate defaults, grab the XML from the spec, modify it to your needs and use it in your generator call. In the example above I would modify the `HIRE_DATE` and the `SALARY` because the generator provided only  default random data depending on the data type and length. Additional we need here to modify the `MANAGER_ID` and the `DEPARTMENT_ID` - these are foreign keys. We will implement soon additional functionality which tries to read an existing row and grab the foreign keys from there...
+You can let the generator do the work to generate defaults, grab the XML from the spec, modify it to your needs and use it in your generator call. In the example above I would modify the `HIRE_DATE` and the `SALARY` because the generator provided only  default random data depending on the data type and length.
 
-If you provide the follwing defaults ...
-
-```xml
-<custom_defaults>
-  <column name="JOB_ID"><![CDATA['AD_VP']]></column>
-  <column name="MANAGER_ID"><![CDATA[100]]></column>
-  <column name="DEPARTMENT_ID"><![CDATA[90]]></column>
-</custom_defaults>
-```
-
-... then you are able now to do this:
+With the provided defaults you are able now to do this:
 
 ```sql
 -- create 100 rows without providing any data...

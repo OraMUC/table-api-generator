@@ -1,4 +1,11 @@
 CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
+  /**
+   * generator="OM_TAPIGEN"
+   * generator_version="0.5.0_b4"
+   * generator_action="COMPILE_API"
+   * generated_at="2018-02-05 20:26:38"
+   * generated_by="DECAF4"
+   */
 
   FUNCTION row_exists (
     p_department_id   IN "DEPARTMENTS"."DEPARTMENT_ID"%TYPE /*PK*/ )
@@ -40,10 +47,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     INSERT INTO "DEPARTMENTS" (
-      "DEPARTMENT_ID",
+      "DEPARTMENT_ID" /*PK*/,
       "DEPARTMENT_NAME",
-      "MANAGER_ID",
-      "LOCATION_ID" )
+      "MANAGER_ID" /*FK*/,
+      "LOCATION_ID" /*FK*/ )
     VALUES (
       COALESCE( p_department_id, "DEPARTMENTS_SEQ".nextval ),
       p_department_name,
@@ -64,10 +71,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_department_id   => p_department_id,
+      p_department_id   => p_department_id /*PK*/,
       p_department_name => p_department_name,
-      p_manager_id      => p_manager_id,
-      p_location_id     => p_location_id );
+      p_manager_id      => p_manager_id /*FK*/,
+      p_location_id     => p_location_id /*FK*/ );
   END create_row;
 
   FUNCTION create_row (
@@ -76,10 +83,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_department_id   => p_row."DEPARTMENT_ID",
+      p_department_id   => p_row."DEPARTMENT_ID" /*PK*/,
       p_department_name => p_row."DEPARTMENT_NAME",
-      p_manager_id      => p_row."MANAGER_ID",
-      p_location_id     => p_row."LOCATION_ID" );
+      p_manager_id      => p_row."MANAGER_ID" /*FK*/,
+      p_location_id     => p_row."LOCATION_ID" /*FK*/ );
     RETURN v_return;
   END create_row;
 
@@ -89,10 +96,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_department_id   => p_row."DEPARTMENT_ID",
+      p_department_id   => p_row."DEPARTMENT_ID" /*PK*/,
       p_department_name => p_row."DEPARTMENT_NAME",
-      p_manager_id      => p_row."MANAGER_ID",
-      p_location_id     => p_row."LOCATION_ID" );
+      p_manager_id      => p_row."MANAGER_ID" /*FK*/,
+      p_location_id     => p_row."LOCATION_ID" /*FK*/ );
   END create_row;
 
   FUNCTION read_row (
@@ -129,8 +136,8 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
       THEN
         UPDATE DEPARTMENTS
            SET "DEPARTMENT_NAME" = p_department_name,
-               "MANAGER_ID"      = p_manager_id,
-               "LOCATION_ID"     = p_location_id
+               "MANAGER_ID"      = p_manager_id /*FK*/,
+               "LOCATION_ID"     = p_location_id /*FK*/
          WHERE COALESCE( "DEPARTMENT_ID",-999999999999999.999999999999999 ) = COALESCE( p_department_id,-999999999999999.999999999999999 );
       END IF;
     END IF;
@@ -141,10 +148,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
   IS
   BEGIN
     update_row(
-      p_department_id   => p_row."DEPARTMENT_ID",
+      p_department_id   => p_row."DEPARTMENT_ID" /*PK*/,
       p_department_name => p_row."DEPARTMENT_NAME",
-      p_manager_id      => p_row."MANAGER_ID",
-      p_location_id     => p_row."LOCATION_ID" );
+      p_manager_id      => p_row."MANAGER_ID" /*FK*/,
+      p_location_id     => p_row."LOCATION_ID" /*FK*/ );
   END update_row;
 
   FUNCTION create_or_update_row (
@@ -157,17 +164,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
   BEGIN
     IF row_exists( p_department_id => p_department_id ) THEN
       update_row(
-        p_department_id   => p_department_id,
+        p_department_id   => p_department_id /*PK*/,
         p_department_name => p_department_name,
-        p_manager_id      => p_manager_id,
-        p_location_id     => p_location_id );
+        p_manager_id      => p_manager_id /*FK*/,
+        p_location_id     => p_location_id /*FK*/ );
       v_return := read_row ( p_department_id => p_department_id )."DEPARTMENT_ID";
     ELSE
       v_return := create_row (
-        p_department_id   => p_department_id,
+        p_department_id   => p_department_id /*PK*/,
         p_department_name => p_department_name,
-        p_manager_id      => p_manager_id,
-        p_location_id     => p_location_id );
+        p_manager_id      => p_manager_id /*FK*/,
+        p_location_id     => p_location_id /*FK*/ );
     END IF;
     RETURN v_return;
   END create_or_update_row;
@@ -181,10 +188,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_department_id   => p_department_id,
+      p_department_id   => p_department_id /*PK*/,
       p_department_name => p_department_name,
-      p_manager_id      => p_manager_id,
-      p_location_id     => p_location_id );
+      p_manager_id      => p_manager_id /*FK*/,
+      p_location_id     => p_location_id /*FK*/ );
   END create_or_update_row;
 
   FUNCTION create_or_update_row (
@@ -193,10 +200,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_department_id   => p_row."DEPARTMENT_ID",
+      p_department_id   => p_row."DEPARTMENT_ID" /*PK*/,
       p_department_name => p_row."DEPARTMENT_NAME",
-      p_manager_id      => p_row."MANAGER_ID",
-      p_location_id     => p_row."LOCATION_ID" );
+      p_manager_id      => p_row."MANAGER_ID" /*FK*/,
+      p_location_id     => p_row."LOCATION_ID" /*FK*/ );
     RETURN v_return;
   END create_or_update_row;
 
@@ -206,20 +213,20 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_department_id   => p_row."DEPARTMENT_ID",
+      p_department_id   => p_row."DEPARTMENT_ID" /*PK*/,
       p_department_name => p_row."DEPARTMENT_NAME",
-      p_manager_id      => p_row."MANAGER_ID",
-      p_location_id     => p_row."LOCATION_ID" );
+      p_manager_id      => p_row."MANAGER_ID" /*FK*/,
+      p_location_id     => p_row."LOCATION_ID" /*FK*/ );
   END create_or_update_row;
 
   FUNCTION get_a_row
   RETURN "DEPARTMENTS"%ROWTYPE IS
     v_row "DEPARTMENTS"%ROWTYPE;
   BEGIN
-    v_row."DEPARTMENT_ID"   := DEPARTMENTS_SEQ.nextval;
+    v_row."DEPARTMENT_ID"   := "DEPARTMENTS_SEQ".nextval /*PK*/;
     v_row."DEPARTMENT_NAME" := substr(sys_guid(),1,30);
-    v_row."MANAGER_ID"      := 100;
-    v_row."LOCATION_ID"     := 1500;
+    v_row."MANAGER_ID"      := 100 /*FK*/;
+    v_row."LOCATION_ID"     := 1000 /*FK*/;
     return v_row;
   END get_a_row;
 
@@ -232,10 +239,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_department_id   => p_department_id,
+      p_department_id   => p_department_id /*PK*/,
       p_department_name => p_department_name,
-      p_manager_id      => p_manager_id,
-      p_location_id     => p_location_id );
+      p_manager_id      => p_manager_id /*FK*/,
+      p_location_id     => p_location_id /*FK*/ );
     RETURN v_return;
   END create_a_row;
 
@@ -248,10 +255,10 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     v_return "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_department_id   => p_department_id,
+      p_department_id   => p_department_id /*PK*/,
       p_department_name => p_department_name,
-      p_manager_id      => p_manager_id,
-      p_location_id     => p_location_id );
+      p_manager_id      => p_manager_id /*FK*/,
+      p_location_id     => p_location_id /*FK*/ );
   END create_a_row;
 
   FUNCTION read_a_row

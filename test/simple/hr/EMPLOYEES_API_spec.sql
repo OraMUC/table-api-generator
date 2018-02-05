@@ -10,7 +10,7 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
     generator="OM_TAPIGEN"
     generator_version="0.5.0_b4"
     generator_action="COMPILE_API"
-    generated_at="2018-02-04 20:46:19"
+    generated_at="2018-02-05 20:26:38"
     generated_by="DECAF4"
     p_table_name="EMPLOYEES"
     p_owner="HR"
@@ -185,20 +185,19 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
   All other custom defaults are only listed for convenience and determined at runtime by the generator.
   You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
   <custom_defaults>
-    <column source="TAPIGEN" name="EMPLOYEE_ID"><![CDATA[EMPLOYEES_SEQ.nextval]]></column>
+    <column source="TAPIGEN" name="EMPLOYEE_ID"><![CDATA["EMPLOYEES_SEQ".nextval]]></column>
     <column source="TAPIGEN" name="FIRST_NAME"><![CDATA[substr(sys_guid(),1,20)]]></column>
     <column source="TAPIGEN" name="LAST_NAME"><![CDATA[substr(sys_guid(),1,25)]]></column>
     <column source="TAPIGEN" name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
     <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
     <column source="TAPIGEN" name="HIRE_DATE"><![CDATA[to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j')]]></column>
-    <column source="USER"    name="JOB_ID"><![CDATA['IT_PROG']]></column>
+    <column source="TAPIGEN" name="JOB_ID"><![CDATA['AC_ACCOUNT']]></column>
     <column source="USER"    name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
     <column source="TAPIGEN" name="COMMISSION_PCT"><![CDATA[round(dbms_random.value(0,.99),2)]]></column>
-    <column source="USER"    name="MANAGER_ID"><![CDATA[100]]></column>
-    <column source="USER"    name="DEPARTMENT_ID"><![CDATA[90]]></column>
+    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
+    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[10]]></column>
   </custom_defaults>
   */
-
 END "EMPLOYEES_API";
 /
 

@@ -10,7 +10,7 @@ CREATE OR REPLACE PACKAGE "HR"."COUNTRIES_API" IS
     generator="OM_TAPIGEN"
     generator_version="0.5.0_b4"
     generator_action="COMPILE_API"
-    generated_at="2018-02-04 20:46:18"
+    generated_at="2018-02-05 20:26:37"
     generated_by="DECAF4"
     p_table_name="COUNTRIES"
     p_owner="HR"
@@ -123,10 +123,9 @@ CREATE OR REPLACE PACKAGE "HR"."COUNTRIES_API" IS
   <custom_defaults>
     <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA[substr(sys_guid(),1,2)]]></column>
     <column source="TAPIGEN" name="COUNTRY_NAME"><![CDATA[substr(sys_guid(),1,40)]]></column>
-    <column source="USER"    name="REGION_ID"><![CDATA[1]]></column>
+    <column source="TAPIGEN" name="REGION_ID"><![CDATA[1]]></column>
   </custom_defaults>
   */
-
 END "COUNTRIES_API";
 /
 

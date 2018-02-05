@@ -16,7 +16,6 @@ BEGIN
     p_enable_custom_defaults        => true,
     p_custom_default_values         => xmltype(q'[
       <custom_defaults>
-        <column name="REGION_ID"><![CDATA[1]]></column>
       </custom_defaults>
     ]')
   );

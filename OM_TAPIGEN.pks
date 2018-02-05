@@ -139,13 +139,13 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   --    
 
   TYPE t_rec_columns IS RECORD(
-    column_name           user_tab_columns.column_name%TYPE,
-    data_type             user_tab_cols.data_type%TYPE,
-    data_length           user_tab_cols.data_length%TYPE,
-    data_precision        user_tab_cols.data_precision%TYPE,
-    data_scale            user_tab_cols.data_scale%TYPE,
+    column_name           all_tab_cols.column_name%TYPE,
+    data_type             all_tab_cols.data_type%TYPE,
+    data_length           all_tab_cols.data_length%TYPE,
+    data_precision        all_tab_cols.data_precision%TYPE,
+    data_scale            all_tab_cols.data_scale%TYPE,
     data_default          VARCHAR2(4000 CHAR),
-    char_length           user_tab_cols.char_length%TYPE,
+    char_length           all_tab_cols.char_length%TYPE,
     data_custom_default   VARCHAR2(4000 CHAR),
     custom_default_source VARCHAR2(15 CHAR),
     identity_type         VARCHAR2(15 CHAR),
@@ -153,7 +153,10 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
     is_uk_yn              VARCHAR2(1 CHAR),
     is_fk_yn              VARCHAR2(1 CHAR),
     is_nullable_yn        VARCHAR2(1 CHAR),
-    is_excluded_yn        VARCHAR2(1 CHAR));
+    is_excluded_yn        VARCHAR2(1 CHAR),
+    r_owner               all_users.username%TYPE,
+    r_table_name          all_objects.object_name%TYPE,
+    r_column_name         all_tab_cols.column_name%TYPE);
 
   -- We use t_tab_columns as a private array/collection inside the package body indexed by binary_intager.
   -- For the pipelined function util_view_columns_array we need this additional table type
@@ -319,10 +322,6 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   FUNCTION util_get_ddl(p_object_type VARCHAR2,
                         p_object_name VARCHAR2,
                         p_owner       VARCHAR2 DEFAULT USER) RETURN CLOB;
-
-  FUNCTION util_fetch_fk_value(p_table_name  VARCHAR2,
-                               p_column_name VARCHAR2,
-                               p_owner       VARCHAR2 DEFAULT USER) RETURN VARCHAR2;
 
 END om_tapigen;
 /

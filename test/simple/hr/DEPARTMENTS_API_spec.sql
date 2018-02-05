@@ -10,7 +10,7 @@ CREATE OR REPLACE PACKAGE "HR"."DEPARTMENTS_API" IS
     generator="OM_TAPIGEN"
     generator_version="0.5.0_b4"
     generator_action="COMPILE_API"
-    generated_at="2018-02-04 20:46:19"
+    generated_at="2018-02-05 20:26:38"
     generated_by="DECAF4"
     p_table_name="DEPARTMENTS"
     p_owner="HR"
@@ -128,13 +128,12 @@ CREATE OR REPLACE PACKAGE "HR"."DEPARTMENTS_API" IS
   All other custom defaults are only listed for convenience and determined at runtime by the generator.
   You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
   <custom_defaults>
-    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[DEPARTMENTS_SEQ.nextval]]></column>
+    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA["DEPARTMENTS_SEQ".nextval]]></column>
     <column source="TAPIGEN" name="DEPARTMENT_NAME"><![CDATA[substr(sys_guid(),1,30)]]></column>
-    <column source="USER"    name="MANAGER_ID"><![CDATA[100]]></column>
-    <column source="USER"    name="LOCATION_ID"><![CDATA[1500]]></column>
+    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
+    <column source="TAPIGEN" name="LOCATION_ID"><![CDATA[1000]]></column>
   </custom_defaults>
   */
-
 END "DEPARTMENTS_API";
 /
 

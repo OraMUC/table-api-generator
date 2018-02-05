@@ -1,4 +1,11 @@
 CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
+  /**
+   * generator="OM_TAPIGEN"
+   * generator_version="0.5.0_b4"
+   * generator_action="COMPILE_API"
+   * generated_at="2018-02-05 20:26:37"
+   * generated_by="DECAF4"
+   */
 
   FUNCTION row_exists (
     p_country_id   IN "COUNTRIES"."COUNTRY_ID"%TYPE /*PK*/ )
@@ -39,9 +46,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     INSERT INTO "COUNTRIES" (
-      "COUNTRY_ID",
+      "COUNTRY_ID" /*PK*/,
       "COUNTRY_NAME",
-      "REGION_ID" )
+      "REGION_ID" /*FK*/ )
     VALUES (
       p_country_id,
       p_country_name,
@@ -60,9 +67,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_country_id   => p_country_id,
+      p_country_id   => p_country_id /*PK*/,
       p_country_name => p_country_name,
-      p_region_id    => p_region_id );
+      p_region_id    => p_region_id /*FK*/ );
   END create_row;
 
   FUNCTION create_row (
@@ -71,9 +78,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_country_id   => p_row."COUNTRY_ID",
+      p_country_id   => p_row."COUNTRY_ID" /*PK*/,
       p_country_name => p_row."COUNTRY_NAME",
-      p_region_id    => p_row."REGION_ID" );
+      p_region_id    => p_row."REGION_ID" /*FK*/ );
     RETURN v_return;
   END create_row;
 
@@ -83,9 +90,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_country_id   => p_row."COUNTRY_ID",
+      p_country_id   => p_row."COUNTRY_ID" /*PK*/,
       p_country_name => p_row."COUNTRY_NAME",
-      p_region_id    => p_row."REGION_ID" );
+      p_region_id    => p_row."REGION_ID" /*FK*/ );
   END create_row;
 
   FUNCTION read_row (
@@ -120,7 +127,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
       THEN
         UPDATE COUNTRIES
            SET "COUNTRY_NAME" = p_country_name,
-               "REGION_ID"    = p_region_id
+               "REGION_ID"    = p_region_id /*FK*/
          WHERE COALESCE( "COUNTRY_ID",'@@@@@@@@@@@@@@@' ) = COALESCE( p_country_id,'@@@@@@@@@@@@@@@' );
       END IF;
     END IF;
@@ -131,9 +138,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
   IS
   BEGIN
     update_row(
-      p_country_id   => p_row."COUNTRY_ID",
+      p_country_id   => p_row."COUNTRY_ID" /*PK*/,
       p_country_name => p_row."COUNTRY_NAME",
-      p_region_id    => p_row."REGION_ID" );
+      p_region_id    => p_row."REGION_ID" /*FK*/ );
   END update_row;
 
   FUNCTION create_or_update_row (
@@ -145,15 +152,15 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
   BEGIN
     IF row_exists( p_country_id => p_country_id ) THEN
       update_row(
-        p_country_id   => p_country_id,
+        p_country_id   => p_country_id /*PK*/,
         p_country_name => p_country_name,
-        p_region_id    => p_region_id );
+        p_region_id    => p_region_id /*FK*/ );
       v_return := read_row ( p_country_id => p_country_id )."COUNTRY_ID";
     ELSE
       v_return := create_row (
-        p_country_id   => p_country_id,
+        p_country_id   => p_country_id /*PK*/,
         p_country_name => p_country_name,
-        p_region_id    => p_region_id );
+        p_region_id    => p_region_id /*FK*/ );
     END IF;
     RETURN v_return;
   END create_or_update_row;
@@ -166,9 +173,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_country_id   => p_country_id,
+      p_country_id   => p_country_id /*PK*/,
       p_country_name => p_country_name,
-      p_region_id    => p_region_id );
+      p_region_id    => p_region_id /*FK*/ );
   END create_or_update_row;
 
   FUNCTION create_or_update_row (
@@ -177,9 +184,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_country_id   => p_row."COUNTRY_ID",
+      p_country_id   => p_row."COUNTRY_ID" /*PK*/,
       p_country_name => p_row."COUNTRY_NAME",
-      p_region_id    => p_row."REGION_ID" );
+      p_region_id    => p_row."REGION_ID" /*FK*/ );
     RETURN v_return;
   END create_or_update_row;
 
@@ -189,18 +196,18 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_or_update_row(
-      p_country_id   => p_row."COUNTRY_ID",
+      p_country_id   => p_row."COUNTRY_ID" /*PK*/,
       p_country_name => p_row."COUNTRY_NAME",
-      p_region_id    => p_row."REGION_ID" );
+      p_region_id    => p_row."REGION_ID" /*FK*/ );
   END create_or_update_row;
 
   FUNCTION get_a_row
   RETURN "COUNTRIES"%ROWTYPE IS
     v_row "COUNTRIES"%ROWTYPE;
   BEGIN
-    v_row."COUNTRY_ID"   := substr(sys_guid(),1,2);
+    v_row."COUNTRY_ID"   := substr(sys_guid(),1,2) /*PK*/;
     v_row."COUNTRY_NAME" := substr(sys_guid(),1,40);
-    v_row."REGION_ID"    := 1;
+    v_row."REGION_ID"    := 1 /*FK*/;
     return v_row;
   END get_a_row;
 
@@ -212,9 +219,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_country_id   => p_country_id,
+      p_country_id   => p_country_id /*PK*/,
       p_country_name => p_country_name,
-      p_region_id    => p_region_id );
+      p_region_id    => p_region_id /*FK*/ );
     RETURN v_return;
   END create_a_row;
 
@@ -226,9 +233,9 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     v_return "COUNTRIES"."COUNTRY_ID"%TYPE;
   BEGIN
     v_return := create_row (
-      p_country_id   => p_country_id,
+      p_country_id   => p_country_id /*PK*/,
       p_country_name => p_country_name,
-      p_region_id    => p_region_id );
+      p_region_id    => p_region_id /*FK*/ );
   END create_a_row;
 
   FUNCTION read_a_row
