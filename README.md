@@ -4,16 +4,26 @@
 
 - Align oddgen wrapper package for SQL Developer integration
 - List also dml_v and trigger status in all apis view
-- Update documentation 
+- Update documentation (Ottmar)
   - README.md: new parameters
   - SQL Dev Screenshot
   - ...
 - Delete_row (by uk) functions ?
-- Create tests with utplsql, Travis and SonarQube
+- Create tests with utplsql, Travis and SonarQube (André)
   - Provide a stable set of test tables and data
-    - hr/departments and hr/locations tables: provide a script to reset the sequence numbers - they are limited and exceeding their max values during testing
-  - Test all combinations of column defaults
-  - ...
+    - Long column names
+    - More then 1000 columns
+    - Columns with double qotes
+    - Tables with multiple unique constraints
+    - Multi column primary keys
+    - DML on non standard data types (XML type, clob, blob, non numeric pk...)
+    - Tables hr/departments and hr/locations: provide a script to reset the sequence numbers - they are limited and exceeding their max values during testing
+  - Test all combinations of column defaults (create method only)
+  - All paramete combinations
+  - Generic change log is deprecated now
+    - Not in oddgen
+    - Multi column pk not supported
+    - Please use Quick SQL style history or any other history framework when possible
 - Something else?
 - ...
 
@@ -22,7 +32,7 @@
 Special thanks to Jacek Gębal (github.com/jgebal), Peter Ettinger (github.com/pettinger) and PaoloM (github.com/softinn72) for the valuable feedback in several issues. That is the way how open source software works :-)
 
 - New branches `0.5` and `0.5-dev`
-- ATTENTION: When installed in a central tools schema you need from version 0.5 on a public synonym `om_tapigen` to run the package from within other schemas because of SQL functions inside the package see also section [installation](#installation)
+- ATTENTION: When installed in a central tools schema you need from version 0.5 on a (public) synonym `om_tapigen` to run the package from within other schemas because of SQL functions inside the package see also section [installation](#installation)
 - Support for multi column primary keys:
   - NOT generated: get_pk_by_unique_cols functions - use instead read_row functions, which are also overloaded with unique constraint params and returning the whole row
   - NOT supported: use of generic change log (p_enable_generic_change_log)
