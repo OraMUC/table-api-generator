@@ -30,7 +30,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- public global constants c_*
   -----------------------------------------------------------------------------
   c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b4';
+  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b5';
   c_ora_max_name_len  CONSTANT INTEGER :=$IF dbms_db_version.ver_le_11_1 $THEN
    30
                                          $ELSE
@@ -176,69 +176,77 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -----------------------------------------------------------------------------
   -- public table API generation methods: see also the docs under https://github.com/OraMUC/table-api-generator
   -----------------------------------------------------------------------------
-  PROCEDURE compile_api(p_table_name                IN all_objects.object_name%TYPE,
-                        p_owner                     IN all_users.username%TYPE DEFAULT USER,
-                        p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
-                        --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
-                        p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-                        p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
-                        p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-                        p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-                        p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-                        p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
-                        p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-                        p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-                        p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-                        p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-                        p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-                        p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-                        p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-                        p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
-                        p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
-                        p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values);
+  PROCEDURE compile_api
+  (
+    p_table_name                IN all_objects.object_name%TYPE,
+    p_owner                     IN all_users.username%TYPE DEFAULT USER,
+    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+    --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
+    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
+    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values
+  );
 
-  FUNCTION compile_api_and_get_code(p_table_name                IN all_objects.object_name%TYPE,
-                                    p_owner                     IN all_users.username%TYPE DEFAULT USER,
-                                    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
-                                    --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
-                                    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-                                    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
-                                    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-                                    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-                                    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-                                    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
-                                    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-                                    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-                                    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-                                    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-                                    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-                                    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-                                    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-                                    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
-                                    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
-                                    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values)
-    RETURN CLOB;
+  FUNCTION compile_api_and_get_code
+  (
+    p_table_name                IN all_objects.object_name%TYPE,
+    p_owner                     IN all_users.username%TYPE DEFAULT USER,
+    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+    --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
+    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
+    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values
+  ) RETURN CLOB;
 
-  FUNCTION get_code(p_table_name                IN all_objects.object_name%TYPE,
-                    p_owner                     IN all_users.username%TYPE DEFAULT USER,
-                    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
-                    --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
-                    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-                    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
-                    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-                    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-                    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-                    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
-                    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-                    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-                    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-                    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-                    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-                    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-                    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-                    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
-                    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
-                    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values) RETURN CLOB;
+  FUNCTION get_code
+  (
+    p_table_name                IN all_objects.object_name%TYPE,
+    p_owner                     IN all_users.username%TYPE DEFAULT USER,
+    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+    --^ if true, the following params are ignored when API package is already existing and params are extractable from spec source
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
+    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
+    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
+    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
+    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
+    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
+    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values
+  ) RETURN CLOB;
 
   --------------------------------------------------------------------------------
   -- A one liner to recreate all APIs in the current (or another) schema with
@@ -251,8 +259,11 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- A helper function (pipelined) to list all APIs generated by om_tapigen:
   -- SELECT * FROM TABLE (om_tapigen.view_existing_apis);
   --------------------------------------------------------------------------------
-  FUNCTION view_existing_apis(p_table_name all_tables.table_name%TYPE DEFAULT NULL,
-                              p_owner      all_users.username%TYPE DEFAULT USER) RETURN t_tab_existing_apis
+  FUNCTION view_existing_apis
+  (
+    p_table_name all_tables.table_name%TYPE DEFAULT NULL,
+    p_owner      all_users.username%TYPE DEFAULT USER
+  ) RETURN t_tab_existing_apis
     PIPELINED;
 
   --------------------------------------------------------------------------------
@@ -260,31 +271,41 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- SELECT * FROM TABLE (om_tapigen.view_naming_conflicts);
   -- No rows expected. After you generated some APIs there will be results ;-)
   --------------------------------------------------------------------------------
-  FUNCTION view_naming_conflicts(p_owner all_users.username%TYPE DEFAULT USER) RETURN t_tab_naming_conflicts
+  FUNCTION view_naming_conflicts(p_owner all_users.username%TYPE DEFAULT USER)
+    RETURN t_tab_naming_conflicts
     PIPELINED;
 
   --------------------------------------------------------------------------------
   -- Working with long columns: http://www.oracle-developer.net/display.php?id=430
   -- The following helper function is needed to read a column data default from the dictionary:
   --------------------------------------------------------------------------------
-  FUNCTION util_get_column_data_default(p_table_name  IN VARCHAR2,
-                                        p_column_name IN VARCHAR2,
-                                        p_owner       VARCHAR2 DEFAULT USER) RETURN VARCHAR2;
+  FUNCTION util_get_column_data_default
+  (
+    p_table_name  IN VARCHAR2,
+    p_column_name IN VARCHAR2,
+    p_owner       VARCHAR2 DEFAULT USER
+  ) RETURN VARCHAR2;
 
   --------------------------------------------------------------------------------
   -- Working with long columns: http://www.oracle-developer.net/display.php?id=430
   -- The following helper function is needed to read a constraint search condition from the dictionary:
   -- (not needed in 12cR1 and above, there we have a column search_condition_vc in user_constraints)
   --------------------------------------------------------------------------------
-  FUNCTION util_get_cons_search_condition(p_constraint_name IN VARCHAR2,
-                                          p_owner           IN VARCHAR2 DEFAULT USER) RETURN VARCHAR2;
+  FUNCTION util_get_cons_search_condition
+  (
+    p_constraint_name IN VARCHAR2,
+    p_owner           IN VARCHAR2 DEFAULT USER
+  ) RETURN VARCHAR2;
 
   --------------------------------------------------------------------------------
   -- A table function to split a string to a selectable table
   -- Usage: SELECT COLUMN_VALUE FROM TABLE (om_tapigen.util_split_to_table('1,2,3,test'));
   --------------------------------------------------------------------------------
-  FUNCTION util_split_to_table(p_string    IN VARCHAR2,
-                               p_delimiter IN VARCHAR2 DEFAULT ',') RETURN t_tab_vc2_4k
+  FUNCTION util_split_to_table
+  (
+    p_string    IN VARCHAR2,
+    p_delimiter IN VARCHAR2 DEFAULT ','
+  ) RETURN t_tab_vc2_4k
     PIPELINED;
 
   --------------------------------------------------------------------------------
@@ -319,9 +340,12 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   FUNCTION util_view_columns_array RETURN t_tab_debug_columns
     PIPELINED;
 
-  FUNCTION util_get_ddl(p_object_type VARCHAR2,
-                        p_object_name VARCHAR2,
-                        p_owner       VARCHAR2 DEFAULT USER) RETURN CLOB;
+  FUNCTION util_get_ddl
+  (
+    p_object_type VARCHAR2,
+    p_object_name VARCHAR2,
+    p_owner       VARCHAR2 DEFAULT USER
+  ) RETURN CLOB;
 
 END om_tapigen;
 /
