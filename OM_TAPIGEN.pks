@@ -30,7 +30,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -- public global constants c_*
   -----------------------------------------------------------------------------
   c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b5';
+  c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b6';
   c_ora_max_name_len  CONSTANT INTEGER :=$IF dbms_db_version.ver_le_11_1 $THEN
    30
                                          $ELSE
@@ -69,8 +69,8 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   -----------------------------------------------------------------------------
   -- Subtypes (st_*)
   -----------------------------------------------------------------------------
-  SUBTYPE st_session_module IS VARCHAR2(48); --MODULE is limited to 48 bytes - see also: https://mwidlake.wordpress.com/2012/09/03/dbms_application_info-for-instrumentation/
-  SUBTYPE st_session_action IS VARCHAR2(32); --ACTION is limited to 32 bytes
+  SUBTYPE st_session_module IS VARCHAR2(64);
+  SUBTYPE st_session_action IS VARCHAR2(64);
 
   -----------------------------------------------------------------------------
   -- public record (t_rec_*) and collection (t_tab_*) types
@@ -326,7 +326,7 @@ CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
   --------------------------------------------------------------------------------
   -- A function to view the debug details. Maximum 999 API creations are captured
   -- for memory reasons. You can reset the debugging by calling om_tapigen.util_set_debug_on.
-  -- Example: SELECT * FROM TABLE(om_tapigen.util_view_debug);
+  -- Example: SELECT * FROM TABLE(om_tapigen.util_view_debug_log);
   --------------------------------------------------------------------------------
   FUNCTION util_view_debug_log RETURN t_tab_debug_data
     PIPELINED;

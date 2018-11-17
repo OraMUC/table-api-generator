@@ -224,7 +224,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       
       ),
     t AS
-     (SELECT column_id,
+     (SELECT distinct 
+             column_id,
              column_name,
              data_type,
              data_length,
