@@ -1,16 +1,17 @@
 <options><breakOnSubqueries>true</breakOnSubqueries>
-<alignEquality>true</alignEquality>
+<alignEquality>false</alignEquality>
 <breakAfterElsif>false</breakAfterElsif>
 <singleLineComments>CommentsUnchanged</singleLineComments>
 <breakAnsiiJoin>false</breakAnsiiJoin>
 <maxCharLineSize>128</maxCharLineSize>
 <alignAssignments>true</alignAssignments>
 <breaksProcArgs>true</breaksProcArgs>
+<alignRight>true</alignRight>
 <breaksComma>After</breaksComma>
 <breaksAroundLogicalConjunctions>Before</breaksAroundLogicalConjunctions>
 <breakAfterWhen>false</breakAfterWhen>
 <alignNamedArgs>true</alignNamedArgs>
-<formatProgramURL>/C:/Users/decaf4/AppData/Roaming/SQL Developer/system17.4.0.355.2349/o.sqldeveloper/format.arbori</formatProgramURL>
+<formatProgramURL>/C:/Users/decaf4/AppData/Roaming/SQL Developer/system18.1.0.095.1630/o.sqldeveloper/format.arbori</formatProgramURL>
 <formatThreshold>1</formatThreshold>
 <spaceAroundOperators>true</spaceAroundOperators>
 <useTab>false</useTab>
@@ -28,7 +29,7 @@
 <identSpaces>2</identSpaces>
 <breakAfterCase>false</breakAfterCase>
 <breakAfterThen>false</breakAfterThen>
-<breaksAfterSelect>true</breaksAfterSelect>
-<spaceAfterCommas>true</spaceAfterCommas>
+<breaksAfterSelect>false</breaksAfterSelect>
+<spaceAfterCommas>false</spaceAfterCommas>
 <kwCase>UPPER</kwCase>
 </options>
