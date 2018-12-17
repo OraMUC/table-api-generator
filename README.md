@@ -20,12 +20,6 @@
 <h1><a id="om_tapigen"></a>Package om_tapigen</h1>
 <!--===========================================-->
 
-FIXME:
-- Update docs/example-api.md
-- Move links to docs/example-modify-api.md
-- Complete parameter descriptions in getting-started.md
-- Update oddgen wrapper to new parameters
-
 _This is an Oracle PL/SQL Table API Generator. It can be integrated in the
 Oracle SQL-Developer with an additional wrapper package for the 
 [oddgen](https://www.oddgen.org/) extension._
@@ -40,9 +34,7 @@ will speed up your development cycles because developers are able to set the
 focal point to the business logic instead of wasting time by manual creating
 boilerplate code for your tables.
 
-> Get Rid of Hard-Coding in PL/SQL
->
-> [Steven Feuerstein](https://www.youtube.com/playlist?list=PL0mkplxCP4ygQo3zAvhYrrU6hIQ0JtYTA)
+> Get Rid of Hard-Coding in PL/SQL ([Steven Feuerstein](https://www.youtube.com/playlist?list=PL0mkplxCP4ygQo3zAvhYrrU6hIQ0JtYTA))
 
 FEATURES
 
@@ -75,7 +67,8 @@ if you loose any code or data by using this API generator. By using it you
 accept the MIT license. As a best practice test the generator first in your
 development environment and decide after your tests, if you want to use it in
 production. If you miss any feature or find a bug, we are happy to hear from you
-via the GitHub (https://github.com/OraMUC/table-api-generator/issues) functionality.
+via the GitHub [Issues](https://github.com/OraMUC/table-api-generator/issues)
+functionality.
 
 DOCS & LINKS
 
@@ -84,10 +77,9 @@ DOCS & LINKS
 - [Detailed parameter descriptions](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md)
 - [Naming conventions](https://github.com/OraMUC/table-api-generator/blob/master/docs/naming-conventions.md)
 - [SQL Developer integration](https://github.com/OraMUC/table-api-generator/blob/master/docs/sql-developer-integration.md)
-
 - [Project home page](https://github.com/OraMUC/table-api-generator)
 - [Download the latest version](https://github.com/OraMUC/table-api-generator/releases/latest)
-- [Issues](https://github.com/OraMUC/table-api-generator/issues)(https://github.com/OraMUC/table-api-generator/issues)
+- [Issues](https://github.com/OraMUC/table-api-generator/issues)
 - [Changelog](https://github.com/OraMUC/table-api-generator/blob/master/docs/changelog.md)
 
 SIGNATURE
