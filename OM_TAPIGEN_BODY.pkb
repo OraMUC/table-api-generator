@@ -2300,7 +2300,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                              WHEN g_params.reuse_existing_api_params AND
                                                   g_status.api_exists THEN
                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_insertion_of_rows),
-                                                       c_enable_insertion_of_rows)
+                                                       c_true_enable_insertion_of_row)
                                              ELSE
                                               p_enable_insertion_of_rows
                                            END;
@@ -2309,7 +2309,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                            WHEN g_params.reuse_existing_api_params AND
                                                 g_status.api_exists THEN
                                             coalesce(util_string_to_bool(g_params_existing_api.p_enable_column_defaults),
-                                                     c_enable_column_defaults)
+                                                     c_false_enable_column_defaults)
                                            ELSE
                                             p_enable_column_defaults
                                          END;
@@ -2318,7 +2318,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           WHEN g_params.reuse_existing_api_params AND
                                                g_status.api_exists THEN
                                            coalesce(util_string_to_bool(g_params_existing_api.p_enable_update_of_rows),
-                                                    c_enable_update_of_rows)
+                                                    c_true_enable_update_of_rows)
                                           ELSE
                                            p_enable_update_of_rows
                                         END;
@@ -2327,7 +2327,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                             WHEN g_params.reuse_existing_api_params AND
                                                  g_status.api_exists THEN
                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_deletion_of_rows),
-                                                      c_enable_deletion_of_rows)
+                                                      c_false_enable_deletion_of_row)
                                             ELSE
                                              p_enable_deletion_of_rows
                                           END;
@@ -2336,7 +2336,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                               WHEN g_params.reuse_existing_api_params AND
                                                    g_status.api_exists THEN
                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_parameter_prefixes),
-                                                        c_enable_parameter_prefixes)
+                                                        c_true_enable_parameter_prefix)
                                               ELSE
                                                p_enable_parameter_prefixes
                                             END;
@@ -2345,7 +2345,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                 WHEN g_params.reuse_existing_api_params AND
                                                      g_status.api_exists THEN
                                                  coalesce(util_string_to_bool(g_params_existing_api.p_enable_proc_with_out_params),
-                                                          c_enable_proc_with_out_params)
+                                                          c_true_enable_proc_with_out_pa)
                                                 ELSE
                                                  p_enable_proc_with_out_params
                                               END;
@@ -2354,7 +2354,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                              WHEN g_params.reuse_existing_api_params AND
                                                   g_status.api_exists THEN
                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_getter_and_setter),
-                                                       c_enable_getter_and_setter)
+                                                       c_true_enable_getter_and_sette)
                                              ELSE
                                               p_enable_getter_and_setter
                                            END;
@@ -2363,7 +2363,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                WHEN g_params.reuse_existing_api_params AND
                                                     g_status.api_exists THEN
                                                 coalesce(util_string_to_bool(g_params_existing_api.p_col_prefix_in_method_names),
-                                                         c_col_prefix_in_method_names)
+                                                         c_true_col_prefix_in_method_na)
                                                ELSE
                                                 p_col_prefix_in_method_names
                                              END;
@@ -2372,7 +2372,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                              WHEN g_params.reuse_existing_api_params AND
                                                   g_status.api_exists THEN
                                               coalesce(util_string_to_bool(g_params_existing_api.p_return_row_instead_of_pk),
-                                                       c_return_row_instead_of_pk)
+                                                       c_false_return_row_instead_of_)
                                              ELSE
                                               p_return_row_instead_of_pk
                                            END;
@@ -2381,7 +2381,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                     WHEN g_params.reuse_existing_api_params AND
                                          g_status.api_exists THEN
                                      coalesce(util_string_to_bool(g_params_existing_api.p_enable_dml_view),
-                                              c_enable_dml_view)
+                                              c_false_enable_dml_view)
                                     ELSE
                                      p_enable_dml_view
                                   END;
@@ -2390,7 +2390,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                               WHEN g_params.reuse_existing_api_params AND
                                                    g_status.api_exists THEN
                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_generic_change_log),
-                                                        c_enable_generic_change_log)
+                                                        c_false_enable_generic_change_)
                                               ELSE
                                                p_enable_generic_change_log
                                             END;
@@ -2432,7 +2432,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                            WHEN g_params.reuse_existing_api_params AND
                                                 g_status.api_exists THEN
                                             coalesce(util_string_to_bool(g_params_existing_api.p_enable_custom_defaults),
-                                                     c_enable_custom_defaults)
+                                                     c_false_enable_custom_defaults)
                                            ELSE
                                             p_enable_custom_defaults
                                          END;
@@ -4171,24 +4171,24 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   (
     p_table_name                IN all_objects.object_name%TYPE,
     p_owner                     IN all_users.username%TYPE DEFAULT USER,
-    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para,
     --^ if true,the following params are ignored when API package are already existing and params are extractable from spec source
-    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
-    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
-    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
-    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
-    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
+    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
+    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_false_enable_generic_change_,
+    p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
+    p_custom_default_values       IN xmltype DEFAULT NULL
   ) IS
   BEGIN
     util_debug_start_one_run(p_generator_action => 'compile API',
@@ -4223,24 +4223,24 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   (
     p_table_name                IN all_objects.object_name%TYPE,
     p_owner                     IN all_users.username%TYPE DEFAULT USER,
-    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para,
     --^ if true,the following params are ignored when API package are already existing and params are extractable from spec source
-    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
-    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
-    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
-    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
-    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
+    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
+    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_false_enable_generic_change_,
+    p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
+    p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
   BEGIN
     util_debug_start_one_run(p_generator_action => 'compile API, get code',
@@ -4276,24 +4276,24 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   (
     p_table_name                IN all_objects.object_name%TYPE,
     p_owner                     IN all_users.username%TYPE DEFAULT USER,
-    p_reuse_existing_api_params IN BOOLEAN DEFAULT om_tapigen.c_reuse_existing_api_params,
+    p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para,
     --^ if true,the following params are ignored when API package are already existing and params are extractable from spec source
-    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_enable_insertion_of_rows,
-    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_column_defaults,
-    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_enable_update_of_rows,
-    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_enable_deletion_of_rows,
-    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_enable_parameter_prefixes,
-    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_enable_proc_with_out_params,
-    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_enable_getter_and_setter,
-    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_col_prefix_in_method_names,
-    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_return_row_instead_of_pk,
-    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_enable_dml_view,
-    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_enable_generic_change_log,
-    p_api_name                    IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_api_name,
-    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT om_tapigen.c_sequence_name,
-    p_exclude_column_list         IN VARCHAR2 DEFAULT om_tapigen.c_exclude_column_list,
-    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_enable_custom_defaults,
-    p_custom_default_values       IN xmltype DEFAULT om_tapigen.c_custom_default_values
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
+    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
+    p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_false_enable_generic_change_,
+    p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
+    p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
   BEGIN
     util_debug_start_one_run(p_generator_action => 'get code',
