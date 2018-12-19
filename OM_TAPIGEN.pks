@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS 
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b7';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0';
 /**
 
 _This is an Oracle PL/SQL Table API Generator. It can be integrated in the
@@ -73,12 +73,15 @@ LINKS
 --------------------------------------------------------------------------------
 -- Public global constants c_*
 --------------------------------------------------------------------------------
-c_ora_max_name_len  CONSTANT INTEGER :=
-  $IF dbms_db_version.ver_le_11_1 $THEN 30
+c_ora_max_name_len CONSTANT INTEGER :=
+  $IF dbms_db_version.ver_le_11_1 $THEN 
+    30
   $ELSE
-    $IF dbms_db_version.ver_le_11_2 $THEN 30
+    $IF dbms_db_version.ver_le_11_2 $THEN
+      30
     $ELSE
-      $IF dbms_db_version.ver_le_12_1 $THEN 30
+      $IF dbms_db_version.ver_le_12_1 $THEN 
+        30
       $ELSE
         ora_max_name_len
       $END

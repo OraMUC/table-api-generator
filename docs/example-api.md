@@ -60,37 +60,37 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0_b4"
-    generator_action="COMPILE_API"
-    generated_at="2018-02-05 20:26:38"
-    generated_by="DECAF4"
+    generator_version="0.5.0"
+    generator_action="GET_CODE"
+    generated_at="2018-12-19 19:43:04"
+    generated_by="OGOBRECHT"
     p_table_name="EMPLOYEES"
     p_owner="HR"
-    p_reuse_existing_api_params="FALSE"
+    p_reuse_existing_api_params="TRUE"
     p_enable_insertion_of_rows="TRUE"
-    p_enable_column_defaults="TRUE"
+    p_enable_column_defaults="FALSE"
     p_enable_update_of_rows="TRUE"
     p_enable_deletion_of_rows="FALSE"
     p_enable_parameter_prefixes="TRUE"
-    p_enable_proc_with_out_params="FALSE"
-    p_enable_getter_and_setter="FALSE"
+    p_enable_proc_with_out_params="TRUE"
+    p_enable_getter_and_setter="TRUE"
     p_col_prefix_in_method_names="TRUE"
     p_return_row_instead_of_pk="FALSE"
-    p_enable_dml_view="TRUE"
+    p_enable_dml_view="FALSE"
     p_enable_generic_change_log="FALSE"
     p_api_name="EMPLOYEES_API"
-    p_sequence_name="EMPLOYEES_SEQ"
+    p_sequence_name=""
     p_exclude_column_list=""
-    p_enable_custom_defaults="TRUE"
-    p_custom_default_values="SEE_END_OF_API_PACKAGE_SPEC"/>
+    p_enable_custom_defaults="FALSE"
+    p_custom_default_values=""/>
 
   This API provides DML functionality that can be easily called from APEX.
   Target of the table API is to encapsulate the table DML source code for
-  security (UI schema needs only the execute right for the API and the
-  read/write right for the EMPLOYEES_DML_V, tables can be
-  hidden in extra data schema) and easy readability of the business logic
-  (all DML is then written in the same style). For APEX automatic row
-  processing like tabular forms you can optionally use the
+  security (UI schema needs only the execute right for the API and the 
+  read/write right for the EMPLOYEES_DML_V, tables can be 
+  hidden in extra data schema) and easy readability of the business logic 
+  (all DML is then written in the same style). For APEX automatic row 
+  processing like tabular forms you can optionally use the 
   EMPLOYEES_DML_V. The instead of trigger for this view
   is calling simply this "EMPLOYEES_API".
   */
@@ -108,31 +108,31 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
   RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
 
   FUNCTION create_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT NULL /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT NULL,
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      ,
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE           /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT NULL,
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      ,
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE          /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT NULL,
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT NULL,
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT NULL /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT NULL /*FK*/ )
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
+    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE,
+    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE,
+    p_email          IN "EMPLOYEES"."EMAIL"%TYPE /*UK*/,
+    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE,
+    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE,
+    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE /*FK*/,
+    p_salary         IN "EMPLOYEES"."SALARY"%TYPE,
+    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE,
+    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE /*FK*/,
+    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ )
   RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
 
   PROCEDURE create_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT NULL /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT NULL,
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      ,
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE           /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT NULL,
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      ,
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE          /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT NULL,
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT NULL,
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT NULL /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT NULL /*FK*/ );
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
+    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE,
+    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE,
+    p_email          IN "EMPLOYEES"."EMAIL"%TYPE /*UK*/,
+    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE,
+    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE,
+    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE /*FK*/,
+    p_salary         IN "EMPLOYEES"."SALARY"%TYPE,
+    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE,
+    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE /*FK*/,
+    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ );
 
   FUNCTION create_row (
     p_row            IN "EMPLOYEES"%ROWTYPE )
@@ -148,6 +148,19 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
   FUNCTION read_row (
     p_email          IN "EMPLOYEES"."EMAIL"%TYPE /*UK*/ )
   RETURN "EMPLOYEES"%ROWTYPE;
+
+  PROCEDURE read_row (
+    p_employee_id    IN            "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_first_name        OUT NOCOPY "EMPLOYEES"."FIRST_NAME"%TYPE,
+    p_last_name         OUT NOCOPY "EMPLOYEES"."LAST_NAME"%TYPE,
+    p_email             OUT NOCOPY "EMPLOYEES"."EMAIL"%TYPE /*UK*/,
+    p_phone_number      OUT NOCOPY "EMPLOYEES"."PHONE_NUMBER"%TYPE,
+    p_hire_date         OUT NOCOPY "EMPLOYEES"."HIRE_DATE"%TYPE,
+    p_job_id            OUT NOCOPY "EMPLOYEES"."JOB_ID"%TYPE /*FK*/,
+    p_salary            OUT NOCOPY "EMPLOYEES"."SALARY"%TYPE,
+    p_commission_pct    OUT NOCOPY "EMPLOYEES"."COMMISSION_PCT"%TYPE,
+    p_manager_id        OUT NOCOPY "EMPLOYEES"."MANAGER_ID"%TYPE /*FK*/,
+    p_department_id     OUT NOCOPY "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ );
 
   PROCEDURE update_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -199,57 +212,85 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
   PROCEDURE create_or_update_row (
     p_row            IN "EMPLOYEES"%ROWTYPE );
 
-  FUNCTION get_a_row
-  RETURN "EMPLOYEES"%ROWTYPE;
+  FUNCTION get_first_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."FIRST_NAME"%TYPE;
 
-  FUNCTION create_a_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT get_a_row()."EMPLOYEE_ID" /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT get_a_row()."FIRST_NAME",
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      DEFAULT get_a_row()."LAST_NAME",
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE          DEFAULT get_a_row()."EMAIL" /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT get_a_row()."PHONE_NUMBER",
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      DEFAULT get_a_row()."HIRE_DATE",
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE         DEFAULT get_a_row()."JOB_ID" /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT get_a_row()."SALARY",
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT get_a_row()."COMMISSION_PCT",
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT get_a_row()."DEPARTMENT_ID" /*FK*/ )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  FUNCTION get_last_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."LAST_NAME"%TYPE;
 
-  PROCEDURE create_a_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT get_a_row()."EMPLOYEE_ID" /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT get_a_row()."FIRST_NAME",
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      DEFAULT get_a_row()."LAST_NAME",
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE          DEFAULT get_a_row()."EMAIL" /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT get_a_row()."PHONE_NUMBER",
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      DEFAULT get_a_row()."HIRE_DATE",
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE         DEFAULT get_a_row()."JOB_ID" /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT get_a_row()."SALARY",
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT get_a_row()."COMMISSION_PCT",
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT get_a_row()."DEPARTMENT_ID" /*FK*/ );
+  FUNCTION get_email(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."EMAIL"%TYPE;
 
-  FUNCTION read_a_row
-  RETURN "EMPLOYEES"%ROWTYPE;
+  FUNCTION get_phone_number(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."PHONE_NUMBER"%TYPE;
 
-  /*
-  Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
-  All other custom defaults are only listed for convenience and determined at runtime by the generator.
-  You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
-  <custom_defaults>
-    <column source="TAPIGEN" name="EMPLOYEE_ID"><![CDATA["EMPLOYEES_SEQ".nextval]]></column>
-    <column source="TAPIGEN" name="FIRST_NAME"><![CDATA[substr(sys_guid(),1,20)]]></column>
-    <column source="TAPIGEN" name="LAST_NAME"><![CDATA[substr(sys_guid(),1,25)]]></column>
-    <column source="TAPIGEN" name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
-    <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
-    <column source="TAPIGEN" name="HIRE_DATE"><![CDATA[to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j')]]></column>
-    <column source="TAPIGEN" name="JOB_ID"><![CDATA['AC_ACCOUNT']]></column>
-    <column source="USER"    name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
-    <column source="TAPIGEN" name="COMMISSION_PCT"><![CDATA[round(dbms_random.value(0,.99),2)]]></column>
-    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
-    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[10]]></column>
-  </custom_defaults>
-  */
+  FUNCTION get_hire_date(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."HIRE_DATE"%TYPE;
+
+  FUNCTION get_job_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."JOB_ID"%TYPE;
+
+  FUNCTION get_salary(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."SALARY"%TYPE;
+
+  FUNCTION get_commission_pct(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."COMMISSION_PCT"%TYPE;
+
+  FUNCTION get_manager_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."MANAGER_ID"%TYPE;
+
+  FUNCTION get_department_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."DEPARTMENT_ID"%TYPE;
+
+  PROCEDURE set_first_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE );
+
+  PROCEDURE set_last_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE );
+
+  PROCEDURE set_email(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_email          IN "EMPLOYEES"."EMAIL"%TYPE );
+
+  PROCEDURE set_phone_number(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE );
+
+  PROCEDURE set_hire_date(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE );
+
+  PROCEDURE set_job_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE );
+
+  PROCEDURE set_salary(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_salary         IN "EMPLOYEES"."SALARY"%TYPE );
+
+  PROCEDURE set_commission_pct(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE );
+
+  PROCEDURE set_manager_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE );
+
+  PROCEDURE set_department_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE );
 END "EMPLOYEES_API";
 /
 ```
@@ -261,10 +302,10 @@ END "EMPLOYEES_API";
 CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
-   * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:38"
-   * generated_by="DECAF4"
+   * generator_version="0.5.0"
+   * generator_action="GET_CODE"
+   * generated_at="2018-12-19 19:43:04"
+   * generated_by="OGOBRECHT"
    */
 
   FUNCTION row_exists (
@@ -276,7 +317,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     CURSOR   cur_bool IS
       SELECT 1
         FROM "EMPLOYEES"
-       WHERE COALESCE( "EMPLOYEE_ID",-999999999999999.999999999999999 ) = COALESCE( p_employee_id,-999999999999999.999999999999999 );
+       WHERE "EMPLOYEE_ID" = p_employee_id;
   BEGIN
     OPEN cur_bool;
     FETCH cur_bool INTO v_dummy;
@@ -308,17 +349,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
   END get_pk_by_unique_cols;
 
   FUNCTION create_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT NULL /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT NULL,
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      ,
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE           /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT NULL,
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      ,
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE          /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT NULL,
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT NULL,
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT NULL /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT NULL /*FK*/ )
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
+    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE,
+    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE,
+    p_email          IN "EMPLOYEES"."EMAIL"%TYPE /*UK*/,
+    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE,
+    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE,
+    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE /*FK*/,
+    p_salary         IN "EMPLOYEES"."SALARY"%TYPE,
+    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE,
+    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE /*FK*/,
+    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ )
   RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
@@ -335,7 +376,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
       "MANAGER_ID" /*FK*/,
       "DEPARTMENT_ID" /*FK*/ )
     VALUES (
-      COALESCE( p_employee_id, "EMPLOYEES_SEQ".nextval ),
+      p_employee_id,
       p_first_name,
       p_last_name,
       p_email,
@@ -353,17 +394,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
   END create_row;
 
   PROCEDURE create_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT NULL /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT NULL,
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      ,
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE           /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT NULL,
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      ,
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE          /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT NULL,
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT NULL,
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT NULL /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT NULL /*FK*/ )
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
+    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE,
+    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE,
+    p_email          IN "EMPLOYEES"."EMAIL"%TYPE /*UK*/,
+    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE,
+    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE,
+    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE /*FK*/,
+    p_salary         IN "EMPLOYEES"."SALARY"%TYPE,
+    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE,
+    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE /*FK*/,
+    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ )
   IS
     v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
   BEGIN
@@ -427,7 +468,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     CURSOR cur_row IS
       SELECT *
         FROM "EMPLOYEES"
-       WHERE COALESCE( "EMPLOYEE_ID",-999999999999999.999999999999999 ) = COALESCE( p_employee_id,-999999999999999.999999999999999 );
+       WHERE "EMPLOYEE_ID" = p_employee_id;
   BEGIN
     OPEN cur_row;
     FETCH cur_row INTO v_row;
@@ -442,13 +483,43 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     CURSOR cur_row IS
       SELECT *
         FROM "EMPLOYEES"
-       WHERE COALESCE( "EMAIL",'@@@@@@@@@@@@@@@' ) = COALESCE( p_email,'@@@@@@@@@@@@@@@' );
+       WHERE "EMAIL" = p_email;
   BEGIN
     OPEN cur_row;
     FETCH cur_row INTO v_row;
     CLOSE cur_row;
     RETURN v_row;
   END;
+
+  PROCEDURE read_row (
+    p_employee_id    IN            "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_first_name        OUT NOCOPY "EMPLOYEES"."FIRST_NAME"%TYPE,
+    p_last_name         OUT NOCOPY "EMPLOYEES"."LAST_NAME"%TYPE,
+    p_email             OUT NOCOPY "EMPLOYEES"."EMAIL"%TYPE /*UK*/,
+    p_phone_number      OUT NOCOPY "EMPLOYEES"."PHONE_NUMBER"%TYPE,
+    p_hire_date         OUT NOCOPY "EMPLOYEES"."HIRE_DATE"%TYPE,
+    p_job_id            OUT NOCOPY "EMPLOYEES"."JOB_ID"%TYPE /*FK*/,
+    p_salary            OUT NOCOPY "EMPLOYEES"."SALARY"%TYPE,
+    p_commission_pct    OUT NOCOPY "EMPLOYEES"."COMMISSION_PCT"%TYPE,
+    p_manager_id        OUT NOCOPY "EMPLOYEES"."MANAGER_ID"%TYPE /*FK*/,
+    p_department_id     OUT NOCOPY "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      p_first_name     := v_row."FIRST_NAME"; 
+      p_last_name      := v_row."LAST_NAME"; 
+      p_email          := v_row."EMAIL"; 
+      p_phone_number   := v_row."PHONE_NUMBER"; 
+      p_hire_date      := v_row."HIRE_DATE"; 
+      p_job_id         := v_row."JOB_ID"; 
+      p_salary         := v_row."SALARY"; 
+      p_commission_pct := v_row."COMMISSION_PCT"; 
+      p_manager_id     := v_row."MANAGER_ID"; 
+      p_department_id  := v_row."DEPARTMENT_ID"; 
+    END IF;
+  END read_row;
 
   PROCEDURE update_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -464,21 +535,21 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
     p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ )
   IS
     v_row   "EMPLOYEES"%ROWTYPE;
-
+    
   BEGIN
     IF row_exists ( p_employee_id => p_employee_id ) THEN
       v_row := read_row ( p_employee_id => p_employee_id );
-      -- update only,if the column values really differ
-      IF COALESCE( v_row."FIRST_NAME",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_first_name,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."LAST_NAME",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_last_name,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."EMAIL",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_email,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."PHONE_NUMBER",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_phone_number,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."HIRE_DATE",TO_DATE( '01.01.1900','DD.MM.YYYY' ) ) <> COALESCE( p_hire_date,TO_DATE( '01.01.1900','DD.MM.YYYY' ) )
-      OR COALESCE( v_row."JOB_ID",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_job_id,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."SALARY",-999999999999999.999999999999999 ) <> COALESCE( p_salary,-999999999999999.999999999999999 )
-      OR COALESCE( v_row."COMMISSION_PCT",-999999999999999.999999999999999 ) <> COALESCE( p_commission_pct,-999999999999999.999999999999999 )
-      OR COALESCE( v_row."MANAGER_ID",-999999999999999.999999999999999 ) <> COALESCE( p_manager_id,-999999999999999.999999999999999 )
-      OR COALESCE( v_row."DEPARTMENT_ID",-999999999999999.999999999999999 ) <> COALESCE( p_department_id,-999999999999999.999999999999999 )
+      -- update only, if the column values really differ
+      IF COALESCE(v_row."FIRST_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_first_name, '@@@@@@@@@@@@@@@')
+      OR v_row."LAST_NAME" <> p_last_name
+      OR v_row."EMAIL" <> p_email
+      OR COALESCE(v_row."PHONE_NUMBER", '@@@@@@@@@@@@@@@') <> COALESCE(p_phone_number, '@@@@@@@@@@@@@@@')
+      OR v_row."HIRE_DATE" <> p_hire_date
+      OR v_row."JOB_ID" <> p_job_id
+      OR COALESCE(v_row."SALARY", -999999999999999.999999999999999) <> COALESCE(p_salary, -999999999999999.999999999999999)
+      OR COALESCE(v_row."COMMISSION_PCT", -999999999999999.999999999999999) <> COALESCE(p_commission_pct, -999999999999999.999999999999999)
+      OR COALESCE(v_row."MANAGER_ID", -999999999999999.999999999999999) <> COALESCE(p_manager_id, -999999999999999.999999999999999)
+      OR COALESCE(v_row."DEPARTMENT_ID", -999999999999999.999999999999999) <> COALESCE(p_department_id, -999999999999999.999999999999999)
 
       THEN
         UPDATE EMPLOYEES
@@ -492,7 +563,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
                "COMMISSION_PCT" = p_commission_pct,
                "MANAGER_ID"     = p_manager_id /*FK*/,
                "DEPARTMENT_ID"  = p_department_id /*FK*/
-         WHERE COALESCE( "EMPLOYEE_ID",-999999999999999.999999999999999 ) = COALESCE( p_employee_id,-999999999999999.999999999999999 );
+         WHERE "EMPLOYEE_ID" = p_employee_id;
       END IF;
     END IF;
   END update_row;
@@ -629,93 +700,265 @@ CREATE OR REPLACE PACKAGE BODY "HR"."EMPLOYEES_API" IS
       p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
   END create_or_update_row;
 
-  FUNCTION get_a_row
-  RETURN "EMPLOYEES"%ROWTYPE IS
+  FUNCTION get_first_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."FIRST_NAME"%TYPE IS
     v_row "EMPLOYEES"%ROWTYPE;
   BEGIN
-    v_row."EMPLOYEE_ID"    := "EMPLOYEES_SEQ".nextval /*PK*/;
-    v_row."FIRST_NAME"     := substr(sys_guid(),1,20);
-    v_row."LAST_NAME"      := substr(sys_guid(),1,25);
-    v_row."EMAIL"          := substr(sys_guid(),1,15) || '@dummy.com' /*UK*/;
-    v_row."PHONE_NUMBER"   := substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20);
-    v_row."HIRE_DATE"      := to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j');
-    v_row."JOB_ID"         := 'AC_ACCOUNT' /*FK*/;
-    v_row."SALARY"         := round(dbms_random.value(1000,10000),2);
-    v_row."COMMISSION_PCT" := round(dbms_random.value(0,.99),2);
-    v_row."MANAGER_ID"     := 100 /*FK*/;
-    v_row."DEPARTMENT_ID"  := 10 /*FK*/;
-    return v_row;
-  END get_a_row;
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."FIRST_NAME";
+  END get_first_name;
 
-  FUNCTION create_a_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT get_a_row()."EMPLOYEE_ID" /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT get_a_row()."FIRST_NAME",
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      DEFAULT get_a_row()."LAST_NAME",
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE          DEFAULT get_a_row()."EMAIL" /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT get_a_row()."PHONE_NUMBER",
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      DEFAULT get_a_row()."HIRE_DATE",
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE         DEFAULT get_a_row()."JOB_ID" /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT get_a_row()."SALARY",
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT get_a_row()."COMMISSION_PCT",
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT get_a_row()."DEPARTMENT_ID" /*FK*/ )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE IS
-    v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  FUNCTION get_last_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."LAST_NAME"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
   BEGIN
-    v_return := create_row (
-      p_employee_id    => p_employee_id /*PK*/,
-      p_first_name     => p_first_name,
-      p_last_name      => p_last_name,
-      p_email          => p_email /*UK*/,
-      p_phone_number   => p_phone_number,
-      p_hire_date      => p_hire_date,
-      p_job_id         => p_job_id /*FK*/,
-      p_salary         => p_salary,
-      p_commission_pct => p_commission_pct,
-      p_manager_id     => p_manager_id /*FK*/,
-      p_department_id  => p_department_id /*FK*/ );
-    RETURN v_return;
-  END create_a_row;
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."LAST_NAME";
+  END get_last_name;
 
-  PROCEDURE create_a_row (
-    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT get_a_row()."EMPLOYEE_ID" /*PK*/,
-    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE     DEFAULT get_a_row()."FIRST_NAME",
-    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE      DEFAULT get_a_row()."LAST_NAME",
-    p_email          IN "EMPLOYEES"."EMAIL"%TYPE          DEFAULT get_a_row()."EMAIL" /*UK*/,
-    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE   DEFAULT get_a_row()."PHONE_NUMBER",
-    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE      DEFAULT get_a_row()."HIRE_DATE",
-    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE         DEFAULT get_a_row()."JOB_ID" /*FK*/,
-    p_salary         IN "EMPLOYEES"."SALARY"%TYPE         DEFAULT get_a_row()."SALARY",
-    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT get_a_row()."COMMISSION_PCT",
-    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
-    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT get_a_row()."DEPARTMENT_ID" /*FK*/ )
+  FUNCTION get_email(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."EMAIL"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."EMAIL";
+  END get_email;
+
+  FUNCTION get_phone_number(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."PHONE_NUMBER"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."PHONE_NUMBER";
+  END get_phone_number;
+
+  FUNCTION get_hire_date(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."HIRE_DATE"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."HIRE_DATE";
+  END get_hire_date;
+
+  FUNCTION get_job_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."JOB_ID"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."JOB_ID";
+  END get_job_id;
+
+  FUNCTION get_salary(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."SALARY"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."SALARY";
+  END get_salary;
+
+  FUNCTION get_commission_pct(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."COMMISSION_PCT"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."COMMISSION_PCT";
+  END get_commission_pct;
+
+  FUNCTION get_manager_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."MANAGER_ID"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."MANAGER_ID";
+  END get_manager_id;
+
+  FUNCTION get_department_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
+  RETURN "EMPLOYEES"."DEPARTMENT_ID"%TYPE IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    RETURN v_row."DEPARTMENT_ID";
+  END get_department_id;
+
+  PROCEDURE set_first_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE )
   IS
-    v_return "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+    v_row "EMPLOYEES"%ROWTYPE;
   BEGIN
-    v_return := create_row (
-      p_employee_id    => p_employee_id /*PK*/,
-      p_first_name     => p_first_name,
-      p_last_name      => p_last_name,
-      p_email          => p_email /*UK*/,
-      p_phone_number   => p_phone_number,
-      p_hire_date      => p_hire_date,
-      p_job_id         => p_job_id /*FK*/,
-      p_salary         => p_salary,
-      p_commission_pct => p_commission_pct,
-      p_manager_id     => p_manager_id /*FK*/,
-      p_department_id  => p_department_id /*FK*/ );
-  END create_a_row;
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF COALESCE(v_row."FIRST_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_first_name, '@@@@@@@@@@@@@@@') THEN
+        UPDATE EMPLOYEES
+           SET "FIRST_NAME" = p_first_name    
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_first_name;
 
-  FUNCTION read_a_row
-  RETURN "EMPLOYEES"%ROWTYPE IS
-    v_row  "EMPLOYEES"%ROWTYPE;
-    CURSOR cur_row IS SELECT * FROM EMPLOYEES;
+  PROCEDURE set_last_name(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_last_name      IN "EMPLOYEES"."LAST_NAME"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
   BEGIN
-    OPEN cur_row;
-    FETCH cur_row INTO v_row;
-    CLOSE cur_row;
-    RETURN v_row;
-  END read_a_row;
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF v_row."LAST_NAME" <> p_last_name THEN
+        UPDATE EMPLOYEES
+           SET "LAST_NAME" = p_last_name     
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_last_name;
+
+  PROCEDURE set_email(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_email          IN "EMPLOYEES"."EMAIL"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF v_row."EMAIL" <> p_email THEN
+        UPDATE EMPLOYEES
+           SET "EMAIL" = p_email         
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_email;
+
+  PROCEDURE set_phone_number(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_phone_number   IN "EMPLOYEES"."PHONE_NUMBER"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF COALESCE(v_row."PHONE_NUMBER", '@@@@@@@@@@@@@@@') <> COALESCE(p_phone_number, '@@@@@@@@@@@@@@@') THEN
+        UPDATE EMPLOYEES
+           SET "PHONE_NUMBER" = p_phone_number  
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_phone_number;
+
+  PROCEDURE set_hire_date(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_hire_date      IN "EMPLOYEES"."HIRE_DATE"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF v_row."HIRE_DATE" <> p_hire_date THEN
+        UPDATE EMPLOYEES
+           SET "HIRE_DATE" = p_hire_date     
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_hire_date;
+
+  PROCEDURE set_job_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_job_id         IN "EMPLOYEES"."JOB_ID"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF v_row."JOB_ID" <> p_job_id THEN
+        UPDATE EMPLOYEES
+           SET "JOB_ID" = p_job_id        
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_job_id;
+
+  PROCEDURE set_salary(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_salary         IN "EMPLOYEES"."SALARY"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF COALESCE(v_row."SALARY", -999999999999999.999999999999999) <> COALESCE(p_salary, -999999999999999.999999999999999) THEN
+        UPDATE EMPLOYEES
+           SET "SALARY" = p_salary        
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_salary;
+
+  PROCEDURE set_commission_pct(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF COALESCE(v_row."COMMISSION_PCT", -999999999999999.999999999999999) <> COALESCE(p_commission_pct, -999999999999999.999999999999999) THEN
+        UPDATE EMPLOYEES
+           SET "COMMISSION_PCT" = p_commission_pct
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_commission_pct;
+
+  PROCEDURE set_manager_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF COALESCE(v_row."MANAGER_ID", -999999999999999.999999999999999) <> COALESCE(p_manager_id, -999999999999999.999999999999999) THEN
+        UPDATE EMPLOYEES
+           SET "MANAGER_ID" = p_manager_id    
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_manager_id;
+
+  PROCEDURE set_department_id(
+    p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/,
+    p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE )
+  IS
+    v_row "EMPLOYEES"%ROWTYPE;
+  BEGIN
+    IF row_exists ( p_employee_id => p_employee_id ) THEN
+      v_row := read_row ( p_employee_id => p_employee_id );
+      -- update only,if the column value really differs
+      IF COALESCE(v_row."DEPARTMENT_ID", -999999999999999.999999999999999) <> COALESCE(p_department_id, -999999999999999.999999999999999) THEN
+        UPDATE EMPLOYEES
+           SET "DEPARTMENT_ID" = p_department_id 
+         WHERE "EMPLOYEE_ID" = p_employee_id;
+      END IF;
+    END IF;
+  END set_department_id;
 
 END "EMPLOYEES_API";
 /
