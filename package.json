@@ -6,6 +6,6 @@
   },
   "devDependencies": {
     "markdown-toc": "^1.2.0",
-    "ploc": "^0.4.0"
+    "ploc": "^0.4.1"
   }
 }

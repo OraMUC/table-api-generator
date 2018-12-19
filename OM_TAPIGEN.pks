@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS 
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0_b7';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0';
 /**
 
 _This is an Oracle PL/SQL Table API Generator. It can be integrated in the
@@ -53,29 +53,35 @@ production. If you miss any feature or find a bug, we are happy to hear from you
 via the GitHub [Issues](https://github.com/OraMUC/table-api-generator/issues)
 functionality.
 
-DOCS & LINKS
+DOCS
 
 - [Example API for the demo table HR.EMPLOYEES](https://github.com/OraMUC/table-api-generator/blob/master/docs/example-api.md)
 - [Getting started](https://github.com/OraMUC/table-api-generator/blob/master/docs/getting-started.md)
 - [Detailed parameter descriptions](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md)
 - [Naming conventions](https://github.com/OraMUC/table-api-generator/blob/master/docs/naming-conventions.md)
 - [SQL Developer integration](https://github.com/OraMUC/table-api-generator/blob/master/docs/sql-developer-integration.md)
+- [Changelog](https://github.com/OraMUC/table-api-generator/blob/master/docs/changelog.md)
+
+LINKS
+
 - [Project home page](https://github.com/OraMUC/table-api-generator)
 - [Download the latest version](https://github.com/OraMUC/table-api-generator/releases/latest)
 - [Issues](https://github.com/OraMUC/table-api-generator/issues)
-- [Changelog](https://github.com/OraMUC/table-api-generator/blob/master/docs/changelog.md)
 
 **/
 
 --------------------------------------------------------------------------------
 -- Public global constants c_*
 --------------------------------------------------------------------------------
-c_ora_max_name_len  CONSTANT INTEGER :=
-  $IF dbms_db_version.ver_le_11_1 $THEN 30
+c_ora_max_name_len CONSTANT INTEGER :=
+  $IF dbms_db_version.ver_le_11_1 $THEN 
+    30
   $ELSE
-    $IF dbms_db_version.ver_le_11_2 $THEN 30
+    $IF dbms_db_version.ver_le_11_2 $THEN
+      30
     $ELSE
-      $IF dbms_db_version.ver_le_12_1 $THEN 30
+      $IF dbms_db_version.ver_le_12_1 $THEN 
+        30
       $ELSE
         ora_max_name_len
       $END
