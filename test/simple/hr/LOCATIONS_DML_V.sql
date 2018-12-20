@@ -1,4 +1,4 @@
-CREATE OR REPLACE FORCE VIEW "HR"."LOCATIONS_DML_V" AS
+CREATE OR REPLACE FORCE VIEW "TEST"."LOCATIONS_DML_V" AS
 SELECT "LOCATION_ID" /*PK*/,
        "STREET_ADDRESS",
        "POSTAL_CODE",
@@ -8,10 +8,10 @@ SELECT "LOCATION_ID" /*PK*/,
   FROM LOCATIONS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:40"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:13"
+   * generated_by="OGOBRECHT"
    */
     ;
 

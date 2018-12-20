@@ -1,10 +1,10 @@
-CREATE OR REPLACE PACKAGE BODY "HR"."JOBS_API" IS
+CREATE OR REPLACE PACKAGE BODY "TEST"."JOBS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:39"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:14"
+   * generated_by="OGOBRECHT"
    */
 
   FUNCTION row_exists (
@@ -16,7 +16,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."JOBS_API" IS
     CURSOR   cur_bool IS
       SELECT 1
         FROM "JOBS"
-       WHERE COALESCE( "JOB_ID",'@@@@@@@@@@@@@@@' ) = COALESCE( p_job_id,'@@@@@@@@@@@@@@@' );
+       WHERE "JOB_ID" = p_job_id;
   BEGIN
     OPEN cur_bool;
     FETCH cur_bool INTO v_dummy;
@@ -109,7 +109,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."JOBS_API" IS
     CURSOR cur_row IS
       SELECT *
         FROM "JOBS"
-       WHERE COALESCE( "JOB_ID",'@@@@@@@@@@@@@@@' ) = COALESCE( p_job_id,'@@@@@@@@@@@@@@@' );
+       WHERE "JOB_ID" = p_job_id;
   BEGIN
     OPEN cur_row;
     FETCH cur_row INTO v_row;
@@ -128,17 +128,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."JOBS_API" IS
   BEGIN
     IF row_exists ( p_job_id => p_job_id ) THEN
       v_row := read_row ( p_job_id => p_job_id );
-      -- update only,if the column values really differ
-      IF COALESCE( v_row."JOB_TITLE",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_job_title,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."MIN_SALARY",-999999999999999.999999999999999 ) <> COALESCE( p_min_salary,-999999999999999.999999999999999 )
-      OR COALESCE( v_row."MAX_SALARY",-999999999999999.999999999999999 ) <> COALESCE( p_max_salary,-999999999999999.999999999999999 )
+      -- update only, if the column values really differ
+      IF v_row."JOB_TITLE" <> p_job_title
+      OR COALESCE(v_row."MIN_SALARY", -999999999999999.999999999999999) <> COALESCE(p_min_salary, -999999999999999.999999999999999)
+      OR COALESCE(v_row."MAX_SALARY", -999999999999999.999999999999999) <> COALESCE(p_max_salary, -999999999999999.999999999999999)
 
       THEN
         UPDATE JOBS
            SET "JOB_TITLE"  = p_job_title,
                "MIN_SALARY" = p_min_salary,
                "MAX_SALARY" = p_max_salary
-         WHERE COALESCE( "JOB_ID",'@@@@@@@@@@@@@@@' ) = COALESCE( p_job_id,'@@@@@@@@@@@@@@@' );
+         WHERE "JOB_ID" = p_job_id;
       END IF;
     END IF;
   END update_row;

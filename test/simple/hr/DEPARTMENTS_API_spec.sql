@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE "HR"."DEPARTMENTS_API" IS
+CREATE OR REPLACE PACKAGE "TEST"."DEPARTMENTS_API" IS
   /*
   This is the API for the table "DEPARTMENTS".
 
@@ -8,12 +8,12 @@ CREATE OR REPLACE PACKAGE "HR"."DEPARTMENTS_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0_b4"
+    generator_version="0.5.0"
     generator_action="COMPILE_API"
-    generated_at="2018-02-05 20:26:38"
-    generated_by="DECAF4"
+    generated_at="2018-12-20 19:43:12"
+    generated_by="OGOBRECHT"
     p_table_name="DEPARTMENTS"
-    p_owner="HR"
+    p_owner="TEST"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -106,6 +106,10 @@ CREATE OR REPLACE PACKAGE "HR"."DEPARTMENTS_API" IS
 
   FUNCTION get_a_row
   RETURN "DEPARTMENTS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Returns a row with (hopefully) complete default data.
+   */
 
   FUNCTION create_a_row (
     p_department_id   IN "DEPARTMENTS"."DEPARTMENT_ID"%TYPE   DEFAULT get_a_row()."DEPARTMENT_ID" /*PK*/,
@@ -113,15 +117,28 @@ CREATE OR REPLACE PACKAGE "HR"."DEPARTMENTS_API" IS
     p_manager_id      IN "DEPARTMENTS"."MANAGER_ID"%TYPE      DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
     p_location_id     IN "DEPARTMENTS"."LOCATION_ID"%TYPE     DEFAULT get_a_row()."LOCATION_ID" /*FK*/ )
   RETURN "DEPARTMENTS"."DEPARTMENT_ID"%TYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   PROCEDURE create_a_row (
     p_department_id   IN "DEPARTMENTS"."DEPARTMENT_ID"%TYPE   DEFAULT get_a_row()."DEPARTMENT_ID" /*PK*/,
     p_department_name IN "DEPARTMENTS"."DEPARTMENT_NAME"%TYPE DEFAULT get_a_row()."DEPARTMENT_NAME",
     p_manager_id      IN "DEPARTMENTS"."MANAGER_ID"%TYPE      DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
     p_location_id     IN "DEPARTMENTS"."LOCATION_ID"%TYPE     DEFAULT get_a_row()."LOCATION_ID" /*FK*/ );
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   FUNCTION read_a_row
   RETURN "DEPARTMENTS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Fetch one row (the first the database delivers) without providing
+   * a primary key parameter.
+   */
 
   /*
   Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
@@ -130,8 +147,7 @@ CREATE OR REPLACE PACKAGE "HR"."DEPARTMENTS_API" IS
   <custom_defaults>
     <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA["DEPARTMENTS_SEQ".nextval]]></column>
     <column source="TAPIGEN" name="DEPARTMENT_NAME"><![CDATA[substr(sys_guid(),1,30)]]></column>
-    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
-    <column source="TAPIGEN" name="LOCATION_ID"><![CDATA[1000]]></column>
+    <column source="TAPIGEN" name="LOCATION_ID"><![CDATA[1]]></column>
   </custom_defaults>
   */
 END "DEPARTMENTS_API";

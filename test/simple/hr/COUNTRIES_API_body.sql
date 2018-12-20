@@ -1,10 +1,10 @@
-CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
+CREATE OR REPLACE PACKAGE BODY "TEST"."COUNTRIES_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:37"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:11"
+   * generated_by="OGOBRECHT"
    */
 
   FUNCTION row_exists (
@@ -16,7 +16,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     CURSOR   cur_bool IS
       SELECT 1
         FROM "COUNTRIES"
-       WHERE COALESCE( "COUNTRY_ID",'@@@@@@@@@@@@@@@' ) = COALESCE( p_country_id,'@@@@@@@@@@@@@@@' );
+       WHERE "COUNTRY_ID" = p_country_id;
   BEGIN
     OPEN cur_bool;
     FETCH cur_bool INTO v_dummy;
@@ -102,7 +102,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
     CURSOR cur_row IS
       SELECT *
         FROM "COUNTRIES"
-       WHERE COALESCE( "COUNTRY_ID",'@@@@@@@@@@@@@@@' ) = COALESCE( p_country_id,'@@@@@@@@@@@@@@@' );
+       WHERE "COUNTRY_ID" = p_country_id;
   BEGIN
     OPEN cur_row;
     FETCH cur_row INTO v_row;
@@ -120,15 +120,15 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
   BEGIN
     IF row_exists ( p_country_id => p_country_id ) THEN
       v_row := read_row ( p_country_id => p_country_id );
-      -- update only,if the column values really differ
-      IF COALESCE( v_row."COUNTRY_NAME",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_country_name,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."REGION_ID",-999999999999999.999999999999999 ) <> COALESCE( p_region_id,-999999999999999.999999999999999 )
+      -- update only, if the column values really differ
+      IF COALESCE(v_row."COUNTRY_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_country_name, '@@@@@@@@@@@@@@@')
+      OR COALESCE(v_row."REGION_ID", -999999999999999.999999999999999) <> COALESCE(p_region_id, -999999999999999.999999999999999)
 
       THEN
         UPDATE COUNTRIES
            SET "COUNTRY_NAME" = p_country_name,
                "REGION_ID"    = p_region_id /*FK*/
-         WHERE COALESCE( "COUNTRY_ID",'@@@@@@@@@@@@@@@' ) = COALESCE( p_country_id,'@@@@@@@@@@@@@@@' );
+         WHERE "COUNTRY_ID" = p_country_id;
       END IF;
     END IF;
   END update_row;
@@ -207,7 +207,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."COUNTRIES_API" IS
   BEGIN
     v_row."COUNTRY_ID"   := substr(sys_guid(),1,2) /*PK*/;
     v_row."COUNTRY_NAME" := substr(sys_guid(),1,40);
-    v_row."REGION_ID"    := 1 /*FK*/;
+    v_row."REGION_ID"    := 59777415 /*FK*/;
     return v_row;
   END get_a_row;
 

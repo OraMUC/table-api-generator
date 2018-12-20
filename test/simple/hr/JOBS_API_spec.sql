@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE "HR"."JOBS_API" IS
+CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
   /*
   This is the API for the table "JOBS".
 
@@ -8,12 +8,12 @@ CREATE OR REPLACE PACKAGE "HR"."JOBS_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0_b4"
+    generator_version="0.5.0"
     generator_action="COMPILE_API"
-    generated_at="2018-02-05 20:26:39"
-    generated_by="DECAF4"
+    generated_at="2018-12-20 19:43:14"
+    generated_by="OGOBRECHT"
     p_table_name="JOBS"
-    p_owner="HR"
+    p_owner="TEST"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -106,6 +106,10 @@ CREATE OR REPLACE PACKAGE "HR"."JOBS_API" IS
 
   FUNCTION get_a_row
   RETURN "JOBS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Returns a row with (hopefully) complete default data.
+   */
 
   FUNCTION create_a_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE     DEFAULT get_a_row()."JOB_ID" /*PK*/,
@@ -113,15 +117,28 @@ CREATE OR REPLACE PACKAGE "HR"."JOBS_API" IS
     p_min_salary IN "JOBS"."MIN_SALARY"%TYPE DEFAULT get_a_row()."MIN_SALARY",
     p_max_salary IN "JOBS"."MAX_SALARY"%TYPE DEFAULT get_a_row()."MAX_SALARY" )
   RETURN "JOBS"."JOB_ID"%TYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   PROCEDURE create_a_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE     DEFAULT get_a_row()."JOB_ID" /*PK*/,
     p_job_title  IN "JOBS"."JOB_TITLE"%TYPE  DEFAULT get_a_row()."JOB_TITLE",
     p_min_salary IN "JOBS"."MIN_SALARY"%TYPE DEFAULT get_a_row()."MIN_SALARY",
     p_max_salary IN "JOBS"."MAX_SALARY"%TYPE DEFAULT get_a_row()."MAX_SALARY" );
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   FUNCTION read_a_row
   RETURN "JOBS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Fetch one row (the first the database delivers) without providing
+   * a primary key parameter.
+   */
 
   /*
   Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.

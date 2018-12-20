@@ -1,10 +1,10 @@
-CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
+CREATE OR REPLACE PACKAGE BODY "TEST"."DEPARTMENTS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:38"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:12"
+   * generated_by="OGOBRECHT"
    */
 
   FUNCTION row_exists (
@@ -16,7 +16,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     CURSOR   cur_bool IS
       SELECT 1
         FROM "DEPARTMENTS"
-       WHERE COALESCE( "DEPARTMENT_ID",-999999999999999.999999999999999 ) = COALESCE( p_department_id,-999999999999999.999999999999999 );
+       WHERE "DEPARTMENT_ID" = p_department_id;
   BEGIN
     OPEN cur_bool;
     FETCH cur_bool INTO v_dummy;
@@ -109,7 +109,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
     CURSOR cur_row IS
       SELECT *
         FROM "DEPARTMENTS"
-       WHERE COALESCE( "DEPARTMENT_ID",-999999999999999.999999999999999 ) = COALESCE( p_department_id,-999999999999999.999999999999999 );
+       WHERE "DEPARTMENT_ID" = p_department_id;
   BEGIN
     OPEN cur_row;
     FETCH cur_row INTO v_row;
@@ -128,17 +128,17 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
   BEGIN
     IF row_exists ( p_department_id => p_department_id ) THEN
       v_row := read_row ( p_department_id => p_department_id );
-      -- update only,if the column values really differ
-      IF COALESCE( v_row."DEPARTMENT_NAME",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_department_name,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."MANAGER_ID",-999999999999999.999999999999999 ) <> COALESCE( p_manager_id,-999999999999999.999999999999999 )
-      OR COALESCE( v_row."LOCATION_ID",-999999999999999.999999999999999 ) <> COALESCE( p_location_id,-999999999999999.999999999999999 )
+      -- update only, if the column values really differ
+      IF v_row."DEPARTMENT_NAME" <> p_department_name
+      OR COALESCE(v_row."MANAGER_ID", -999999999999999.999999999999999) <> COALESCE(p_manager_id, -999999999999999.999999999999999)
+      OR COALESCE(v_row."LOCATION_ID", -999999999999999.999999999999999) <> COALESCE(p_location_id, -999999999999999.999999999999999)
 
       THEN
         UPDATE DEPARTMENTS
            SET "DEPARTMENT_NAME" = p_department_name,
                "MANAGER_ID"      = p_manager_id /*FK*/,
                "LOCATION_ID"     = p_location_id /*FK*/
-         WHERE COALESCE( "DEPARTMENT_ID",-999999999999999.999999999999999 ) = COALESCE( p_department_id,-999999999999999.999999999999999 );
+         WHERE "DEPARTMENT_ID" = p_department_id;
       END IF;
     END IF;
   END update_row;
@@ -225,8 +225,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."DEPARTMENTS_API" IS
   BEGIN
     v_row."DEPARTMENT_ID"   := "DEPARTMENTS_SEQ".nextval /*PK*/;
     v_row."DEPARTMENT_NAME" := substr(sys_guid(),1,30);
-    v_row."MANAGER_ID"      := 100 /*FK*/;
-    v_row."LOCATION_ID"     := 1000 /*FK*/;
+    v_row."LOCATION_ID"     := 1 /*FK*/;
     return v_row;
   END get_a_row;
 

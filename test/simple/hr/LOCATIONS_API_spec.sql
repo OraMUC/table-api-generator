@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE "HR"."LOCATIONS_API" IS
+CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
   /*
   This is the API for the table "LOCATIONS".
 
@@ -8,12 +8,12 @@ CREATE OR REPLACE PACKAGE "HR"."LOCATIONS_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0_b4"
+    generator_version="0.5.0"
     generator_action="COMPILE_API"
-    generated_at="2018-02-05 20:26:39"
-    generated_by="DECAF4"
+    generated_at="2018-12-20 19:43:13"
+    generated_by="OGOBRECHT"
     p_table_name="LOCATIONS"
-    p_owner="HR"
+    p_owner="TEST"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -116,6 +116,10 @@ CREATE OR REPLACE PACKAGE "HR"."LOCATIONS_API" IS
 
   FUNCTION get_a_row
   RETURN "LOCATIONS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Returns a row with (hopefully) complete default data.
+   */
 
   FUNCTION create_a_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE    DEFAULT get_a_row()."LOCATION_ID" /*PK*/,
@@ -125,6 +129,10 @@ CREATE OR REPLACE PACKAGE "HR"."LOCATIONS_API" IS
     p_state_province IN "LOCATIONS"."STATE_PROVINCE"%TYPE DEFAULT get_a_row()."STATE_PROVINCE",
     p_country_id     IN "LOCATIONS"."COUNTRY_ID"%TYPE     DEFAULT get_a_row()."COUNTRY_ID" /*FK*/ )
   RETURN "LOCATIONS"."LOCATION_ID"%TYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   PROCEDURE create_a_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE    DEFAULT get_a_row()."LOCATION_ID" /*PK*/,
@@ -133,9 +141,18 @@ CREATE OR REPLACE PACKAGE "HR"."LOCATIONS_API" IS
     p_city           IN "LOCATIONS"."CITY"%TYPE           DEFAULT get_a_row()."CITY",
     p_state_province IN "LOCATIONS"."STATE_PROVINCE"%TYPE DEFAULT get_a_row()."STATE_PROVINCE",
     p_country_id     IN "LOCATIONS"."COUNTRY_ID"%TYPE     DEFAULT get_a_row()."COUNTRY_ID" /*FK*/ );
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   FUNCTION read_a_row
   RETURN "LOCATIONS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Fetch one row (the first the database delivers) without providing
+   * a primary key parameter.
+   */
 
   /*
   Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
@@ -147,7 +164,7 @@ CREATE OR REPLACE PACKAGE "HR"."LOCATIONS_API" IS
     <column source="TAPIGEN" name="POSTAL_CODE"><![CDATA[substr(sys_guid(),1,12)]]></column>
     <column source="TAPIGEN" name="CITY"><![CDATA[substr(sys_guid(),1,30)]]></column>
     <column source="TAPIGEN" name="STATE_PROVINCE"><![CDATA[substr(sys_guid(),1,25)]]></column>
-    <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA['AR']]></column>
+    <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA['16']]></column>
   </custom_defaults>
   */
 END "LOCATIONS_API";

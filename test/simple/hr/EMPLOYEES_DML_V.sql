@@ -1,4 +1,4 @@
-CREATE OR REPLACE FORCE VIEW "HR"."EMPLOYEES_DML_V" AS
+CREATE OR REPLACE FORCE VIEW "TEST"."EMPLOYEES_DML_V" AS
 SELECT "EMPLOYEE_ID" /*PK*/,
        "FIRST_NAME",
        "LAST_NAME",
@@ -13,10 +13,10 @@ SELECT "EMPLOYEE_ID" /*PK*/,
   FROM EMPLOYEES
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:38"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:15"
+   * generated_by="OGOBRECHT"
    */
     ;
 

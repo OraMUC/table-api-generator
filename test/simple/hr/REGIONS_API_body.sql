@@ -1,10 +1,10 @@
-CREATE OR REPLACE PACKAGE BODY "HR"."REGIONS_API" IS
+CREATE OR REPLACE PACKAGE BODY "TEST"."REGIONS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:40"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:13"
+   * generated_by="OGOBRECHT"
    */
 
   FUNCTION row_exists (
@@ -16,7 +16,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."REGIONS_API" IS
     CURSOR   cur_bool IS
       SELECT 1
         FROM "REGIONS"
-       WHERE COALESCE( "REGION_ID",-999999999999999.999999999999999 ) = COALESCE( p_region_id,-999999999999999.999999999999999 );
+       WHERE "REGION_ID" = p_region_id;
   BEGIN
     OPEN cur_bool;
     FETCH cur_bool INTO v_dummy;
@@ -95,7 +95,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."REGIONS_API" IS
     CURSOR cur_row IS
       SELECT *
         FROM "REGIONS"
-       WHERE COALESCE( "REGION_ID",-999999999999999.999999999999999 ) = COALESCE( p_region_id,-999999999999999.999999999999999 );
+       WHERE "REGION_ID" = p_region_id;
   BEGIN
     OPEN cur_row;
     FETCH cur_row INTO v_row;
@@ -112,13 +112,13 @@ CREATE OR REPLACE PACKAGE BODY "HR"."REGIONS_API" IS
   BEGIN
     IF row_exists ( p_region_id => p_region_id ) THEN
       v_row := read_row ( p_region_id => p_region_id );
-      -- update only,if the column values really differ
-      IF COALESCE( v_row."REGION_NAME",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_region_name,'@@@@@@@@@@@@@@@' )
+      -- update only, if the column values really differ
+      IF COALESCE(v_row."REGION_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_region_name, '@@@@@@@@@@@@@@@')
 
       THEN
         UPDATE REGIONS
            SET "REGION_NAME" = p_region_name
-         WHERE COALESCE( "REGION_ID",-999999999999999.999999999999999 ) = COALESCE( p_region_id,-999999999999999.999999999999999 );
+         WHERE "REGION_ID" = p_region_id;
       END IF;
     END IF;
   END update_row;

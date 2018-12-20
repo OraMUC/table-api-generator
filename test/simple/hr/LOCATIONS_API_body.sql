@@ -1,10 +1,10 @@
-CREATE OR REPLACE PACKAGE BODY "HR"."LOCATIONS_API" IS
+CREATE OR REPLACE PACKAGE BODY "TEST"."LOCATIONS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:39"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:13"
+   * generated_by="OGOBRECHT"
    */
 
   FUNCTION row_exists (
@@ -16,7 +16,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."LOCATIONS_API" IS
     CURSOR   cur_bool IS
       SELECT 1
         FROM "LOCATIONS"
-       WHERE COALESCE( "LOCATION_ID",-999999999999999.999999999999999 ) = COALESCE( p_location_id,-999999999999999.999999999999999 );
+       WHERE "LOCATION_ID" = p_location_id;
   BEGIN
     OPEN cur_bool;
     FETCH cur_bool INTO v_dummy;
@@ -123,7 +123,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."LOCATIONS_API" IS
     CURSOR cur_row IS
       SELECT *
         FROM "LOCATIONS"
-       WHERE COALESCE( "LOCATION_ID",-999999999999999.999999999999999 ) = COALESCE( p_location_id,-999999999999999.999999999999999 );
+       WHERE "LOCATION_ID" = p_location_id;
   BEGIN
     OPEN cur_row;
     FETCH cur_row INTO v_row;
@@ -144,12 +144,12 @@ CREATE OR REPLACE PACKAGE BODY "HR"."LOCATIONS_API" IS
   BEGIN
     IF row_exists ( p_location_id => p_location_id ) THEN
       v_row := read_row ( p_location_id => p_location_id );
-      -- update only,if the column values really differ
-      IF COALESCE( v_row."STREET_ADDRESS",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_street_address,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."POSTAL_CODE",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_postal_code,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."CITY",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_city,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."STATE_PROVINCE",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_state_province,'@@@@@@@@@@@@@@@' )
-      OR COALESCE( v_row."COUNTRY_ID",'@@@@@@@@@@@@@@@' ) <> COALESCE( p_country_id,'@@@@@@@@@@@@@@@' )
+      -- update only, if the column values really differ
+      IF COALESCE(v_row."STREET_ADDRESS", '@@@@@@@@@@@@@@@') <> COALESCE(p_street_address, '@@@@@@@@@@@@@@@')
+      OR COALESCE(v_row."POSTAL_CODE", '@@@@@@@@@@@@@@@') <> COALESCE(p_postal_code, '@@@@@@@@@@@@@@@')
+      OR v_row."CITY" <> p_city
+      OR COALESCE(v_row."STATE_PROVINCE", '@@@@@@@@@@@@@@@') <> COALESCE(p_state_province, '@@@@@@@@@@@@@@@')
+      OR COALESCE(v_row."COUNTRY_ID", '@@@@@@@@@@@@@@@') <> COALESCE(p_country_id, '@@@@@@@@@@@@@@@')
 
       THEN
         UPDATE LOCATIONS
@@ -158,7 +158,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."LOCATIONS_API" IS
                "CITY"           = p_city,
                "STATE_PROVINCE" = p_state_province,
                "COUNTRY_ID"     = p_country_id /*FK*/
-         WHERE COALESCE( "LOCATION_ID",-999999999999999.999999999999999 ) = COALESCE( p_location_id,-999999999999999.999999999999999 );
+         WHERE "LOCATION_ID" = p_location_id;
       END IF;
     END IF;
   END update_row;
@@ -264,7 +264,7 @@ CREATE OR REPLACE PACKAGE BODY "HR"."LOCATIONS_API" IS
     v_row."POSTAL_CODE"    := substr(sys_guid(),1,12);
     v_row."CITY"           := substr(sys_guid(),1,30);
     v_row."STATE_PROVINCE" := substr(sys_guid(),1,25);
-    v_row."COUNTRY_ID"     := 'AR' /*FK*/;
+    v_row."COUNTRY_ID"     := '16' /*FK*/;
     return v_row;
   END get_a_row;
 
