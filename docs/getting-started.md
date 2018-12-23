@@ -13,10 +13,11 @@ We recommend to install the package `om_tapigen` in a central tools schema. Beca
 
 1. Download the [latest version][latest] and unzip the source code
 1. Run the SQL script `install.sql` in the root folder or compile the spec and body of the package `om_tapigen` and optional `om_tapigen_oddgen_wrapper` for the SQL Developer integration
-1. Optional for central tools schema - grant execute rights: `GRANT EXECUTE ON om_tapigen TO PUBLIC;`
-1. Optional for central tools schema - create synonym:
-    - public in tools schema: `CREATE PUBLIC SYNONYM om_tapigen FOR om_tapigen;`
-    - or private in target schema: `CREATE SYNONYM om_tapigen FOR <yourToolsSchema>.om_tapigen;`
+1. If installed in central tools schema 
+    - grant execute rights: `GRANT EXECUTE ON om_tapigen TO PUBLIC;`
+    - create synonym:
+        - public in tools schema: `CREATE PUBLIC SYNONYM om_tapigen FOR om_tapigen;`
+        - or private in target schema: `CREATE SYNONYM om_tapigen FOR <yourToolsSchema>.om_tapigen;`
 
 [latest]: https://github.com/OraMUC/table-api-generator/releases/latest
 
