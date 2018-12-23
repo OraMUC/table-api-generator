@@ -9,7 +9,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
-- [0.5.0 (2018-12-xx)](#050-2018-12-xx)
+- [0.5.0 (2018-12-23)](#050-2018-12-23)
 - [0.4.1 (2017-05-27)](#041-2017-05-27)
 - [0.4.0 (2017-03-30)](#040-2017-03-30)
 - [0.3.0 (2016-07-03)](#030-2016-07-03)
@@ -18,7 +18,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- tocstop -->
 
-## 0.5.0 (2018-12-xx)
+## 0.5.0 (2018-12-23)
 
 Special thanks to Jacek Gębal (github.com/jgebal), Peter Ettinger (github.com/pettinger) and PaoloM (github.com/softinn72) for the valuable feedback in several issues.
 
