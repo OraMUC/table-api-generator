@@ -1,0 +1,69 @@
+sudo: required
+
+language: java
+jdk:
+  - oraclejdk8
+
+addons:
+  sonarqube:
+    organization: OraMUC
+    token:
+      secure: ${SONAR_TOKEN}
+    branches:
+      - develop
+      - master
+
+env:
+  global:
+    #Oracle 11g XE R2 variables
+    - ORACLE_COOKIE=sqldev
+    - ORACLE_FILE=oracle11g/xe/oracle-xe-11.2.0-1.0.x86_64.rpm.zip
+    - ORACLE_HOME=/u01/app/oracle/product/11.2.0/xe
+    - ORACLE_SID=XE
+    #Adding SQLPlus to path
+    - PATH=$PATH:$ORACLE_HOME/bin
+    # project variables
+    - DB_USER=demo
+    - DB_PASS=LHZYPbWvYdu2ctp8
+    #utPLSQL v3 vars
+    - UTPLSQL_DOWNLOAD_URL=$(curl --silent https://api.github.com/repos/utPLSQL/utPLSQL/releases/latest | awk '/browser_download_url/ { print $2 }' | grep ".tar.gz" | sed 's/"//g')
+    - UTPLSQL_DOWNLOAD_FILE="${UTPLSQL_DOWNLOAD_URL##*/}"
+    - UTPLSQL_DIR=utplsql
+    #utPLSQL-sql-cli vars
+    - UTPLSQL_SQL_CLI_DOWNLOAD_URL=$(curl --silent https://api.github.com/repos/utPLSQL/utPLSQL-sql-cli/releases/latest | awk '/tarball_url/ { print $2 }' | sed 's/"//g' | sed 's/,$//')
+    - UTPLSQL_SQL_CLI_DOWNLOAD_FILE=utplsql-sql-cli
+#    - UTPLSQL_SQL_CLI_DIR=utplsql-sql-cli
+
+before_install:
+  # download Oracle XE installer for Travis (oracle-travis project)
+  - wget 'https://github.com/cbandy/travis-oracle/archive/v2.0.2.tar.gz'
+  - mkdir -p .travis/oracle
+  - tar x -C .travis/oracle --strip-components=1 -f v2.0.2.tar.gz
+  - .travis/oracle/download.sh
+  # download latest release of utPLSQL
+  - wget "${UTPLSQL_DOWNLOAD_URL}"
+  - mkdir "${UTPLSQL_DIR}"
+  - tar x -C "${UTPLSQL_DIR}" --strip-components=1 -f "$UTPLSQL_DOWNLOAD_FILE"
+  # download latest release of utPLSQL-sql-cli
+  - curl -L "${UTPLSQL_SQL_CLI_DOWNLOAD_URL}" > "${UTPLSQL_SQL_CLI_DOWNLOAD_FILE}"
+  # extract downloaded file into current directory and remove containing folder
+  - tar x --strip-components=1 -f "$UTPLSQL_SQL_CLI_DOWNLOAD_FILE"
+
+install:
+  # Install Oracle Database
+  - .travis/oracle/install.sh
+  # Install utPLSQL
+  - .travis/install_utplsql.sh
+  # Install project
+  - .travis/setup_account.sh
+  # Install project sources and tests
+  - .travis/install_sources.sh
+  - .travis/install_tests.sh
+
+script:
+  # Install project sources and tests
+  - .travis/install_sources.sh
+  # Run tests
+  - ./ut_run ${DB_USER}/${DB_PASS} -source_path=. -test_path=test -f=ut_documentation_reporter -c -f=ut_coverage_sonar_reporter -o=coverage.xml -f=ut_sonar_test_reporter -o=test_results.xml
+#  # Run sonar scanner and publish to sonar
+#  - sonar-scanner

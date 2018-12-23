@@ -1,0 +1,11 @@
+{
+  "name": "om_tapigen",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npx ploc -i OM_TAPIGEN.pks -o README.md && npx markdown-toc -i --maxdepth 2 docs/parameters.md && npx markdown-toc -i --maxdepth 2 docs/getting-started.md && npx markdown-toc -i --maxdepth 2 docs/changelog.md"
+  },
+  "devDependencies": {
+    "markdown-toc": "^1.2.0",
+    "ploc": "^0.5.0"
+  }
+}
