@@ -1,6 +1,6 @@
 set define off verify off feedback off
 whenever sqlerror exit sql.sqlcode rollback
-
+whenever oserror exit 1 rollback
 
 prompt
 prompt
@@ -17,6 +17,6 @@ prompt Done :-)
 prompt
 prompt Don't forget to create a private or public synonym, 
 prompt if you installed in a central tools schema. Also see
-prompt https://github.com/OraMUC/table-api-generator/blob/0.5/docs/getting-started.md#installation
+prompt https://github.com/OraMUC/table-api-generator/blob/master/docs/getting-started.md
 prompt
 prompt
