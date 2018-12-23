@@ -4,6 +4,6 @@ BEGIN
   FOR i IN 1..3 LOOP
     EMPLOYEES_api.create_a_row;
   END LOOP;
-  ROLLBACK;
+  COMMIT;
 END;
 /

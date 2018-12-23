@@ -1,13 +1,13 @@
-CREATE OR REPLACE TRIGGER "HR"."LOCATIONS_IOIUD"
+CREATE OR REPLACE TRIGGER "TEST"."LOCATIONS_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON "LOCATIONS_DML_V"
   FOR EACH ROW
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:40"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:13"
+   * generated_by="OGOBRECHT"
    */
 BEGIN
   IF INSERTING THEN
@@ -31,5 +31,5 @@ BEGIN
   END IF;
 END "LOCATIONS_IOIUD";
 /
-ALTER TRIGGER "HR"."LOCATIONS_IOIUD" ENABLE;
+ALTER TRIGGER "TEST"."LOCATIONS_IOIUD" ENABLE;
 

@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
+CREATE OR REPLACE PACKAGE "TEST"."EMPLOYEES_API" IS
   /*
   This is the API for the table "EMPLOYEES".
 
@@ -8,12 +8,12 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0_b4"
+    generator_version="0.5.0"
     generator_action="COMPILE_API"
-    generated_at="2018-02-05 20:26:38"
-    generated_by="DECAF4"
+    generated_at="2018-12-20 19:43:15"
+    generated_by="OGOBRECHT"
     p_table_name="EMPLOYEES"
-    p_owner="HR"
+    p_owner="TEST"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -23,9 +23,9 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
     p_enable_proc_with_out_params="FALSE"
     p_enable_getter_and_setter="FALSE"
     p_col_prefix_in_method_names="TRUE"
-    p_return_row_instead_of_pk="FALSE"
+    p_return_row_instead_of_pk="TRUE"
     p_enable_dml_view="TRUE"
-    p_enable_generic_change_log="FALSE"
+    p_enable_generic_change_log="TRUE"
     p_api_name="EMPLOYEES_API"
     p_sequence_name="EMPLOYEES_SEQ"
     p_exclude_column_list=""
@@ -53,7 +53,7 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
 
   FUNCTION get_pk_by_unique_cols (
     p_email          IN "EMPLOYEES"."EMAIL"%TYPE /*UK*/ )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  RETURN "EMPLOYEES"%ROWTYPE;
 
   FUNCTION create_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT NULL /*PK*/,
@@ -67,7 +67,7 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
     p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT NULL,
     p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT NULL /*FK*/,
     p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT NULL /*FK*/ )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  RETURN "EMPLOYEES"%ROWTYPE;
 
   PROCEDURE create_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT NULL /*PK*/,
@@ -84,7 +84,7 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
 
   FUNCTION create_row (
     p_row            IN "EMPLOYEES"%ROWTYPE )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  RETURN "EMPLOYEES"%ROWTYPE;
 
   PROCEDURE create_row (
     p_row            IN "EMPLOYEES"%ROWTYPE );
@@ -125,7 +125,7 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
     p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE,
     p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE /*FK*/,
     p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE /*FK*/ )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  RETURN "EMPLOYEES"%ROWTYPE;
 
   PROCEDURE create_or_update_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -142,13 +142,17 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
 
   FUNCTION create_or_update_row (
     p_row            IN "EMPLOYEES"%ROWTYPE )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  RETURN "EMPLOYEES"%ROWTYPE;
 
   PROCEDURE create_or_update_row (
     p_row            IN "EMPLOYEES"%ROWTYPE );
 
   FUNCTION get_a_row
   RETURN "EMPLOYEES"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Returns a row with (hopefully) complete default data.
+   */
 
   FUNCTION create_a_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT get_a_row()."EMPLOYEE_ID" /*PK*/,
@@ -162,7 +166,11 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
     p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT get_a_row()."COMMISSION_PCT",
     p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
     p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT get_a_row()."DEPARTMENT_ID" /*FK*/ )
-  RETURN "EMPLOYEES"."EMPLOYEE_ID"%TYPE;
+  RETURN "EMPLOYEES"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   PROCEDURE create_a_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE    DEFAULT get_a_row()."EMPLOYEE_ID" /*PK*/,
@@ -176,9 +184,18 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
     p_commission_pct IN "EMPLOYEES"."COMMISSION_PCT"%TYPE DEFAULT get_a_row()."COMMISSION_PCT",
     p_manager_id     IN "EMPLOYEES"."MANAGER_ID"%TYPE     DEFAULT get_a_row()."MANAGER_ID" /*FK*/,
     p_department_id  IN "EMPLOYEES"."DEPARTMENT_ID"%TYPE  DEFAULT get_a_row()."DEPARTMENT_ID" /*FK*/ );
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   FUNCTION read_a_row
   RETURN "EMPLOYEES"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Fetch one row (the first the database delivers) without providing
+   * a primary key parameter.
+   */
 
   /*
   Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
@@ -191,11 +208,10 @@ CREATE OR REPLACE PACKAGE "HR"."EMPLOYEES_API" IS
     <column source="TAPIGEN" name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
     <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
     <column source="TAPIGEN" name="HIRE_DATE"><![CDATA[to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j')]]></column>
-    <column source="TAPIGEN" name="JOB_ID"><![CDATA['AC_ACCOUNT']]></column>
+    <column source="TAPIGEN" name="JOB_ID"><![CDATA['6A3FE8B021']]></column>
     <column source="USER"    name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
     <column source="TAPIGEN" name="COMMISSION_PCT"><![CDATA[round(dbms_random.value(0,.99),2)]]></column>
-    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
-    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[10]]></column>
+    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[1]]></column>
   </custom_defaults>
   */
 END "EMPLOYEES_API";

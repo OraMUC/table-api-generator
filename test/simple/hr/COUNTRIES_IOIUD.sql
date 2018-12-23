@@ -1,13 +1,13 @@
-CREATE OR REPLACE TRIGGER "HR"."COUNTRIES_IOIUD"
+CREATE OR REPLACE TRIGGER "TEST"."COUNTRIES_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON "COUNTRIES_DML_V"
   FOR EACH ROW
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0_b4"
+   * generator_version="0.5.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-02-05 20:26:37"
-   * generated_by="DECAF4"
+   * generated_at="2018-12-20 19:43:11"
+   * generated_by="OGOBRECHT"
    */
 BEGIN
   IF INSERTING THEN
@@ -25,5 +25,5 @@ BEGIN
   END IF;
 END "COUNTRIES_IOIUD";
 /
-ALTER TRIGGER "HR"."COUNTRIES_IOIUD" ENABLE;
+ALTER TRIGGER "TEST"."COUNTRIES_IOIUD" ENABLE;
 

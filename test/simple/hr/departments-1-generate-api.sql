@@ -27,11 +27,9 @@ BEGIN
     v_count
   FROM
     TABLE ( om_tapigen.view_existing_apis )
-  WHERE
-    owner = 'HR'
-    AND   table_name = 'DEPARTMENTS'
-    AND   spec_status = 'VALID'
-    AND   body_status = 'VALID';
+  WHERE table_name = 'DEPARTMENTS'
+    AND spec_status = 'VALID'
+    AND body_status = 'VALID';
 
   IF
     v_count = 0

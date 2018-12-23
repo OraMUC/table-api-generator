@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE "HR"."COUNTRIES_API" IS
+CREATE OR REPLACE PACKAGE "TEST"."COUNTRIES_API" IS
   /*
   This is the API for the table "COUNTRIES".
 
@@ -8,12 +8,12 @@ CREATE OR REPLACE PACKAGE "HR"."COUNTRIES_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0_b4"
+    generator_version="0.5.0"
     generator_action="COMPILE_API"
-    generated_at="2018-02-05 20:26:37"
-    generated_by="DECAF4"
+    generated_at="2018-12-20 19:43:11"
+    generated_by="OGOBRECHT"
     p_table_name="COUNTRIES"
-    p_owner="HR"
+    p_owner="TEST"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -101,20 +101,37 @@ CREATE OR REPLACE PACKAGE "HR"."COUNTRIES_API" IS
 
   FUNCTION get_a_row
   RETURN "COUNTRIES"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Returns a row with (hopefully) complete default data.
+   */
 
   FUNCTION create_a_row (
     p_country_id   IN "COUNTRIES"."COUNTRY_ID"%TYPE   DEFAULT get_a_row()."COUNTRY_ID" /*PK*/,
     p_country_name IN "COUNTRIES"."COUNTRY_NAME"%TYPE DEFAULT get_a_row()."COUNTRY_NAME",
     p_region_id    IN "COUNTRIES"."REGION_ID"%TYPE    DEFAULT get_a_row()."REGION_ID" /*FK*/ )
   RETURN "COUNTRIES"."COUNTRY_ID"%TYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   PROCEDURE create_a_row (
     p_country_id   IN "COUNTRIES"."COUNTRY_ID"%TYPE   DEFAULT get_a_row()."COUNTRY_ID" /*PK*/,
     p_country_name IN "COUNTRIES"."COUNTRY_NAME"%TYPE DEFAULT get_a_row()."COUNTRY_NAME",
     p_region_id    IN "COUNTRIES"."REGION_ID"%TYPE    DEFAULT get_a_row()."REGION_ID" /*FK*/ );
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   FUNCTION read_a_row
   RETURN "COUNTRIES"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Fetch one row (the first the database delivers) without providing
+   * a primary key parameter.
+   */
 
   /*
   Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
@@ -123,7 +140,7 @@ CREATE OR REPLACE PACKAGE "HR"."COUNTRIES_API" IS
   <custom_defaults>
     <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA[substr(sys_guid(),1,2)]]></column>
     <column source="TAPIGEN" name="COUNTRY_NAME"><![CDATA[substr(sys_guid(),1,40)]]></column>
-    <column source="TAPIGEN" name="REGION_ID"><![CDATA[1]]></column>
+    <column source="TAPIGEN" name="REGION_ID"><![CDATA[59777415]]></column>
   </custom_defaults>
   */
 END "COUNTRIES_API";

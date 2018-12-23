@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE "HR"."REGIONS_API" IS
+CREATE OR REPLACE PACKAGE "TEST"."REGIONS_API" IS
   /*
   This is the API for the table "REGIONS".
 
@@ -8,12 +8,12 @@ CREATE OR REPLACE PACKAGE "HR"."REGIONS_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0_b4"
+    generator_version="0.5.0"
     generator_action="COMPILE_API"
-    generated_at="2018-02-05 20:26:40"
-    generated_by="DECAF4"
+    generated_at="2018-12-20 19:43:13"
+    generated_by="OGOBRECHT"
     p_table_name="REGIONS"
-    p_owner="HR"
+    p_owner="TEST"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -96,18 +96,35 @@ CREATE OR REPLACE PACKAGE "HR"."REGIONS_API" IS
 
   FUNCTION get_a_row
   RETURN "REGIONS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Returns a row with (hopefully) complete default data.
+   */
 
   FUNCTION create_a_row (
     p_region_id   IN "REGIONS"."REGION_ID"%TYPE   DEFAULT get_a_row()."REGION_ID" /*PK*/,
     p_region_name IN "REGIONS"."REGION_NAME"%TYPE DEFAULT get_a_row()."REGION_NAME" )
   RETURN "REGIONS"."REGION_ID"%TYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   PROCEDURE create_a_row (
     p_region_id   IN "REGIONS"."REGION_ID"%TYPE   DEFAULT get_a_row()."REGION_ID" /*PK*/,
     p_region_name IN "REGIONS"."REGION_NAME"%TYPE DEFAULT get_a_row()."REGION_NAME" );
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Create a new row without (hopefully) providing any parameters.
+   */
 
   FUNCTION read_a_row
   RETURN "REGIONS"%ROWTYPE;
+  /**
+   * Helper mainly for testing and dummy data generation purposes.
+   * Fetch one row (the first the database delivers) without providing
+   * a primary key parameter.
+   */
 
   /*
   Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
