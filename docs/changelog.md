@@ -44,6 +44,7 @@ New parameters:
 
 Other things, mostly internals, the visible one is better formatted API code:
 
+- Support for Oracle 12c long identifiers
 - Rework pipelined table function `view_existing_apis` to be able to find also APIs with names other then `<TABLE_NAME>_API` since the API name is now changeable with the parameter `p_api_name`
 - Changed signatur of the helper method `create_change_log_entry` with column type parameters to support also varchar2 pk_id values (needed for natural pk's like an ISO currency code)
 - Enhanced template engine - Supports now dynamic substitutions:
