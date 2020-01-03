@@ -20,9 +20,8 @@ BEGIN
       <custom_defaults>
         <column name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
       </custom_defaults>
-    ]'
-)
-  );
+    ]'),
+    p_enable_bulk_methods           => TRUE);
 
   SELECT
     COUNT(*)

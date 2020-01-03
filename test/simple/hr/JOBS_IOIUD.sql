@@ -1,13 +1,13 @@
-CREATE OR REPLACE TRIGGER "TEST"."JOBS_IOIUD"
+CREATE OR REPLACE EDITIONABLE TRIGGER "HR"."JOBS_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON "JOBS_DML_V"
   FOR EACH ROW
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0"
+   * generator_version="0.7.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-12-20 19:43:14"
-   * generated_by="OGOBRECHT"
+   * generated_at="2020-01-03 21:39:44"
+   * generated_by="DATA-ABC\INFO"
    */
 BEGIN
   IF INSERTING THEN
@@ -27,5 +27,5 @@ BEGIN
   END IF;
 END "JOBS_IOIUD";
 /
-ALTER TRIGGER "TEST"."JOBS_IOIUD" ENABLE;
+ALTER TRIGGER "HR"."JOBS_IOIUD" ENABLE;
 
