@@ -859,12 +859,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         dbms_metadata.set_transform_param(dbms_metadata.session_transform, 'PRETTY', TRUE);
         CASE p_object_type
           WHEN 'PACKAGE' THEN
-            v_return := dbms_metadata.get_ddl(object_type => p_object_type, NAME => p_object_name, SCHEMA => p_owner);
-            v_return := ltrim(substr(v_return, 1, instr(v_return, 'CREATE OR REPLACE PACKAGE BODY') - 1),
-                              ' ' || chr(10));
+            v_return := dbms_metadata.get_ddl(object_type => 'PACKAGE_SPEC', NAME => p_object_name, SCHEMA => p_owner);
+--            v_return := ltrim(substr(v_return, 1, instr(v_return, 'CREATE OR REPLACE PACKAGE') - 1),
+--                              ' ' || chr(10));
           WHEN 'PACKAGE BODY' THEN
-            v_return := dbms_metadata.get_ddl(object_type => 'PACKAGE', NAME => p_object_name, SCHEMA => p_owner);
-            v_return := substr(v_return, instr(v_return, 'CREATE OR REPLACE PACKAGE BODY'));
+            v_return := dbms_metadata.get_ddl(object_type => 'PACKAGE_BODY', NAME => p_object_name, SCHEMA => p_owner);
+--            v_return := substr(v_return, instr(v_return, 'CREATE OR REPLACE PACKAGE BODY'));
           WHEN 'VIEW' THEN
             v_return := ltrim(regexp_replace(regexp_replace(dbms_metadata.get_ddl(object_type => p_object_type,
                                                                                   NAME        => p_object_name,

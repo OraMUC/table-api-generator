@@ -6,7 +6,7 @@ CREATE OR REPLACE EDITIONABLE TRIGGER "HR"."COUNTRIES_IOIUD"
    * generator="OM_TAPIGEN"
    * generator_version="0.7.0"
    * generator_action="COMPILE_API"
-   * generated_at="2020-01-03 21:39:39"
+   * generated_at="2020-01-03 22:14:26"
    * generated_by="DATA-ABC\INFO"
    */
 BEGIN
