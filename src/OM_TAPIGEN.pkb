@@ -1017,7 +1017,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         IF g_columns(i).is_excluded_yn = 'N' AND
             NOT (g_template_options.hide_identity_columns AND
                  nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT')) THEN
-          v_result(v_result.count + 1) := '        v_return(i)."' || g_columns(i).column_name || '"' || c_list_delimiter;
+          v_result(v_result.count + 1) := '      ' || CASE
+                                            WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_params.sequence_name IS NOT NULL THEN
+                                             'COALESCE( p_rows_tab(i)."' || g_columns(i).column_name || '", "' || g_params.sequence_name ||
+                                             '".nextval )'
+                                            ELSE
+                                             'p_rows_tab(i)."' || g_columns(i).column_name || '"'
+                                          END || c_list_delimiter;
         END IF;
       END LOOP;
     
@@ -1503,6 +1509,79 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       RETURN v_result;
     END list_pk_params;
     
+    -----------------------------------------------------------------------------
+    -- Primary key column definition for create_row:
+    -- {% LIST_PARAMS_PK %}
+    -- Example:
+    --   col1 table.col1%TYPE,
+    --   col2 table.col2%TYPE,
+    --   col3 table.col3%TYPE,
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_pk_columns RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+        v_result(v_result.count + 1) := '    "' ||
+                                        g_pk_columns(i).column_name ||
+                                        '" "' || g_params.table_name || '"."' || g_pk_columns(i).column_name ||
+                                        '"%TYPE /*PK*/' || c_list_delimiter;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+    
+      RETURN v_result;
+    END list_pk_columns;
+    
+    -----------------------------------------------------------------------------
+    -- Primary key column definition for create_row:
+    -- {% LIST_PARAMS_PK %}
+    -- Example:
+    --   col1,
+    --   col2,
+    --   col3,
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_pk_names RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+        v_result(v_result.count + 1) := '      "' ||
+                                        g_pk_columns(i).column_name ||
+                                        '" /*PK*/' || c_list_delimiter;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+    
+      RETURN v_result;
+    END list_pk_names;
+    
+    -----------------------------------------------------------------------------
+    -- Primary key column definition for create_row:
+    -- {% LIST_PARAMS_PK %}
+    -- Example:
+    --   v_return(i).col1 := v_pk_tab.col1;
+    --   v_return(i).col2 := v_pk_tab.col2;
+    --   v_return(i).col3 := v_pk_tab.col3;
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_pk_return_columns_bulk RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+        v_result(v_result.count + 1) := '    v_return(i)."' ||
+                                        g_pk_columns(i).column_name ||
+                                        '" := v_pk_tab(i)."' || g_pk_columns(i).column_name || '"; /*PK*/';
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(v_result(v_result.first));
+      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+    
+      RETURN v_result;
+    END list_pk_return_columns_bulk;
+    
   
     -----------------------------------------------------------------------------
     -- Primary key columns parameter compare for get_pk_by_unique_cols functions:
@@ -1558,6 +1637,61 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     
       RETURN v_result;
     END list_pk_column_bulk_compare;
+    
+    -----------------------------------------------------------------------------
+    -- Primary key columns parameter compare for get_pk_by_unique_cols functions:
+    -- {% LIST_PK_COLUMN_COMPARE %}
+    -- Example:
+    --       COALESCE( "COL1",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col1,'@@@@@@@@@@@@@@@' )
+    --   AND COALESCE( "COL2",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col2,'@@@@@@@@@@@@@@@' )
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_pk_column_fetch RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+        v_result(v_result.count + 1) := ', ' ||
+                                        util_get_attribute_compare(p_data_type         => g_pk_columns(i).data_type,
+                                                                   p_nullable          => util_string_to_bool(g_columns(g_columns_reverse_index(g_pk_columns(i).column_name)).is_nullable_yn),
+                                                                   p_first_attribute   => util_get_parameter_name(g_pk_columns(i).column_name,
+                                                                                                                  NULL),
+                                                                   p_second_attribute  => 'v_pk_rec."' || g_pk_columns(i).column_name || '"',
+                                                                   p_compare_operation => '=>');
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), ', ');
+    
+      v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
+    
+      RETURN v_result;
+    END list_pk_column_fetch;
+    
+    -----------------------------------------------------------------------------
+    -- Primary key columns parameter compare for get_pk_by_unique_cols functions:
+    -- {% LIST_PK_COLUMN_BULK_COMPARE %}
+    -- Example:
+    --       COALESCE( "COL1",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col1,'@@@@@@@@@@@@@@@' )
+    --   AND COALESCE( "COL2",'@@@@@@@@@@@@@@@' ) = COALESCE( p_col2,'@@@@@@@@@@@@@@@' )
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_pk_column_bulk_fetch RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+        v_result(v_result.count + 1) := '               ' || '                     AND ' ||
+                                        util_get_attribute_compare(p_data_type         => g_pk_columns(i).data_type,
+                                                                   p_nullable          => util_string_to_bool(g_columns(g_columns_reverse_index(g_pk_columns(i).column_name)).is_nullable_yn),
+                                                                   p_first_attribute   => 'data_table."' || g_pk_columns(i).column_name || '"',
+                                                                   p_second_attribute  => 'pk_collection."' || g_pk_columns(i).column_name || '"',
+                                                                   p_compare_operation => '=') || c_lf;
+      END LOOP;
+    
+      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), '                     AND ');
+    
+      v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
+    
+      RETURN v_result;
+    END list_pk_column_bulk_fetch;
   
     -----------------------------------------------------------------------------
     -- Primary key columns as "parameter => parameter" mapping for read_row functions:
@@ -1816,10 +1950,20 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_set_par_eq_rowtycol_wo_pk;
       WHEN 'LIST_PK_PARAMS' THEN
         RETURN list_pk_params;
+      WHEN 'LIST_PK_COLUMNS' THEN
+        RETURN list_pk_columns;
+      WHEN 'LIST_PK_NAMES' THEN
+        RETURN list_pk_names;
+      WHEN 'LIST_PK_RETURN_COLUMNS_BULK' THEN
+        RETURN list_pk_return_columns_bulk;
       WHEN 'LIST_PK_COLUMN_COMPARE' THEN
         RETURN list_pk_column_compare;
+      WHEN 'LIST_PK_COLUMN_FETCH' THEN
+        RETURN list_pk_column_fetch;
       WHEN 'LIST_PK_COLUMN_BULK_COMPARE' THEN
         RETURN list_pk_column_bulk_compare;
+      WHEN 'LIST_PK_COLUMN_BULK_FETCH' THEN
+        RETURN list_pk_column_bulk_fetch;
       WHEN 'LIST_PK_MAP_PARAM_EQ_PARAM' THEN
         RETURN list_pk_map_param_eq_param;
       WHEN 'LIST_PK_MAP_PARAM_EQ_OLDCOL' THEN
@@ -2688,6 +2832,8 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       util_debug_start_one_step(p_action => 'init_process_columns');
       -- init rpad
       g_status.rpad_columns := 0;
+      g_status.xmltype_column_present := FALSE;
+      
       FOR i IN g_columns.first .. g_columns.last LOOP
         -- calc rpad length
         IF length(g_columns(i).column_name) > g_status.rpad_columns THEN
@@ -3022,7 +3168,12 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
   processing like tabular forms you can optionally use the 
   {{ TABLE_NAME_MINUS_6 }}_DML_V. The instead of trigger for this view
   is calling simply this "{{ API_NAME }}".
-  */';
+  */' || case when g_status.xmltype_column_present then '
+  
+  /*This is required to handle column of datatype XMLTYPE for single row processing*/
+  TYPE t_pk_rec IS RECORD (
+    {% LIST_PK_COLUMNS %}
+  );' else null end;
   
       util_template_replace('API SPEC');
       g_code_blocks.template := '
@@ -3042,13 +3193,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_header_bulk IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_header_bulk');
-      g_code_blocks.template := '
+      g_code_blocks.template := case when g_status.xmltype_column_present then '
+  /*This is required to handle column of datatype XMLTYPE for bulk processing*/
+  TYPE t_pk_tab IS TABLE OF t_pk_rec;' else null end || '
   
   TYPE t_strong_ref_cursor IS REF CURSOR RETURN "{{ TABLE_NAME }}"%ROWTYPE;
-  TYPE t_rows_tab IS TABLE OF "{{ TABLE_NAME }}"%ROWTYPE;';
+  TYPE t_rows_tab IS TABLE OF "{{ TABLE_NAME }}"%ROWTYPE; ';  
    
-      util_template_replace('API SPEC');
-      
+      util_template_replace('API SPEC');      
       
       g_code_blocks.template := '
   
@@ -3169,23 +3321,24 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
   RETURN {{ RETURN_TYPE }} IS
-    v_return {{ RETURN_TYPE }};
+    v_return {{ RETURN_TYPE }}; ' || case when g_status.xmltype_column_present then '
+    
+    /*This is required to handle column of datatype XMLTYPE for single row processing*/
+    v_pk_rec t_pk_rec;' else null end || '
   BEGIN
     INSERT INTO "{{ TABLE_NAME }}" (
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
     VALUES (
-      {% LIST_INSERT_PARAMS hide_identity_columns=true %} )' || CASE
-                                  WHEN g_status.xmltype_column_present THEN
-                                   ';
-    -- returning clause does not support XMLTYPE,so we do here an extra fetch
-    v_return := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} ){{ RETURN_TYPE_READ_ROW }};'
-                                  ELSE
-                                   '
-    RETURN
+      {% LIST_INSERT_PARAMS hide_identity_columns=true %} )
+    RETURN ' || case when not g_status.xmltype_column_present then '
       {% RETURN_VALUE %}
-    INTO v_return;'
-                                END || CASE
-                                  WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+    INTO v_return;' else '
+      {% LIST_PK_NAMES %}
+    INTO v_pk_rec;
+    
+    /*Record has to be fetched again, because 
+      XMLType column can not be returned*/
+    v_return := read_row({% LIST_PK_COLUMN_FETCH %});' end || CASE WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
                                    '
     create_change_log_entry (
       p_table     => ''{{ TABLE_NAME }}'',
@@ -3193,7 +3346,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       p_pk_id     => {{ RETURN_TYPE_PK_SINGLE_COLUMN }},
       p_old_value => ''ROW CREATED'',
       p_new_value => ''ROW CREATED'' );'
-                                END || '
+                       END || '
+                       
     RETURN v_return;
   END create_row;';
     
@@ -3213,20 +3367,33 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
   FUNCTION create_rows(p_rows_tab IN t_rows_tab)
     RETURN t_rows_tab IS
-    v_return t_rows_tab;
-  BEGIN
-    v_return := p_rows_tab;'|| case when g_status.pk_is_multi_column= false AND g_params.sequence_name IS NOT NULL THEN '
-      
-    FOR i IN 1 .. v_return.COUNT
-    LOOP
-      v_return(i)."'||g_pk_columns(1).column_name||'" := COALESCE(v_return(i)."'||g_pk_columns(1).column_name||'", "'||g_params.sequence_name||'".NEXTVAL);
-    END LOOP;' else null end ||'
+    v_return t_rows_tab;' || CASE WHEN g_status.xmltype_column_present THEN '
     
+    /*This is required to handle column of datatype XMLTYPE for bulk processing*/
+    v_pk_tab t_pk_tab;
+    v_strong_ref_cursor t_strong_ref_cursor;' ELSE NULL END || '
+  BEGIN    
     FORALL i IN INDICES OF p_rows_tab
-      INSERT INTO "{{ TABLE_NAME }}" (
+    INSERT INTO "{{ TABLE_NAME }}" (
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
-      VALUES (
-      {% LIST_INSERT_BULK_PARAMS hide_identity_columns=true %} );
+    VALUES (
+      {% LIST_INSERT_BULK_PARAMS hide_identity_columns=true %} ) ' || CASE WHEN NOT g_status.xmltype_column_present THEN '
+    RETURN 
+      {% RETURN_VALUE %} BULK COLLECT INTO v_return;' ELSE '
+    RETURN 
+      {% LIST_PK_NAMES %} BULK COLLECT INTO v_pk_tab;
+      
+    /*Records have to be bulk-fetched again, because 
+      XMLType column can not be returned*/
+    OPEN v_strong_ref_cursor FOR SELECT data_table.* 
+                                   FROM "{{ TABLE_NAME }}" data_table INNER JOIN TABLE(v_pk_tab) pk_collection 
+                                     ON {% LIST_PK_COLUMN_BULK_FETCH %};
+     
+    /*no loop required here, because maximum bulk limit already given by 
+      the size of p_rows_tab*/
+    v_return := read_rows(p_ref_cursor => v_strong_ref_cursor);
+     
+    CLOSE v_strong_ref_cursor;' END || '
       
     RETURN v_return;
   END create_rows;';
