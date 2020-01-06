@@ -3515,10 +3515,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   IS
     v_row "{{ TABLE_NAME }}"%ROWTYPE;
   BEGIN
-    IF row_exists( {% LIST_PK_MAP_PARAM_EQ_PARAM %} ) THEN
-      v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-      {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
-    END IF;
+    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
+    {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
   END read_row;';
       util_template_replace('API BODY');
       util_debug_stop_one_step;
@@ -3574,15 +3572,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     v_row   "{{ TABLE_NAME }}"%ROWTYPE;
     {{ COUNTER_DECLARATION }}
   BEGIN
-    IF row_exists ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} ) THEN
-      v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-      -- update only, if the column values really differ
-      IF {% LIST_COLUMNS_WO_PK_COMPARE %}
-      THEN
-        UPDATE {{ TABLE_NAME }}
-           SET {% LIST_SET_COL_EQ_PARAM_WO_PK %}
-         WHERE {% LIST_PK_COLUMN_COMPARE %};
-      END IF;
+    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
+    -- update only, if the column values really differ
+    IF {% LIST_COLUMNS_WO_PK_COMPARE %}
+    THEN
+      UPDATE {{ TABLE_NAME }}
+         SET {% LIST_SET_COL_EQ_PARAM_WO_PK %}
+       WHERE {% LIST_PK_COLUMN_COMPARE %};
     END IF;
   END update_row;';
       util_template_replace('API BODY');
@@ -3797,23 +3793,21 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   IS
     v_row "{{ TABLE_NAME }}"%ROWTYPE;
   BEGIN
-    IF row_exists ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} ) THEN
-      v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-      -- update only,if the column value really differs
-      IF {{ I_COLUMN_COMPARE }} THEN
-        UPDATE {{ TABLE_NAME }}
-           SET "{{ I_COLUMN_NAME }}" = {{ I_PARAMETER_NAME }}
-         WHERE {% LIST_PK_COLUMN_COMPARE %};' || CASE
-                                      WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                       '
-        create_change_log_entry(
-          p_table     => ''{{ TABLE_NAME }}'',
-          p_column    => ''{{ I_COLUMN_NAME }}'',
-          p_pk_id     => {{ PARAMETER_PK_FIRST_COLUMN }},
-          p_old_value => {{ I_OLD_VALUE }},
-          p_new_value => {{ I_NEW_VALUE }} );'
-                                    END || '
-      END IF;
+    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
+    -- update only,if the column value really differs
+    IF {{ I_COLUMN_COMPARE }} THEN
+      UPDATE {{ TABLE_NAME }}
+         SET "{{ I_COLUMN_NAME }}" = {{ I_PARAMETER_NAME }}
+       WHERE {% LIST_PK_COLUMN_COMPARE %};' || CASE
+                                    WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
+                                     '
+      create_change_log_entry(
+        p_table     => ''{{ TABLE_NAME }}'',
+        p_column    => ''{{ I_COLUMN_NAME }}'',
+        p_pk_id     => {{ PARAMETER_PK_FIRST_COLUMN }},
+        p_old_value => {{ I_OLD_VALUE }},
+        p_new_value => {{ I_NEW_VALUE }} );'
+                                  END || '
     END IF;
   END set_{{ I_METHOD_NAME }};';
         
