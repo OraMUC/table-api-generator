@@ -3321,18 +3321,18 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
   RETURN {{ RETURN_TYPE }} IS
-    v_return {{ RETURN_TYPE }}; ' || case when g_status.xmltype_column_present then '
+    v_return {{ RETURN_TYPE }}; ' || CASE WHEN g_status.xmltype_column_present AND g_params.return_row_instead_of_pk THEN '
     
     /*This is required to handle column of datatype XMLTYPE for single row processing*/
-    v_pk_rec t_pk_rec;' else null end || '
+    v_pk_rec t_pk_rec;' ELSE NULL END || '
   BEGIN
     INSERT INTO "{{ TABLE_NAME }}" (
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
     VALUES (
       {% LIST_INSERT_PARAMS hide_identity_columns=true %} )
-    RETURN ' || case when not g_status.xmltype_column_present then '
+    RETURN ' || CASE WHEN NOT g_status.xmltype_column_present OR NOT g_params.return_row_instead_of_pk THEN '
       {% RETURN_VALUE %}
-    INTO v_return;' else '
+    INTO v_return;' ELSE '
       {% LIST_PK_NAMES %}
     INTO v_pk_rec;
     
