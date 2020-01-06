@@ -1,13 +1,13 @@
-CREATE OR REPLACE TRIGGER "TEST"."REGIONS_IOIUD"
+CREATE OR REPLACE EDITIONABLE TRIGGER "HR"."REGIONS_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON "REGIONS_DML_V"
   FOR EACH ROW
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0"
+   * generator_version="0.7.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-12-20 19:43:13"
-   * generated_by="OGOBRECHT"
+   * generated_at="2020-01-03 22:14:27"
+   * generated_by="DATA-ABC\INFO"
    */
 BEGIN
   IF INSERTING THEN
@@ -23,5 +23,5 @@ BEGIN
   END IF;
 END "REGIONS_IOIUD";
 /
-ALTER TRIGGER "TEST"."REGIONS_IOIUD" ENABLE;
+ALTER TRIGGER "HR"."REGIONS_IOIUD" ENABLE;
 

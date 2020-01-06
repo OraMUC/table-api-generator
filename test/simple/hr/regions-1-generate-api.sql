@@ -17,8 +17,8 @@ BEGIN
     p_custom_default_values         => xmltype(q'[
       <custom_defaults>
       </custom_defaults>
-    ]')
-  );
+    ]'),
+    p_enable_bulk_methods           => TRUE);
 
   SELECT
     COUNT(*)

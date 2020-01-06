@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS 
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.7.0';
 /**
 
 _This is an Oracle PL/SQL Table API Generator. It can be integrated in the
@@ -28,6 +28,8 @@ FEATURES
 - Standard CRUD methods (column and row type based) and an additional create 
   or update method
 - Insert / Update / Delete of rows can be enabled or disabled
+- Optional bulk methods for Reading Rows / Insert / Update / Delete for high
+  performant DML processing
 - Functions to check if a row exists (primary key based, returning boolean or 
   varchar2)
 - For each unique constraint a getter function to fetch the primary key
@@ -38,12 +40,12 @@ FEATURES
 - Checks for real changes during UPDATE operation and updates only if required
 - Supports APEX automatic row processing by generation of an optional updatable
   view with an instead of trigger (which calls simply the API and, if enabled, 
-  the generic logging)
+  the generic logging)  
 
 LICENSE
 
 - [The MIT License (MIT)](https://github.com/OraMUC/table-api-generator/blob/master/LICENSE.txt)
-- Copyright (c) 2015-2018 André Borngräber, Ottmar Gobrecht
+- Copyright (c) 2015-2020 André Borngräber, Ottmar Gobrecht
 
 We give our best to produce clean and robust code, but we are NOT responsible,
 if you loose any code or data by using this API generator. By using it you
@@ -102,12 +104,13 @@ c_false_return_row_instead_of_ CONSTANT BOOLEAN := FALSE;
 c_false_enable_dml_view        CONSTANT BOOLEAN := FALSE;
 c_false_enable_generic_change_ CONSTANT BOOLEAN := FALSE;
 c_false_enable_custom_defaults CONSTANT BOOLEAN := FALSE;
+c_true_enable_bulk_methods     CONSTANT BOOLEAN := TRUE;
 
 --------------------------------------------------------------------------------
 -- Subtypes (st_*)
 --------------------------------------------------------------------------------
-SUBTYPE st_session_module IS VARCHAR2(64);
-SUBTYPE st_session_action IS VARCHAR2(64);
+SUBTYPE st_session_module IS VARCHAR2(64 CHAR);
+SUBTYPE st_session_action IS VARCHAR2(64 CHAR);
 
 --------------------------------------------------------------------------------
 -- Public record (t_rec_*) and collection (t_tab_*) types
@@ -144,7 +147,8 @@ TYPE t_rec_existing_apis IS RECORD(
   p_sequence_name               all_objects.object_name%TYPE,
   p_exclude_column_list         VARCHAR2(4000 CHAR),
   p_enable_custom_defaults      VARCHAR2(5 CHAR),
-  p_custom_default_values       VARCHAR2(30 CHAR));
+  p_custom_default_values       VARCHAR2(30 CHAR),
+  p_enable_bulk_methods         VARCHAR2(5 CHAR));
 
 TYPE t_tab_existing_apis IS TABLE OF t_rec_existing_apis;
 
@@ -236,7 +240,8 @@ PROCEDURE compile_api
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
 );
 /**
 
@@ -270,7 +275,8 @@ FUNCTION compile_api_and_get_code
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
 ) RETURN CLOB;
 /**
 
@@ -308,7 +314,8 @@ FUNCTION get_code
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
 ) RETURN CLOB;
 /**
 

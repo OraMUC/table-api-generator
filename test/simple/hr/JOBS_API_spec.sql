@@ -1,4 +1,5 @@
-CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
+
+  CREATE OR REPLACE EDITIONABLE PACKAGE "HR"."JOBS_API" IS
   /*
   This is the API for the table "JOBS".
 
@@ -8,12 +9,12 @@ CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0"
+    generator_version="0.7.0"
     generator_action="COMPILE_API"
-    generated_at="2018-12-20 19:43:14"
-    generated_by="OGOBRECHT"
+    generated_at="2020-01-03 22:14:28"
+    generated_by="DATA-ABC\INFO"
     p_table_name="JOBS"
-    p_owner="TEST"
+    p_owner="HR"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -30,7 +31,8 @@ CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
     p_sequence_name=""
     p_exclude_column_list=""
     p_enable_custom_defaults="TRUE"
-    p_custom_default_values="SEE_END_OF_API_PACKAGE_SPEC"/>
+    p_custom_default_values="SEE_END_OF_API_PACKAGE_SPEC"
+    p_enable_bulk_methods="TRUE"/>
 
   This API provides DML functionality that can be easily called from APEX.
   Target of the table API is to encapsulate the table DML source code for
@@ -42,6 +44,17 @@ CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
   JOBS_DML_V. The instead of trigger for this view
   is calling simply this "JOBS_API".
   */
+
+  TYPE t_strong_ref_cursor IS REF CURSOR RETURN "JOBS"%ROWTYPE;
+  TYPE t_rows_tab IS TABLE OF "JOBS"%ROWTYPE;
+
+  FUNCTION bulk_is_complete
+    RETURN BOOLEAN;
+
+  PROCEDURE set_bulk_limit(p_bulk_limit IN PLS_INTEGER);
+
+  FUNCTION get_bulk_limit
+    RETURN PLS_INTEGER;
 
   FUNCTION row_exists (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE /*PK*/ )
@@ -71,9 +84,17 @@ CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
   PROCEDURE create_row (
     p_row        IN "JOBS"%ROWTYPE );
 
+  FUNCTION create_rows(p_rows_tab IN t_rows_tab)
+    RETURN t_rows_tab;
+
+  PROCEDURE create_rows(p_rows_tab IN t_rows_tab);
+
   FUNCTION read_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE /*PK*/ )
   RETURN "JOBS"%ROWTYPE;
+
+  FUNCTION read_rows(p_ref_cursor IN t_strong_ref_cursor)
+    RETURN t_rows_tab;
 
   PROCEDURE update_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -83,6 +104,8 @@ CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
 
   PROCEDURE update_row (
     p_row        IN "JOBS"%ROWTYPE );
+
+  PROCEDURE update_rows(p_rows_tab IN t_rows_tab);
 
   FUNCTION create_or_update_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -153,5 +176,4 @@ CREATE OR REPLACE PACKAGE "TEST"."JOBS_API" IS
   */
 END "JOBS_API";
 /
-
 

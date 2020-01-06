@@ -1,4 +1,4 @@
-CREATE OR REPLACE FORCE VIEW "TEST"."JOBS_DML_V" AS
+CREATE OR REPLACE FORCE EDITIONABLE VIEW "HR"."JOBS_DML_V" AS
 SELECT "JOB_ID" /*PK*/,
        "JOB_TITLE",
        "MIN_SALARY",
@@ -6,10 +6,10 @@ SELECT "JOB_ID" /*PK*/,
   FROM JOBS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0"
+   * generator_version="0.7.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-12-20 19:43:14"
-   * generated_by="OGOBRECHT"
+   * generated_at="2020-01-03 22:14:28"
+   * generated_by="DATA-ABC\INFO"
    */
     ;
 

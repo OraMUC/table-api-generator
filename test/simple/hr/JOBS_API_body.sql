@@ -1,11 +1,35 @@
-CREATE OR REPLACE PACKAGE BODY "TEST"."JOBS_API" IS
+
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."JOBS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0"
+   * generator_version="0.7.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-12-20 19:43:14"
-   * generated_by="OGOBRECHT"
+   * generated_at="2020-01-03 22:14:28"
+   * generated_by="DATA-ABC\INFO"
    */
+
+  g_bulk_limit     PLS_INTEGER := 10000;
+  g_bulk_completed BOOLEAN := FALSE;
+
+  FUNCTION bulk_is_complete
+    RETURN BOOLEAN
+  IS
+  BEGIN
+    RETURN g_bulk_completed;
+  END bulk_is_complete;
+
+  PROCEDURE set_bulk_limit(p_bulk_limit IN PLS_INTEGER)
+  IS
+  BEGIN
+    g_bulk_limit := p_bulk_limit;
+  END set_bulk_limit;
+
+  FUNCTION get_bulk_limit
+    RETURN PLS_INTEGER
+  IS
+  BEGIN
+    RETURN g_bulk_limit;
+  END get_bulk_limit;
 
   FUNCTION row_exists (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE /*PK*/ )
@@ -102,6 +126,34 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."JOBS_API" IS
       p_max_salary => p_row."MAX_SALARY" );
   END create_row;
 
+  FUNCTION create_rows(p_rows_tab IN t_rows_tab)
+    RETURN t_rows_tab IS
+    v_return t_rows_tab;
+  BEGIN
+    v_return := p_rows_tab;
+
+    FORALL i IN INDICES OF p_rows_tab
+      INSERT INTO "JOBS" (
+      "JOB_ID" /*PK*/,
+      "JOB_TITLE",
+      "MIN_SALARY",
+      "MAX_SALARY" )
+      VALUES (
+      v_return(i)."JOB_ID",
+        v_return(i)."JOB_TITLE",
+        v_return(i)."MIN_SALARY",
+        v_return(i)."MAX_SALARY" );
+
+    RETURN v_return;
+  END create_rows;
+
+  PROCEDURE create_rows(p_rows_tab IN t_rows_tab)
+  IS
+    v_return t_rows_tab;
+  BEGIN
+    v_return := create_rows(p_rows_tab => p_rows_tab);
+  END create_rows;
+
   FUNCTION read_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE /*PK*/ )
   RETURN "JOBS"%ROWTYPE IS
@@ -116,6 +168,26 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."JOBS_API" IS
     CLOSE cur_row;
     RETURN v_row;
   END read_row;
+
+  FUNCTION read_rows(p_ref_cursor IN t_strong_ref_cursor)
+    RETURN t_rows_tab
+  IS
+    v_return t_rows_tab;
+  BEGIN
+    IF (p_ref_cursor%ISOPEN)
+    THEN
+      g_bulk_completed := FALSE;
+
+      FETCH p_ref_cursor BULK COLLECT INTO v_return LIMIT g_bulk_limit;
+
+      IF (v_return.COUNT < g_bulk_limit)
+      THEN
+        g_bulk_completed := TRUE;
+      END IF;
+    END IF;
+
+    RETURN v_return;
+  END read_rows;
 
   PROCEDURE update_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -153,6 +225,17 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."JOBS_API" IS
       p_min_salary => p_row."MIN_SALARY",
       p_max_salary => p_row."MAX_SALARY" );
   END update_row;
+
+  PROCEDURE update_rows(p_rows_tab IN t_rows_tab)
+  IS
+  BEGIN
+    FORALL i IN INDICES OF p_rows_tab
+        UPDATE JOBS
+           SET "JOB_TITLE"  = p_rows_tab(i)."JOB_TITLE",
+               "MIN_SALARY" = p_rows_tab(i)."MIN_SALARY",
+               "MAX_SALARY" = p_rows_tab(i)."MAX_SALARY"
+         WHERE "JOB_ID" = p_rows_tab(i)."JOB_ID";
+  END update_rows;
 
   FUNCTION create_or_update_row (
     p_job_id     IN "JOBS"."JOB_ID"%TYPE DEFAULT NULL /*PK*/,

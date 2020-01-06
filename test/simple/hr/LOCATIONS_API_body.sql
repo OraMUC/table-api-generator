@@ -1,11 +1,35 @@
-CREATE OR REPLACE PACKAGE BODY "TEST"."LOCATIONS_API" IS
+
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."LOCATIONS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0"
+   * generator_version="0.7.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-12-20 19:43:13"
-   * generated_by="OGOBRECHT"
+   * generated_at="2020-01-03 22:14:27"
+   * generated_by="DATA-ABC\INFO"
    */
+
+  g_bulk_limit     PLS_INTEGER := 10000;
+  g_bulk_completed BOOLEAN := FALSE;
+
+  FUNCTION bulk_is_complete
+    RETURN BOOLEAN
+  IS
+  BEGIN
+    RETURN g_bulk_completed;
+  END bulk_is_complete;
+
+  PROCEDURE set_bulk_limit(p_bulk_limit IN PLS_INTEGER)
+  IS
+  BEGIN
+    g_bulk_limit := p_bulk_limit;
+  END set_bulk_limit;
+
+  FUNCTION get_bulk_limit
+    RETURN PLS_INTEGER
+  IS
+  BEGIN
+    RETURN g_bulk_limit;
+  END get_bulk_limit;
 
   FUNCTION row_exists (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE /*PK*/ )
@@ -116,6 +140,43 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."LOCATIONS_API" IS
       p_country_id     => p_row."COUNTRY_ID" /*FK*/ );
   END create_row;
 
+  FUNCTION create_rows(p_rows_tab IN t_rows_tab)
+    RETURN t_rows_tab IS
+    v_return t_rows_tab;
+  BEGIN
+    v_return := p_rows_tab;
+
+    FOR i IN 1 .. v_return.COUNT
+    LOOP
+      v_return(i)."LOCATION_ID" := COALESCE(v_return(i)."LOCATION_ID", "LOCATIONS_SEQ".NEXTVAL);
+    END LOOP;
+
+    FORALL i IN INDICES OF p_rows_tab
+      INSERT INTO "LOCATIONS" (
+      "LOCATION_ID" /*PK*/,
+      "STREET_ADDRESS",
+      "POSTAL_CODE",
+      "CITY",
+      "STATE_PROVINCE",
+      "COUNTRY_ID" /*FK*/ )
+      VALUES (
+      v_return(i)."LOCATION_ID",
+        v_return(i)."STREET_ADDRESS",
+        v_return(i)."POSTAL_CODE",
+        v_return(i)."CITY",
+        v_return(i)."STATE_PROVINCE",
+        v_return(i)."COUNTRY_ID" );
+
+    RETURN v_return;
+  END create_rows;
+
+  PROCEDURE create_rows(p_rows_tab IN t_rows_tab)
+  IS
+    v_return t_rows_tab;
+  BEGIN
+    v_return := create_rows(p_rows_tab => p_rows_tab);
+  END create_rows;
+
   FUNCTION read_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE /*PK*/ )
   RETURN "LOCATIONS"%ROWTYPE IS
@@ -130,6 +191,26 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."LOCATIONS_API" IS
     CLOSE cur_row;
     RETURN v_row;
   END read_row;
+
+  FUNCTION read_rows(p_ref_cursor IN t_strong_ref_cursor)
+    RETURN t_rows_tab
+  IS
+    v_return t_rows_tab;
+  BEGIN
+    IF (p_ref_cursor%ISOPEN)
+    THEN
+      g_bulk_completed := FALSE;
+
+      FETCH p_ref_cursor BULK COLLECT INTO v_return LIMIT g_bulk_limit;
+
+      IF (v_return.COUNT < g_bulk_limit)
+      THEN
+        g_bulk_completed := TRUE;
+      END IF;
+    END IF;
+
+    RETURN v_return;
+  END read_rows;
 
   PROCEDURE update_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -175,6 +256,19 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."LOCATIONS_API" IS
       p_state_province => p_row."STATE_PROVINCE",
       p_country_id     => p_row."COUNTRY_ID" /*FK*/ );
   END update_row;
+
+  PROCEDURE update_rows(p_rows_tab IN t_rows_tab)
+  IS
+  BEGIN
+    FORALL i IN INDICES OF p_rows_tab
+        UPDATE LOCATIONS
+           SET "STREET_ADDRESS" = p_rows_tab(i)."STREET_ADDRESS",
+               "POSTAL_CODE"    = p_rows_tab(i)."POSTAL_CODE",
+               "CITY"           = p_rows_tab(i)."CITY",
+               "STATE_PROVINCE" = p_rows_tab(i)."STATE_PROVINCE",
+               "COUNTRY_ID"     = p_rows_tab(i)."COUNTRY_ID" /*FK*/
+         WHERE "LOCATION_ID" = p_rows_tab(i)."LOCATION_ID";
+  END update_rows;
 
   FUNCTION create_or_update_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -264,7 +358,7 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."LOCATIONS_API" IS
     v_row."POSTAL_CODE"    := substr(sys_guid(),1,12);
     v_row."CITY"           := substr(sys_guid(),1,30);
     v_row."STATE_PROVINCE" := substr(sys_guid(),1,25);
-    v_row."COUNTRY_ID"     := '16' /*FK*/;
+    v_row."COUNTRY_ID"     := '09' /*FK*/;
     return v_row;
   END get_a_row;
 

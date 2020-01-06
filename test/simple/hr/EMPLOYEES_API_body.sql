@@ -1,11 +1,35 @@
-CREATE OR REPLACE PACKAGE BODY "TEST"."EMPLOYEES_API" IS
+
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."EMPLOYEES_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.5.0"
+   * generator_version="0.7.0"
    * generator_action="COMPILE_API"
-   * generated_at="2018-12-20 19:43:15"
-   * generated_by="OGOBRECHT"
+   * generated_at="2020-01-03 22:00:04"
+   * generated_by="DATA-ABC\INFO"
    */
+
+  g_bulk_limit     PLS_INTEGER := 10000;
+  g_bulk_completed BOOLEAN := FALSE;
+
+  FUNCTION bulk_is_complete
+    RETURN BOOLEAN
+  IS
+  BEGIN
+    RETURN g_bulk_completed;
+  END bulk_is_complete;
+
+  PROCEDURE set_bulk_limit(p_bulk_limit IN PLS_INTEGER)
+  IS
+  BEGIN
+    g_bulk_limit := p_bulk_limit;
+  END set_bulk_limit;
+
+  FUNCTION get_bulk_limit
+    RETURN PLS_INTEGER
+  IS
+  BEGIN
+    RETURN g_bulk_limit;
+  END get_bulk_limit;
 
   PROCEDURE create_change_log_entry (
     p_table     IN generic_change_log.gcl_table%TYPE,
@@ -202,6 +226,53 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."EMPLOYEES_API" IS
       p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
   END create_row;
 
+  FUNCTION create_rows(p_rows_tab IN t_rows_tab)
+    RETURN t_rows_tab IS
+    v_return t_rows_tab;
+  BEGIN
+    v_return := p_rows_tab;
+
+    FOR i IN 1 .. v_return.COUNT
+    LOOP
+      v_return(i)."EMPLOYEE_ID" := COALESCE(v_return(i)."EMPLOYEE_ID", "EMPLOYEES_SEQ".NEXTVAL);
+    END LOOP;
+
+    FORALL i IN INDICES OF p_rows_tab
+      INSERT INTO "EMPLOYEES" (
+      "EMPLOYEE_ID" /*PK*/,
+      "FIRST_NAME",
+      "LAST_NAME",
+      "EMAIL" /*UK*/,
+      "PHONE_NUMBER",
+      "HIRE_DATE",
+      "JOB_ID" /*FK*/,
+      "SALARY",
+      "COMMISSION_PCT",
+      "MANAGER_ID" /*FK*/,
+      "DEPARTMENT_ID" /*FK*/ )
+      VALUES (
+      v_return(i)."EMPLOYEE_ID",
+        v_return(i)."FIRST_NAME",
+        v_return(i)."LAST_NAME",
+        v_return(i)."EMAIL",
+        v_return(i)."PHONE_NUMBER",
+        v_return(i)."HIRE_DATE",
+        v_return(i)."JOB_ID",
+        v_return(i)."SALARY",
+        v_return(i)."COMMISSION_PCT",
+        v_return(i)."MANAGER_ID",
+        v_return(i)."DEPARTMENT_ID" );
+
+    RETURN v_return;
+  END create_rows;
+
+  PROCEDURE create_rows(p_rows_tab IN t_rows_tab)
+  IS
+    v_return t_rows_tab;
+  BEGIN
+    v_return := create_rows(p_rows_tab => p_rows_tab);
+  END create_rows;
+
   FUNCTION read_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE /*PK*/ )
   RETURN "EMPLOYEES"%ROWTYPE IS
@@ -231,6 +302,26 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."EMPLOYEES_API" IS
     CLOSE cur_row;
     RETURN v_row;
   END;
+
+  FUNCTION read_rows(p_ref_cursor IN t_strong_ref_cursor)
+    RETURN t_rows_tab
+  IS
+    v_return t_rows_tab;
+  BEGIN
+    IF (p_ref_cursor%ISOPEN)
+    THEN
+      g_bulk_completed := FALSE;
+
+      FETCH p_ref_cursor BULK COLLECT INTO v_return LIMIT g_bulk_limit;
+
+      IF (v_return.COUNT < g_bulk_limit)
+      THEN
+        g_bulk_completed := TRUE;
+      END IF;
+    END IF;
+
+    RETURN v_return;
+  END read_rows;
 
   PROCEDURE update_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -377,6 +468,24 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."EMPLOYEES_API" IS
       p_department_id  => p_row."DEPARTMENT_ID" /*FK*/ );
   END update_row;
 
+  PROCEDURE update_rows(p_rows_tab IN t_rows_tab)
+  IS
+  BEGIN
+    FORALL i IN INDICES OF p_rows_tab
+        UPDATE EMPLOYEES
+           SET "FIRST_NAME"     = p_rows_tab(i)."FIRST_NAME",
+               "LAST_NAME"      = p_rows_tab(i)."LAST_NAME",
+               "EMAIL"          = p_rows_tab(i)."EMAIL" /*UK*/,
+               "PHONE_NUMBER"   = p_rows_tab(i)."PHONE_NUMBER",
+               "HIRE_DATE"      = p_rows_tab(i)."HIRE_DATE",
+               "JOB_ID"         = p_rows_tab(i)."JOB_ID" /*FK*/,
+               "SALARY"         = p_rows_tab(i)."SALARY",
+               "COMMISSION_PCT" = p_rows_tab(i)."COMMISSION_PCT",
+               "MANAGER_ID"     = p_rows_tab(i)."MANAGER_ID" /*FK*/,
+               "DEPARTMENT_ID"  = p_rows_tab(i)."DEPARTMENT_ID" /*FK*/
+         WHERE "EMPLOYEE_ID" = p_rows_tab(i)."EMPLOYEE_ID";
+  END update_rows;
+
   FUNCTION create_or_update_row (
     p_employee_id    IN "EMPLOYEES"."EMPLOYEE_ID"%TYPE DEFAULT NULL /*PK*/,
     p_first_name     IN "EMPLOYEES"."FIRST_NAME"%TYPE,
@@ -501,10 +610,11 @@ CREATE OR REPLACE PACKAGE BODY "TEST"."EMPLOYEES_API" IS
     v_row."EMAIL"          := substr(sys_guid(),1,15) || '@dummy.com' /*UK*/;
     v_row."PHONE_NUMBER"   := substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20);
     v_row."HIRE_DATE"      := to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j');
-    v_row."JOB_ID"         := '6A3FE8B021' /*FK*/;
+    v_row."JOB_ID"         := '323358CFAE' /*FK*/;
     v_row."SALARY"         := round(dbms_random.value(1000,10000),2);
     v_row."COMMISSION_PCT" := round(dbms_random.value(0,.99),2);
-    v_row."DEPARTMENT_ID"  := 1 /*FK*/;
+    v_row."MANAGER_ID"     := 100 /*FK*/;
+    v_row."DEPARTMENT_ID"  := 10 /*FK*/;
     return v_row;
   END get_a_row;
 

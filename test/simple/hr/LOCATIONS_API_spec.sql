@@ -1,4 +1,5 @@
-CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
+
+  CREATE OR REPLACE EDITIONABLE PACKAGE "HR"."LOCATIONS_API" IS
   /*
   This is the API for the table "LOCATIONS".
 
@@ -8,12 +9,12 @@ CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.5.0"
+    generator_version="0.7.0"
     generator_action="COMPILE_API"
-    generated_at="2018-12-20 19:43:13"
-    generated_by="OGOBRECHT"
+    generated_at="2020-01-03 22:14:27"
+    generated_by="DATA-ABC\INFO"
     p_table_name="LOCATIONS"
-    p_owner="TEST"
+    p_owner="HR"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -30,7 +31,8 @@ CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
     p_sequence_name="LOCATIONS_SEQ"
     p_exclude_column_list=""
     p_enable_custom_defaults="TRUE"
-    p_custom_default_values="SEE_END_OF_API_PACKAGE_SPEC"/>
+    p_custom_default_values="SEE_END_OF_API_PACKAGE_SPEC"
+    p_enable_bulk_methods="TRUE"/>
 
   This API provides DML functionality that can be easily called from APEX.
   Target of the table API is to encapsulate the table DML source code for
@@ -42,6 +44,17 @@ CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
   LOCATIONS_DML_V. The instead of trigger for this view
   is calling simply this "LOCATIONS_API".
   */
+
+  TYPE t_strong_ref_cursor IS REF CURSOR RETURN "LOCATIONS"%ROWTYPE;
+  TYPE t_rows_tab IS TABLE OF "LOCATIONS"%ROWTYPE;
+
+  FUNCTION bulk_is_complete
+    RETURN BOOLEAN;
+
+  PROCEDURE set_bulk_limit(p_bulk_limit IN PLS_INTEGER);
+
+  FUNCTION get_bulk_limit
+    RETURN PLS_INTEGER;
 
   FUNCTION row_exists (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE /*PK*/ )
@@ -75,9 +88,17 @@ CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
   PROCEDURE create_row (
     p_row            IN "LOCATIONS"%ROWTYPE );
 
+  FUNCTION create_rows(p_rows_tab IN t_rows_tab)
+    RETURN t_rows_tab;
+
+  PROCEDURE create_rows(p_rows_tab IN t_rows_tab);
+
   FUNCTION read_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE /*PK*/ )
   RETURN "LOCATIONS"%ROWTYPE;
+
+  FUNCTION read_rows(p_ref_cursor IN t_strong_ref_cursor)
+    RETURN t_rows_tab;
 
   PROCEDURE update_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -89,6 +110,8 @@ CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
 
   PROCEDURE update_row (
     p_row            IN "LOCATIONS"%ROWTYPE );
+
+  PROCEDURE update_rows(p_rows_tab IN t_rows_tab);
 
   FUNCTION create_or_update_row (
     p_location_id    IN "LOCATIONS"."LOCATION_ID"%TYPE DEFAULT NULL /*PK*/,
@@ -164,10 +187,9 @@ CREATE OR REPLACE PACKAGE "TEST"."LOCATIONS_API" IS
     <column source="TAPIGEN" name="POSTAL_CODE"><![CDATA[substr(sys_guid(),1,12)]]></column>
     <column source="TAPIGEN" name="CITY"><![CDATA[substr(sys_guid(),1,30)]]></column>
     <column source="TAPIGEN" name="STATE_PROVINCE"><![CDATA[substr(sys_guid(),1,25)]]></column>
-    <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA['16']]></column>
+    <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA['09']]></column>
   </custom_defaults>
   */
 END "LOCATIONS_API";
 /
-
 
