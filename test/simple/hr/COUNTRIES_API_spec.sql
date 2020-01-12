@@ -1,5 +1,5 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE "HR"."COUNTRIES_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE "TESTS"."COUNTRIES_API" IS
   /*
   This is the API for the table "COUNTRIES".
 
@@ -9,12 +9,12 @@
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.7.0"
+    generator_version="0.5.0.2"
     generator_action="COMPILE_API"
-    generated_at="2020-01-03 22:14:26"
-    generated_by="DATA-ABC\INFO"
+    generated_at="2020-01-12 20:35:52"
+    generated_by="OGOBRECHT"
     p_table_name="COUNTRIES"
-    p_owner="HR"
+    p_owner="TESTS"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -163,6 +163,7 @@
   <custom_defaults>
     <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA[substr(sys_guid(),1,2)]]></column>
     <column source="TAPIGEN" name="COUNTRY_NAME"><![CDATA[substr(sys_guid(),1,40)]]></column>
+    <column source="TAPIGEN" name="REGION_ID"><![CDATA[116906565]]></column>
   </custom_defaults>
   */
 END "COUNTRIES_API";

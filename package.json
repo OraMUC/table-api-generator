@@ -11,7 +11,7 @@
     "prebuild": "npx ploc --in src/OM_TAPIGEN.pks --out README.md && npx markdown-toc -i --maxdepth 2 docs/parameters.md && npx markdown-toc -i --maxdepth 2 docs/getting-started.md && npx markdown-toc -i --maxdepth 2 docs/changelog.md",
     "build": "node src/build.js",
     "postbuild": "echo exit | sqlplus -S tests/oracle@localhost:1521/xepdb1 @om_tapigen_install.sql",
-    "watch": "chokidar src/OM_TAPIGEN.pks src/OM_TAPIGEN.pkb src/OM_TAPIGEN_ODDGEN_WRAPPER.pks src/OM_TAPIGEN_ODDGEN_WRAPPER.pkb src/om_tapigen_install.sql --initial -c \"npm run build\""
+    "watch": "chokidar src/*.pks src/*.pkb src/om_tapigen_install.sql --initial -c \"npm run build\""
   },
   "devDependencies": {
     "chokidar-cli": "^2.1.0",

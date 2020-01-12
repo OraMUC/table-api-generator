@@ -1,11 +1,11 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."JOBS_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "TESTS"."JOBS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.7.0"
+   * generator_version="0.5.0.2"
    * generator_action="COMPILE_API"
-   * generated_at="2020-01-03 22:14:28"
-   * generated_by="DATA-ABC\INFO"
+   * generated_at="2020-01-12 20:36:21"
+   * generated_by="OGOBRECHT"
    */
 
   g_bulk_limit     PLS_INTEGER := 10000;
@@ -198,20 +198,18 @@
     v_row   "JOBS"%ROWTYPE;
 
   BEGIN
-    IF row_exists ( p_job_id => p_job_id ) THEN
-      v_row := read_row ( p_job_id => p_job_id );
-      -- update only, if the column values really differ
-      IF v_row."JOB_TITLE" <> p_job_title
+    v_row := read_row ( p_job_id => p_job_id );
+    -- update only, if the column values really differ
+    IF v_row."JOB_TITLE" <> p_job_title
       OR COALESCE(v_row."MIN_SALARY", -999999999999999.999999999999999) <> COALESCE(p_min_salary, -999999999999999.999999999999999)
       OR COALESCE(v_row."MAX_SALARY", -999999999999999.999999999999999) <> COALESCE(p_max_salary, -999999999999999.999999999999999)
 
-      THEN
-        UPDATE JOBS
-           SET "JOB_TITLE"  = p_job_title,
+    THEN
+      UPDATE JOBS
+         SET "JOB_TITLE"  = p_job_title,
                "MIN_SALARY" = p_min_salary,
                "MAX_SALARY" = p_max_salary
-         WHERE "JOB_ID" = p_job_id;
-      END IF;
+       WHERE "JOB_ID" = p_job_id;
     END IF;
   END update_row;
 

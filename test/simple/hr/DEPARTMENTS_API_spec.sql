@@ -1,5 +1,5 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE "HR"."DEPARTMENTS_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE "TESTS"."DEPARTMENTS_API" IS
   /*
   This is the API for the table "DEPARTMENTS".
 
@@ -9,12 +9,12 @@
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.7.0"
+    generator_version="0.5.0.2"
     generator_action="COMPILE_API"
-    generated_at="2020-01-03 22:14:26"
-    generated_by="DATA-ABC\INFO"
+    generated_at="2020-01-12 20:36:01"
+    generated_by="OGOBRECHT"
     p_table_name="DEPARTMENTS"
-    p_owner="HR"
+    p_owner="TESTS"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -170,6 +170,7 @@
   <custom_defaults>
     <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA["DEPARTMENTS_SEQ".nextval]]></column>
     <column source="TAPIGEN" name="DEPARTMENT_NAME"><![CDATA[substr(sys_guid(),1,30)]]></column>
+    <column source="TAPIGEN" name="LOCATION_ID"><![CDATA[1]]></column>
   </custom_defaults>
   */
 END "DEPARTMENTS_API";

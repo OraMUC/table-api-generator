@@ -1,4 +1,4 @@
-CREATE OR REPLACE FORCE EDITIONABLE VIEW "HR"."EMPLOYEES_DML_V" AS
+CREATE OR REPLACE FORCE EDITIONABLE VIEW "TESTS"."EMPLOYEES_DML_V" AS
 SELECT "EMPLOYEE_ID" /*PK*/,
        "FIRST_NAME",
        "LAST_NAME",
@@ -13,10 +13,10 @@ SELECT "EMPLOYEE_ID" /*PK*/,
   FROM EMPLOYEES
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.7.0"
+   * generator_version="0.5.0.2"
    * generator_action="COMPILE_API"
-   * generated_at="2020-01-03 22:00:04"
-   * generated_by="DATA-ABC\INFO"
+   * generated_at="2020-01-12 20:36:29"
+   * generated_by="OGOBRECHT"
    */
     ;
 

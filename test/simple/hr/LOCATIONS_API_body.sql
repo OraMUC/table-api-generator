@@ -1,11 +1,11 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."LOCATIONS_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "TESTS"."LOCATIONS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.7.0"
+   * generator_version="0.5.0.2"
    * generator_action="COMPILE_API"
-   * generated_at="2020-01-03 22:14:27"
-   * generated_by="DATA-ABC\INFO"
+   * generated_at="2020-01-12 20:36:08"
+   * generated_by="OGOBRECHT"
    */
 
   g_bulk_limit     PLS_INTEGER := 10000;
@@ -223,24 +223,22 @@
     v_row   "LOCATIONS"%ROWTYPE;
 
   BEGIN
-    IF row_exists ( p_location_id => p_location_id ) THEN
-      v_row := read_row ( p_location_id => p_location_id );
-      -- update only, if the column values really differ
-      IF COALESCE(v_row."STREET_ADDRESS", '@@@@@@@@@@@@@@@') <> COALESCE(p_street_address, '@@@@@@@@@@@@@@@')
+    v_row := read_row ( p_location_id => p_location_id );
+    -- update only, if the column values really differ
+    IF COALESCE(v_row."STREET_ADDRESS", '@@@@@@@@@@@@@@@') <> COALESCE(p_street_address, '@@@@@@@@@@@@@@@')
       OR COALESCE(v_row."POSTAL_CODE", '@@@@@@@@@@@@@@@') <> COALESCE(p_postal_code, '@@@@@@@@@@@@@@@')
       OR v_row."CITY" <> p_city
       OR COALESCE(v_row."STATE_PROVINCE", '@@@@@@@@@@@@@@@') <> COALESCE(p_state_province, '@@@@@@@@@@@@@@@')
       OR COALESCE(v_row."COUNTRY_ID", '@@@@@@@@@@@@@@@') <> COALESCE(p_country_id, '@@@@@@@@@@@@@@@')
 
-      THEN
-        UPDATE LOCATIONS
-           SET "STREET_ADDRESS" = p_street_address,
+    THEN
+      UPDATE LOCATIONS
+         SET "STREET_ADDRESS" = p_street_address,
                "POSTAL_CODE"    = p_postal_code,
                "CITY"           = p_city,
                "STATE_PROVINCE" = p_state_province,
                "COUNTRY_ID"     = p_country_id /*FK*/
-         WHERE "LOCATION_ID" = p_location_id;
-      END IF;
+       WHERE "LOCATION_ID" = p_location_id;
     END IF;
   END update_row;
 
@@ -358,7 +356,7 @@
     v_row."POSTAL_CODE"    := substr(sys_guid(),1,12);
     v_row."CITY"           := substr(sys_guid(),1,30);
     v_row."STATE_PROVINCE" := substr(sys_guid(),1,25);
-    v_row."COUNTRY_ID"     := '09' /*FK*/;
+    v_row."COUNTRY_ID"     := '9B' /*FK*/;
     return v_row;
   END get_a_row;
 

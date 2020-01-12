@@ -1,11 +1,11 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."REGIONS_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "TESTS"."REGIONS_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.7.0"
+   * generator_version="0.5.0.2"
    * generator_action="COMPILE_API"
-   * generated_at="2020-01-03 22:14:27"
-   * generated_by="DATA-ABC\INFO"
+   * generated_at="2020-01-12 20:36:14"
+   * generated_by="OGOBRECHT"
    */
 
   g_bulk_limit     PLS_INTEGER := 10000;
@@ -178,16 +178,14 @@
     v_row   "REGIONS"%ROWTYPE;
 
   BEGIN
-    IF row_exists ( p_region_id => p_region_id ) THEN
-      v_row := read_row ( p_region_id => p_region_id );
-      -- update only, if the column values really differ
-      IF COALESCE(v_row."REGION_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_region_name, '@@@@@@@@@@@@@@@')
+    v_row := read_row ( p_region_id => p_region_id );
+    -- update only, if the column values really differ
+    IF COALESCE(v_row."REGION_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_region_name, '@@@@@@@@@@@@@@@')
 
-      THEN
-        UPDATE REGIONS
-           SET "REGION_NAME" = p_region_name
-         WHERE "REGION_ID" = p_region_id;
-      END IF;
+    THEN
+      UPDATE REGIONS
+         SET "REGION_NAME" = p_region_name
+       WHERE "REGION_ID" = p_region_id;
     END IF;
   END update_row;
 

@@ -1,3 +1,3 @@
 echo off
 set NLS_LANG=AMERICAN_AMERICA.AL32UTF8
-echo exit | sqlplus test/oracle@localhost:1521/xe @automatic-tests.sql
+echo exit | sqlplus tests/oracle@localhost:1521/xepdb1 @automatic-tests.sql

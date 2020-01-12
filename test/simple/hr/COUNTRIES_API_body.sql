@@ -1,11 +1,11 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."COUNTRIES_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "TESTS"."COUNTRIES_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.7.0"
+   * generator_version="0.5.0.2"
    * generator_action="COMPILE_API"
-   * generated_at="2020-01-03 22:14:26"
-   * generated_by="DATA-ABC\INFO"
+   * generated_at="2020-01-12 20:35:52"
+   * generated_by="OGOBRECHT"
    */
 
   g_bulk_limit     PLS_INTEGER := 10000;
@@ -188,18 +188,16 @@
     v_row   "COUNTRIES"%ROWTYPE;
 
   BEGIN
-    IF row_exists ( p_country_id => p_country_id ) THEN
-      v_row := read_row ( p_country_id => p_country_id );
-      -- update only, if the column values really differ
-      IF COALESCE(v_row."COUNTRY_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_country_name, '@@@@@@@@@@@@@@@')
+    v_row := read_row ( p_country_id => p_country_id );
+    -- update only, if the column values really differ
+    IF COALESCE(v_row."COUNTRY_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_country_name, '@@@@@@@@@@@@@@@')
       OR COALESCE(v_row."REGION_ID", -999999999999999.999999999999999) <> COALESCE(p_region_id, -999999999999999.999999999999999)
 
-      THEN
-        UPDATE COUNTRIES
-           SET "COUNTRY_NAME" = p_country_name,
+    THEN
+      UPDATE COUNTRIES
+         SET "COUNTRY_NAME" = p_country_name,
                "REGION_ID"    = p_region_id /*FK*/
-         WHERE "COUNTRY_ID" = p_country_id;
-      END IF;
+       WHERE "COUNTRY_ID" = p_country_id;
     END IF;
   END update_row;
 
@@ -287,6 +285,7 @@
   BEGIN
     v_row."COUNTRY_ID"   := substr(sys_guid(),1,2) /*PK*/;
     v_row."COUNTRY_NAME" := substr(sys_guid(),1,40);
+    v_row."REGION_ID"    := 116906565 /*FK*/;
     return v_row;
   END get_a_row;
 

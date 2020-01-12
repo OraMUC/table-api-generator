@@ -1,11 +1,11 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "HR"."EMPLOYEES_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE BODY "TESTS"."EMPLOYEES_API" IS
   /**
    * generator="OM_TAPIGEN"
-   * generator_version="0.7.0"
+   * generator_version="0.5.0.2"
    * generator_action="COMPILE_API"
-   * generated_at="2020-01-03 22:00:04"
-   * generated_by="DATA-ABC\INFO"
+   * generated_at="2020-01-12 20:36:29"
+   * generated_by="OGOBRECHT"
    */
 
   g_bulk_limit     PLS_INTEGER := 10000;
@@ -339,10 +339,9 @@
     v_row   "EMPLOYEES"%ROWTYPE;
     v_count PLS_INTEGER := 0;
   BEGIN
-    IF row_exists ( p_employee_id => p_employee_id ) THEN
-      v_row := read_row ( p_employee_id => p_employee_id );
-      -- update only, if the column values really differ
-      IF COALESCE(v_row."FIRST_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_first_name, '@@@@@@@@@@@@@@@') THEN
+    v_row := read_row ( p_employee_id => p_employee_id );
+    -- update only, if the column values really differ
+    IF COALESCE(v_row."FIRST_NAME", '@@@@@@@@@@@@@@@') <> COALESCE(p_first_name, '@@@@@@@@@@@@@@@') THEN
         v_count := v_count + 1;
         create_change_log_entry (
           p_table     => 'EMPLOYEES',
@@ -433,9 +432,9 @@
           p_new_value => to_char(p_department_id) );
       END IF;
       IF v_count > 0
-      THEN
-        UPDATE EMPLOYEES
-           SET "FIRST_NAME"     = p_first_name,
+    THEN
+      UPDATE EMPLOYEES
+         SET "FIRST_NAME"     = p_first_name,
                "LAST_NAME"      = p_last_name,
                "EMAIL"          = p_email /*UK*/,
                "PHONE_NUMBER"   = p_phone_number,
@@ -445,8 +444,7 @@
                "COMMISSION_PCT" = p_commission_pct,
                "MANAGER_ID"     = p_manager_id /*FK*/,
                "DEPARTMENT_ID"  = p_department_id /*FK*/
-         WHERE "EMPLOYEE_ID" = p_employee_id;
-      END IF;
+       WHERE "EMPLOYEE_ID" = p_employee_id;
     END IF;
   END update_row;
 
@@ -610,11 +608,9 @@
     v_row."EMAIL"          := substr(sys_guid(),1,15) || '@dummy.com' /*UK*/;
     v_row."PHONE_NUMBER"   := substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20);
     v_row."HIRE_DATE"      := to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j');
-    v_row."JOB_ID"         := '323358CFAE' /*FK*/;
     v_row."SALARY"         := round(dbms_random.value(1000,10000),2);
     v_row."COMMISSION_PCT" := round(dbms_random.value(0,.99),2);
-    v_row."MANAGER_ID"     := 100 /*FK*/;
-    v_row."DEPARTMENT_ID"  := 10 /*FK*/;
+    v_row."DEPARTMENT_ID"  := 1 /*FK*/;
     return v_row;
   END get_a_row;
 

@@ -1,5 +1,5 @@
 
-  CREATE OR REPLACE EDITIONABLE PACKAGE "HR"."LOCATIONS_API" IS
+  CREATE OR REPLACE EDITIONABLE PACKAGE "TESTS"."LOCATIONS_API" IS
   /*
   This is the API for the table "LOCATIONS".
 
@@ -9,12 +9,12 @@
   - Read the docs under github.com/OraMUC/table-api-generator ;-)
   <options
     generator="OM_TAPIGEN"
-    generator_version="0.7.0"
+    generator_version="0.5.0.2"
     generator_action="COMPILE_API"
-    generated_at="2020-01-03 22:14:27"
-    generated_by="DATA-ABC\INFO"
+    generated_at="2020-01-12 20:36:08"
+    generated_by="OGOBRECHT"
     p_table_name="LOCATIONS"
-    p_owner="HR"
+    p_owner="TESTS"
     p_reuse_existing_api_params="FALSE"
     p_enable_insertion_of_rows="TRUE"
     p_enable_column_defaults="TRUE"
@@ -187,7 +187,7 @@
     <column source="TAPIGEN" name="POSTAL_CODE"><![CDATA[substr(sys_guid(),1,12)]]></column>
     <column source="TAPIGEN" name="CITY"><![CDATA[substr(sys_guid(),1,30)]]></column>
     <column source="TAPIGEN" name="STATE_PROVINCE"><![CDATA[substr(sys_guid(),1,25)]]></column>
-    <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA['09']]></column>
+    <column source="TAPIGEN" name="COUNTRY_ID"><![CDATA['9B']]></column>
   </custom_defaults>
   */
 END "LOCATIONS_API";
