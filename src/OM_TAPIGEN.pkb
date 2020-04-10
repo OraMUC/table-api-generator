@@ -1553,7 +1553,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
-        v_result(v_result.count + 1) := '      "' ||
+        v_result(v_result.count + 1) := '     "' ||
                                         g_pk_columns(i).column_name ||
                                         '" /*PK*/' || c_list_delimiter;
       END LOOP;
@@ -1601,7 +1601,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
-        v_result(v_result.count + 1) := '               AND ' ||
+        v_result(v_result.count + 1) := '         AND ' ||
                                         util_get_attribute_compare(p_data_type         => g_pk_columns(i).data_type,
                                                                    p_nullable          => util_string_to_bool(g_columns(g_columns_reverse_index(g_pk_columns(i).column_name)).is_nullable_yn),
                                                                    p_first_attribute   => '"' || g_pk_columns(i).column_name || '"',
@@ -1629,7 +1629,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
-        v_result(v_result.count + 1) := '               AND ' ||
+        v_result(v_result.count + 1) := '         AND ' ||
                                         util_get_attribute_compare(p_data_type         => g_pk_columns(i).data_type,
                                                                    p_nullable          => util_string_to_bool(g_columns(g_columns_reverse_index(g_pk_columns(i).column_name)).is_nullable_yn),
                                                                    p_first_attribute   => '"' || g_pk_columns(i).column_name || '"',
@@ -2271,6 +2271,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         ELSE
           v_dynamic_result(1) := '"' || g_pk_columns(1).column_name || '"';
         END IF;
+      ELSIF v_match = 'RETURN_VALUE_BULK' THEN
+        v_dynamic_result := util_generate_list('LIST_COLUMNS_W_PK_FULL');
       ELSE
         raise_application_error(c_generator_error_number,
                                 'FIXME: Bug - dynamic substitution ' || v_match || ' not defined');
@@ -3385,9 +3387,11 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     VALUES (
       {% LIST_INSERT_BULK_PARAMS hide_identity_columns=true %} ) ' || CASE WHEN NOT g_status.xmltype_column_present THEN '
     RETURN 
-      {% RETURN_VALUE %} BULK COLLECT INTO v_return;' ELSE '
+      {% RETURN_VALUE_BULK %} 
+    BULK COLLECT INTO v_return;' ELSE '
     RETURN 
-      {% LIST_PK_NAMES %} BULK COLLECT INTO v_pk_tab;
+      {% LIST_PK_NAMES %} 
+    BULK COLLECT INTO v_pk_tab;
       
     /*Records have to be bulk-fetched again, because 
       XMLType column can not be returned*/
@@ -3737,8 +3741,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       
       g_code_blocks.template := '
 
-    PROCEDURE update_row (
-      {% LIST_PARAMS_W_PK %} );';
+  PROCEDURE update_row (
+    {% LIST_PARAMS_W_PK %} );';
         util_template_replace('API SPEC');
       
       -- check if additional columns exist that are 
@@ -3749,32 +3753,32 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       IF v_other_cols.count > 0 THEN
         g_code_blocks.template := '
 
-    PROCEDURE update_row (
-      {% LIST_PARAMS_W_PK %} )
-    IS
-      v_row   "{{ TABLE_NAME }}"%ROWTYPE;
-      {{ COUNTER_DECLARATION }}
-    BEGIN
-      v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-      -- update only, if the column values really differ
-      IF {% LIST_COLUMNS_WO_PK_COMPARE %}
-      THEN
-        UPDATE {{ TABLE_NAME }}
-           SET {% LIST_SET_COL_EQ_PARAM_WO_PK %}
-         WHERE {% LIST_PK_COLUMN_COMPARE %};
-      END IF;
-    END update_row;';
+  PROCEDURE update_row (
+    {% LIST_PARAMS_W_PK %} )
+  IS
+    v_row   "{{ TABLE_NAME }}"%ROWTYPE;
+    {{ COUNTER_DECLARATION }}
+  BEGIN
+    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
+    -- update only, if the column values really differ
+    IF {% LIST_COLUMNS_WO_PK_COMPARE %}
+    THEN
+      UPDATE {{ TABLE_NAME }}
+         SET {% LIST_SET_COL_EQ_PARAM_WO_PK %}
+       WHERE {% LIST_PK_COLUMN_COMPARE %};
+    END IF;
+  END update_row;';
       ELSE
         g_code_blocks.template := '
 
-    PROCEDURE update_row (
-      {% LIST_PARAMS_W_PK %} )
-    IS
-    BEGIN
-      -- there is no column anymore to update! All remaining columns are part 
-      -- of the primary key or excluded via exclude column list
-      NULL;
-    END update_row;';
+  PROCEDURE update_row (
+    {% LIST_PARAMS_W_PK %} )
+  IS
+  BEGIN
+    -- there is no column anymore to update! All remaining columns are part 
+    -- of the primary key or excluded via exclude column list
+    NULL;
+  END update_row;';
       END IF;
       
       util_template_replace('API BODY');
@@ -3822,24 +3826,24 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       IF v_other_cols.count > 0 THEN
         g_code_blocks.template := '      
 
-    PROCEDURE update_rows(p_rows_tab IN t_rows_tab)
-    IS
-    BEGIN
-      FORALL i IN INDICES OF p_rows_tab
-          UPDATE {{ TABLE_NAME }}
-             SET {% LIST_SET_COL_EQ_PARAM_BULK_WO_PK %}
-           WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};
-    END update_rows;';
+  PROCEDURE update_rows(p_rows_tab IN t_rows_tab)
+  IS
+  BEGIN
+    FORALL i IN INDICES OF p_rows_tab
+      UPDATE {{ TABLE_NAME }}
+         SET {% LIST_SET_COL_EQ_PARAM_BULK_WO_PK %}
+       WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};
+  END update_rows;';
       ELSE
         g_code_blocks.template := '      
 
-    PROCEDURE update_rows(p_rows_tab IN t_rows_tab)
-    IS
-    BEGIN
-      -- there is no column anymore to update! All remaining columns are part 
-      -- of the primary key or excluded via exclude column list
-      NULL;
-    END update_rows;';
+  PROCEDURE update_rows(p_rows_tab IN t_rows_tab)
+  IS
+  BEGIN
+    -- there is no column anymore to update! All remaining columns are part 
+    -- of the primary key or excluded via exclude column list
+    NULL;
+  END update_rows;';
       END IF;
       
       util_template_replace('API BODY');
