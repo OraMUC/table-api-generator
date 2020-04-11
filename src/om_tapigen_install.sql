@@ -3,7 +3,7 @@ whenever sqlerror exit sql.sqlcode rollback
 whenever oserror exit 1 rollback
 
 prompt
-prompt Install  github.com/OraMUC/table-api-generator
+prompt Install github.com/OraMUC/table-api-generator
 prompt ============================================================
 
 prompt Compile package om_tapigen (spec)
@@ -25,7 +25,7 @@ show errors
 prompt ============================================================
 prompt Installation Done
 prompt
-prompt Don't forget to create a private or public synonym, 
+prompt Don't forget to create a private or public synonym,
 prompt if you installed in a central tools schema. Also see
 prompt https://github.com/OraMUC/table-api-generator/blob/master/docs/getting-started.md
 prompt

@@ -1,0 +1,17 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+[*]
+trim_trailing_whitespace = true
+
+[*.{md}]
+trim_trailing_whitespace = false
+
+[*.{sql,pks,pkb,json}]
+indent_style = space
+indent_size = 2
+
+[*.{sql,pks,pkb,json,md,txt,bat}]
+charset = utf-8

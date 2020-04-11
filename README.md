@@ -24,7 +24,7 @@ Oracle PL/SQL Table API Generator
 <h2><a id="om_tapigen"></a>Package om_tapigen</h2>
 <!----------------------------------------------->
 
-_This table API generator can be integrated in the Oracle SQL-Developer with an 
+_This table API generator can be integrated in the Oracle SQL-Developer with an
 additional wrapper package for the [SQL Developer extension oddgen](https://www.oddgen.org/)._
 
 The effort of generated API's is to reduce your PL/SQL code by calling standard
@@ -45,12 +45,12 @@ FEATURES
 - You only need to specify generation options once per table - parameters are
   saved in the package spec source and can be reused for regeneration
 - Highly configurable
-- Standard CRUD methods (column and row type based) and an additional create 
+- Standard CRUD methods (column and row type based) and an additional create
   or update method
 - Insert / Update / Delete of rows can be enabled or disabled
 - Optional bulk methods for Reading Rows / Insert / Update / Delete for high
   performant DML processing
-- Functions to check if a row exists (primary key based, returning boolean or 
+- Functions to check if a row exists (primary key based, returning boolean or
   varchar2)
 - For each unique constraint a getter function to fetch the primary key
 - Optional getter and setter for each column
@@ -59,8 +59,8 @@ FEATURES
   history in the user interface)
 - Checks for real changes during UPDATE operation and updates only if required
 - Supports APEX automatic row processing by generation of an optional updatable
-  view with an instead of trigger (which calls simply the API and, if enabled, 
-  the generic logging)  
+  view with an instead of trigger (which calls simply the API and, if enabled,
+  the generic logging)
 
 LICENSE
 
@@ -93,9 +93,9 @@ LINKS
 SIGNATURE
 
 ```sql
-PACKAGE om_tapigen AUTHID CURRENT_USER IS 
+PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.2';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.3';
 ```
 
 
@@ -133,6 +133,8 @@ PROCEDURE compile_api
   p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
+  p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
   p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
   p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
@@ -177,6 +179,8 @@ FUNCTION compile_api_and_get_code
   p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
+  p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
   p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
   p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
@@ -187,7 +191,7 @@ FUNCTION compile_api_and_get_code
 <h2><a id="get_code"></a>Function get_code</h2>
 <!-------------------------------------------->
 
-Generates the code and returns it as a CLOB. When the defaults are used you 
+Generates the code and returns it as a CLOB. When the defaults are used you
 need only to provide the table name.
 
 This function is called by the oddgen wrapper for the SQL Developer integration.
@@ -215,7 +219,7 @@ FUNCTION get_code
   p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
   p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix, -- If true, the param names of methods will be prefixed with 'p_'.
   p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa, -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
-  p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette, -- prefixedIf true, for each column get and set methods are created.
+  p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette, -- If true, for each column get and set methods are created.
   p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na, -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
   p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
   p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
@@ -223,6 +227,8 @@ FUNCTION get_code
   p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
+  p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
   p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
   p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
@@ -312,8 +318,8 @@ FUNCTION util_get_column_data_default
 <h2><a id="util_get_cons_search_condition"></a>Function util_get_cons_search_condition</h2>
 <!---------------------------------------------------------------------------------------->
 
-Helper to read a constraint search condition from the dictionary (not needed 
-in 12cR1 and above, there we have a column search_condition_vc in 
+Helper to read a constraint search condition from the dictionary (not needed
+in 12cR1 and above, there we have a column search_condition_vc in
 user_constraints).
 
 SIGNATURE
@@ -351,7 +357,7 @@ FUNCTION util_split_to_table
 <h2><a id="util_get_ora_max_name_len"></a>Function util_get_ora_max_name_len</h2>
 <!------------------------------------------------------------------------------>
 
-Helper function to determine the maximum length for an identifier name (e.g. 
+Helper function to determine the maximum length for an identifier name (e.g.
 column name). Returns the package constant c_ora_max_name_len, which is
 determined by a conditional compilation.
 
@@ -368,7 +374,7 @@ FUNCTION util_get_ora_max_name_len RETURN INTEGER;
 Enable (and reset) the debugging (previous debug data will be lost)
 
 ```sql
-BEGIN 
+BEGIN
   om_tapigen.util_set_debug_on;
 END;
 ```
@@ -386,7 +392,7 @@ PROCEDURE util_set_debug_on;
 Disable the debugging
 
 ```sql
-BEGIN 
+BEGIN
   om_tapigen.util_set_debug_off;
 END;
 ```
@@ -401,7 +407,7 @@ PROCEDURE util_set_debug_off;
 <h2><a id="util_view_debug_log"></a>Function util_view_debug_log</h2>
 <!------------------------------------------------------------------>
 
-View the debug details. Maximum 999 API creations are captured for memory 
+View the debug details. Maximum 999 API creations are captured for memory
 reasons. You can reset the debugging by calling `om_tapigen.util_set_debug_on`.
 
 ```sql
