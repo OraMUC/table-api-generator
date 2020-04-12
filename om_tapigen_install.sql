@@ -5644,6 +5644,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
   c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #TABLE_NAME_26#_SEQ)';
   c_exclude_column_list         CONSTANT param_type := 'Exclude column list (comma separated)';
+  c_audit_column_mappings       CONSTANT param_type := 'Audit column mappings (comma separated)';
+  c_audit_user_expression       CONSTANT param_type := 'Audit user expression';
   c_enable_custom_defaults      CONSTANT param_type := 'Enable custom defaults (additional methods)';
   c_custom_default_values       CONSTANT param_type := 'Custom default values (XMLTYPE)';
   c_enable_bulk_methods         CONSTANT param_type := 'Enable bulk processing methods';
@@ -5692,6 +5694,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_api_name) := NULL;
     v_params(c_sequence_name) := NULL;
     v_params(c_exclude_column_list) := NULL;
+    v_params(c_audit_column_mappings) := NULL;
+    v_params(c_audit_user_expression) := om_tapigen.c_audit_user_expression;
     v_params(c_enable_custom_defaults) := util_bool_to_string(om_tapigen.c_false_enable_custom_defaults);
     v_params(c_custom_default_values) := NULL;
     v_params(c_enable_bulk_methods) := util_bool_to_string(om_tapigen.c_true_enable_bulk_methods);
@@ -5716,6 +5720,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
                         c_api_name,
                         c_sequence_name,
                         c_exclude_column_list,
+                        c_audit_column_mappings,
+                        c_audit_user_expression,
                         c_enable_custom_defaults,
                         c_custom_default_values,
                         c_enable_bulk_methods);
@@ -5764,6 +5770,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
                                p_api_name                    => in_params(c_api_name),
                                p_sequence_name               => in_params(c_sequence_name),
                                p_exclude_column_list         => in_params(c_exclude_column_list),
+                               p_audit_column_mappings       => in_params(c_audit_column_mappings),
+                               p_audit_user_expression       => in_params(c_audit_user_expression),
                                p_enable_custom_defaults      => util_string_to_bool(in_params(c_enable_custom_defaults)),
                                p_custom_default_values       => CASE
                                                                   WHEN in_params(c_custom_default_values) IS NOT NULL THEN
