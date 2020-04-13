@@ -20,7 +20,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_audit_user_expression       CONSTANT param_type := 'Audit user expression';
   c_enable_custom_defaults      CONSTANT param_type := 'Enable custom defaults (additional methods)';
   c_custom_default_values       CONSTANT param_type := 'Custom default values (XMLTYPE)';
-  c_enable_bulk_methods         CONSTANT param_type := 'Enable bulk processing methods';
 
   FUNCTION util_string_to_bool(p_string IN VARCHAR2) RETURN BOOLEAN IS
   BEGIN
@@ -70,7 +69,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_audit_user_expression) := om_tapigen.c_audit_user_expression;
     v_params(c_enable_custom_defaults) := util_bool_to_string(om_tapigen.c_false_enable_custom_defaults);
     v_params(c_custom_default_values) := NULL;
-    v_params(c_enable_bulk_methods) := util_bool_to_string(om_tapigen.c_true_enable_bulk_methods);
     RETURN v_params;
   END get_params;
 
@@ -95,8 +93,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
                         c_audit_column_mappings,
                         c_audit_user_expression,
                         c_enable_custom_defaults,
-                        c_custom_default_values,
-                        c_enable_bulk_methods);
+                        c_custom_default_values);
   END get_ordered_params;
 
   FUNCTION get_lov RETURN t_lov IS
@@ -115,7 +112,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_lov(c_enable_dml_view) := NEW t_string('true', 'false');
     v_lov(c_enable_generic_change_log) := NEW t_string('true', 'false');
     v_lov(c_enable_custom_defaults) := NEW t_string('true', 'false');
-    v_lov(c_enable_bulk_methods) := NEW t_string('true', 'false');
     RETURN v_lov;
   END get_lov;
 
@@ -150,8 +146,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
                                                                    xmltype(in_params(c_custom_default_values))
                                                                   ELSE
                                                                    NULL
-                                                                END,
-                               p_enable_bulk_methods         => util_string_to_bool(in_params(c_enable_bulk_methods)));
+                                                                END);
   END generate;
 
 END om_tapigen_oddgen_wrapper;

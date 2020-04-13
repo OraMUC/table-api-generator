@@ -38,8 +38,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     audit_user_expression       VARCHAR2(4000 CHAR),
     enable_custom_defaults      BOOLEAN,
     custom_default_values       xmltype,
-    custom_defaults_serialized  VARCHAR2(32767 CHAR),
-    enable_bulk_methods         BOOLEAN);
+    custom_defaults_serialized  VARCHAR2(32767 CHAR));
 
   TYPE t_rec_status IS RECORD(
     pk_is_multi_column     BOOLEAN,
@@ -2205,8 +2204,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(util_bool_to_string(g_params.enable_getter_and_setter));
         WHEN 'ENABLE_PROC_WITH_OUT_PARAMS' THEN
           code_append(util_bool_to_string(g_params.enable_proc_with_out_params));
-        WHEN 'ENABLE_BULK_METHODS' THEN
-          code_append(util_bool_to_string(g_params.enable_bulk_methods));
         WHEN 'ENABLE_PARAMETER_PREFIXES' THEN
           code_append(util_bool_to_string(g_params.enable_parameter_prefixes));
         WHEN 'RETURN_ROW_INSTEAD_OF_PK' THEN
@@ -2403,8 +2400,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_audit_column_mappings       IN VARCHAR2,
     p_audit_user_expression       IN VARCHAR2,
     p_enable_custom_defaults      IN BOOLEAN,
-    p_custom_default_values       IN xmltype,
-    p_enable_bulk_methods         IN BOOLEAN
+    p_custom_default_values       IN xmltype
   ) IS
 
     -----------------------------------------------------------------------------
@@ -2571,14 +2567,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                            ELSE
                                             p_enable_custom_defaults
                                          END;
-
-      g_params.enable_bulk_methods := CASE
-                                        WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                         coalesce(util_string_to_bool(g_params_existing_api.p_enable_bulk_methods),
-                                                  c_true_enable_bulk_methods)
-                                        ELSE
-                                         p_enable_bulk_methods
-                                      END;
       util_debug_stop_one_step;
     END init_process_parameters;
 
@@ -3295,8 +3283,7 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
     p_audit_column_mappings="{{ AUDIT_COLUMN_MAPPINGS }}"
     p_audit_user_expression="{{ AUDIT_USER_EXPRESSION }}"
     p_enable_custom_defaults="{{ ENABLE_CUSTOM_DEFAULTS }}"
-    p_custom_default_values="{{ CUSTOM_DEFAULTS }}"
-    p_enable_bulk_methods="{{ ENABLE_BULK_METHODS }}"/>
+    p_custom_default_values="{{ CUSTOM_DEFAULTS }}"/>
 
   This API provides DML functionality that can be easily called from APEX.
   Target of the table API is to encapsulate the table DML source code for
@@ -4547,12 +4534,10 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     gen_header;
 
     -- bulk header if choosen
-    IF g_params.enable_bulk_methods THEN
-      gen_header_bulk;
-      gen_bulk_is_complete_fnc;
-      gen_set_bulk_limit_prc;
-      gen_get_bulk_limit_fnc;
-    END IF;
+    gen_header_bulk;
+    gen_bulk_is_complete_fnc;
+    gen_set_bulk_limit_prc;
+    gen_get_bulk_limit_fnc;
 
     IF g_status.xmltype_column_present THEN
       gen_xml_compare_fnc;
@@ -4565,58 +4550,44 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     gen_row_exists_fnc;
     gen_row_exists_yn_fnc;
 
-    -- GET_PK_BY_UNIQUE_COLS functions only if no multi row pk is present
-    -- use overloaded READ_ROW functions with unique params instead
+    -- GET_PK_BY_UNIQUE_COLS methods only if no multi row pk is present
+    -- use overloaded READ_ROW methods with unique params instead
     IF NOT g_status.pk_is_multi_column THEN
       gen_get_pk_by_unique_cols_fnc;
     END IF;
 
-    -- CREATE procedures/functions only if allowed
+    -- CREATE methods
     IF g_params.enable_insertion_of_rows THEN
       gen_create_row_fnc;
       gen_create_row_prc;
       gen_create_rowtype_fnc;
       gen_create_rowtype_prc;
-
-      IF g_params.enable_bulk_methods THEN
-        gen_create_rows_bulk_fnc;
-        gen_create_rows_bulk_prc;
-      END IF;
+      gen_create_rows_bulk_fnc;
+      gen_create_rows_bulk_prc;
     END IF;
 
-    -- READ procedures
+    -- READ methods
     gen_read_row_fnc;
-
     gen_read_row_by_uk_fnc;
     IF g_params.enable_proc_with_out_params THEN
       gen_read_row_prc;
     END IF;
+    gen_read_rows_bulk_fnc;
 
-    -- bulk read_rows if choosen
-    IF g_params.enable_bulk_methods THEN
-      gen_read_rows_bulk_fnc;
-    END IF;
-
-    -- UPDATE procedures/functions only if allowed
+    -- UPDATE methods
     IF g_params.enable_update_of_rows THEN
       gen_update_row_prc;
       gen_update_rowtype_prc;
-
-      IF g_params.enable_bulk_methods THEN
-        gen_update_rows_bulk_prc;
-      END IF;
+      gen_update_rows_bulk_prc;
     END IF;
 
-    -- DELETE procedures only if allowed
+    -- DELETE methods
     IF g_params.enable_deletion_of_rows THEN
       gen_delete_row_prc;
-
-      IF g_params.enable_bulk_methods THEN
-        gen_delete_rows_bulk_prc;
-      END IF;
+      gen_delete_rows_bulk_prc;
     END IF;
 
-    -- CREATE or UPDATE procedures/functions only if both is allowed
+    -- CREATE or UPDATE methods
     IF g_params.enable_insertion_of_rows AND g_params.enable_update_of_rows THEN
       gen_createorupdate_row_fnc;
       gen_createorupdate_row_prc;
@@ -4624,12 +4595,12 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       gen_createorupdate_rowtype_prc;
     END IF;
 
-    -- GETTER procedures/functions always
+    -- GETTER methods
     IF g_params.enable_getter_and_setter THEN
       gen_getter_functions;
     END IF;
 
-    -- SETTER procedures/functions only if allowed
+    -- SETTER methods
     IF g_params.enable_update_of_rows AND g_params.enable_getter_and_setter THEN
       gen_setter_procedures;
     END IF;
@@ -4644,7 +4615,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
     gen_footer;
 
-    -- DML View and Trigger only if allowed
+    -- DML View and Trigger
     IF g_params.enable_dml_view THEN
       gen_dml_view;
       gen_dml_view_trigger;
@@ -4735,8 +4706,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,
     p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
-    p_custom_default_values       IN xmltype DEFAULT NULL,
-    p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods
+    p_custom_default_values       IN xmltype DEFAULT NULL
   ) IS
   BEGIN
     util_debug_start_one_run(p_generator_action => 'compile API', p_table_name => p_table_name, p_owner => p_owner);
@@ -4761,8 +4731,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
               p_enable_custom_defaults      => p_enable_custom_defaults,
-              p_custom_default_values       => p_custom_default_values,
-              p_enable_bulk_methods         => p_enable_bulk_methods);
+              p_custom_default_values       => p_custom_default_values);
     main_generate_code;
     main_compile_code;
     util_debug_stop_one_run;
@@ -4792,8 +4761,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,
     p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
-    p_custom_default_values       IN xmltype DEFAULT NULL,
-    p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods
+    p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
   BEGIN
     util_debug_start_one_run(p_generator_action => 'compile API, get code',
@@ -4821,8 +4789,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
               p_enable_custom_defaults      => p_enable_custom_defaults,
-              p_custom_default_values       => p_custom_default_values,
-              p_enable_bulk_methods         => p_enable_bulk_methods);
+              p_custom_default_values       => p_custom_default_values);
     main_generate_code;
     main_compile_code;
     util_debug_stop_one_run;
@@ -4853,8 +4820,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,
     p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
-    p_custom_default_values       IN xmltype DEFAULT NULL,
-    p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods
+    p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
   BEGIN
     util_debug_start_one_run(p_generator_action => 'get code', p_table_name => p_table_name, p_owner => p_owner);
@@ -4879,8 +4845,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
               p_enable_custom_defaults      => p_enable_custom_defaults,
-              p_custom_default_values       => p_custom_default_values,
-              p_enable_bulk_methods         => p_enable_bulk_methods);
+              p_custom_default_values       => p_custom_default_values);
     main_generate_code;
     util_debug_stop_one_run;
     RETURN main_return_code;
@@ -4989,8 +4954,7 @@ WITH api_names AS (
                 x.p_audit_column_mappings,
                 x.p_audit_user_expression,
                 x.p_enable_custom_defaults,
-                x.p_custom_default_values,
-                x.p_enable_bulk_methods
+                x.p_custom_default_values
            FROM sources t
                 CROSS JOIN
                 XMLTABLE (
@@ -5021,8 +4985,7 @@ WITH api_names AS (
                            p_audit_column_mappings       VARCHAR2 (4000 CHAR) PATH ''@p_audit_column_mappings'',
                            p_audit_user_expression       VARCHAR2 (4000 CHAR) PATH ''@p_audit_user_expression'',
                            p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_custom_defaults'',
-                           p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'',
-                           p_enable_bulk_methods         VARCHAR2 (5 CHAR)    PATH ''@p_enable_bulk_methods'') x
+                           p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'') x
      ) -- select * from apis;
      , objects AS (
          SELECT specs.object_name   AS package_name,
@@ -5085,8 +5048,7 @@ SELECT NULL AS errors,
        apis.p_audit_column_mappings,
        apis.p_audit_user_expression,
        apis.p_enable_custom_defaults,
-       apis.p_custom_default_values,
-       apis.p_enable_bulk_methods
+       apis.p_custom_default_values
   FROM apis JOIN objects ON apis.package_name = objects.package_name
  WHERE table_name = NVL ( :p_table_name, table_name)
             ' BULK COLLECT

@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.5';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.6';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -105,7 +105,6 @@ c_false_return_row_instead_of_ CONSTANT BOOLEAN := FALSE;
 c_false_enable_dml_view        CONSTANT BOOLEAN := FALSE;
 c_false_enable_generic_change_ CONSTANT BOOLEAN := FALSE;
 c_false_enable_custom_defaults CONSTANT BOOLEAN := FALSE;
-c_true_enable_bulk_methods     CONSTANT BOOLEAN := TRUE;
 c_audit_user_expression        CONSTANT VARCHAR2(128 CHAR) := q'[coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'))]';
 
 --------------------------------------------------------------------------------
@@ -151,8 +150,7 @@ TYPE t_rec_existing_apis IS RECORD(
   p_audit_column_mappings       VARCHAR2(4000 CHAR),
   p_audit_user_expression       VARCHAR2(4000 CHAR),
   p_enable_custom_defaults      VARCHAR2(5 CHAR),
-  p_custom_default_values       VARCHAR2(30 CHAR),
-  p_enable_bulk_methods         VARCHAR2(5 CHAR));
+  p_custom_default_values       VARCHAR2(30 CHAR));
 
 TYPE t_tab_existing_apis IS TABLE OF t_rec_existing_apis;
 
@@ -257,8 +255,7 @@ PROCEDURE compile_api
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
   p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
-  p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
+  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 );
 /**
 
@@ -294,8 +291,7 @@ FUNCTION compile_api_and_get_code
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
   p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
-  p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
+  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 ) RETURN CLOB;
 /**
 
@@ -335,8 +331,7 @@ FUNCTION get_code
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
   p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
   p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                     , -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
-  p_enable_bulk_methods         IN BOOLEAN DEFAULT om_tapigen.c_true_enable_bulk_methods      -- If true, additional CRUD methods are created for bulk processing (read_rows, create_rows, update_rows, delete_rows)
+  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 ) RETURN CLOB;
 /**
 
