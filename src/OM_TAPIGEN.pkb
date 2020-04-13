@@ -2612,23 +2612,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     EXCEPTION
       WHEN OTHERS THEN
         CLOSE v_cur;
+        util_debug_stop_one_step;
         RAISE;
     END init_fetch_existing_api_params;
-
-    -----------------------------------------------------------------------------
-
-    PROCEDURE init_check_table_column_prefix IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'init_check_table_column_prefix');
-      -- check,if option "col_prefix_in_method_names" is set and check then
-      -- if table's column prefix is unique
-      g_status.column_prefix := util_get_table_column_prefix(p_table_name => g_params.table_name);
-      IF g_status.column_prefix IS NULL THEN
-        raise_application_error(c_generator_error_number,
-                                'The prefix of your column names (example: prefix_rest_of_column_name) is not unique and you requested to cut off the prefix for getter and setter method names. Please ensure either your column names have a unique prefix or switch the parameter p_col_prefix_in_method_names to true (SQL Developer oddgen integration: check option "Keep column prefix in method names").');
-      END IF;
-      util_debug_stop_one_step;
-    END init_check_table_column_prefix;
 
     -----------------------------------------------------------------------------
 
@@ -2908,7 +2894,14 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       util_debug_stop_one_step;
     END init_fetch_constraint_columns;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE init_process_columns IS
+      v_column_prefix varchar2(c_ora_max_name_len);
+      type v_varchar_tab is
+        table of varchar2(c_ora_max_name_len)
+        index by varchar2(c_ora_max_name_len);
+      v_column_prefix_tab v_varchar_tab;
     BEGIN
       util_debug_start_one_step(p_action => 'init_process_columns');
       -- init rpad
@@ -2922,12 +2915,39 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
         END IF;
         -- create reverse index to get collection id by column name
         g_columns_reverse_index(g_columns(i).column_name) := i;
-        -- check,if we have a xmltype column present (we have then to provide a XML compare function)
+        -- check, if we have a xmltype column present (we have then to provide a XML compare function)
         IF g_columns(i).data_type = 'XMLTYPE' THEN
           g_status.xmltype_column_present := TRUE;
         END IF;
+        -- Calc column prefix by saving the found prefix as tab index and count afterwards
+        -- the length of the tab: if it is greater then 1 we have NO distinct column prefix.
+        v_column_prefix := substr(g_columns(i).column_name, 1,
+            CASE WHEN instr(g_columns(i).column_name, '_') = 0
+              THEN length(g_columns(i).column_name)
+              ELSE instr(g_columns(i).column_name, '_') - 1
+            END);
+        v_column_prefix_tab(v_column_prefix) := v_column_prefix;
       END LOOP;
+
+      if v_column_prefix_tab.count > 1 then
+        g_status.column_prefix := null;
+      else
+        g_status.column_prefix := v_column_prefix_tab.first;
+      end if;
+      IF g_params.col_prefix_in_method_names = FALSE and g_status.column_prefix IS NULL THEN
+        raise_application_error(c_generator_error_number,
+          'The prefix of your column names (example: prefix_rest_of_column_name)' || c_lf ||
+          'is not unique and you requested to cut off the prefix for getter and' || c_lf ||
+          'setter method names. Please ensure either your column names have a' || c_lf ||
+          'unique prefix or switch the parameter p_col_prefix_in_method_names' || c_lf ||
+          'to true (SQL Developer oddgen integration: check option "Keep column' || c_lf ||
+          'prefix in method names").');
+      END IF;
       util_debug_stop_one_step;
+    exception
+      when others then
+        util_debug_stop_one_step;
+        raise;
     END init_process_columns;
 
     -----------------------------------------------------------------------------
@@ -3018,6 +3038,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
           g_params.audit_column_mappings,
           p_audit_type || '="?([^,"]*)"?',1,1,'i',1);
         if v_column_name is not null then
+          v_column_name := replace(v_column_name, '#PREFIX#', g_status.column_prefix);
           begin
             v_idx := g_columns_reverse_index(v_column_name);
             g_columns(v_idx).audit_type := p_audit_type;
@@ -3177,38 +3198,25 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
   BEGIN
     init_reset_globals;
-    --
     g_status.generator_action := p_generator_action;
-    g_params.owner            := p_owner;
-    g_params.table_name       := p_table_name;
-    --
+    g_params.owner := p_owner;
+    g_params.table_name := p_table_name;
     init_check_if_table_exists;
-    --
     g_params.reuse_existing_api_params := p_reuse_existing_api_params;
-    g_status.api_exists                := FALSE;
-    --
+    g_status.api_exists := FALSE;
     IF g_params.reuse_existing_api_params THEN
       init_fetch_existing_api_params;
     END IF;
-    --
     init_process_parameters;
-    --
-    IF g_params.col_prefix_in_method_names = FALSE THEN
-      init_check_table_column_prefix;
-    END IF;
-    --
     IF g_params.enable_generic_change_log THEN
       init_check_if_log_table_exists;
     END IF;
-    --
     IF g_params.api_name IS NOT NULL THEN
       init_check_if_api_name_exists;
     END IF;
-    --
     IF g_params.sequence_name IS NOT NULL THEN
       init_check_if_sequence_exists;
     END IF;
-    --
     init_create_temporary_lobs;
     init_fetch_columns;
     init_fetch_constraints;
@@ -3218,7 +3226,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     init_process_uk_columns;
     init_process_fk_columns;
     init_process_audit_columns;
-    --
     IF g_params.enable_custom_defaults THEN
       init_fetch_custom_defaults;
       init_process_custom_defaults;
@@ -3303,6 +3310,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_header;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_header_bulk IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_header_bulk');
@@ -3324,6 +3333,107 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       util_debug_stop_one_step;
     END gen_header_bulk;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_bulk_is_complete_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_bulk_is_complete_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION bulk_is_complete
+  RETURN BOOLEAN;';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  FUNCTION bulk_is_complete
+  RETURN BOOLEAN IS
+  BEGIN
+    RETURN g_bulk_completed;
+  END bulk_is_complete;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_bulk_is_complete_fnc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_get_bulk_limit_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_get_bulk_limit_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION get_bulk_limit
+  RETURN PLS_INTEGER;';
+
+      util_template_replace('API SPEC');
+
+
+      g_code_blocks.template := '
+
+  FUNCTION get_bulk_limit
+  RETURN PLS_INTEGER IS
+  BEGIN
+    RETURN g_bulk_limit;
+  END get_bulk_limit;';
+
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_get_bulk_limit_fnc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_set_bulk_limit_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_set_bulk_limit_prc');
+      g_code_blocks.template := '
+
+  PROCEDURE set_bulk_limit (
+    p_bulk_limit     IN PLS_INTEGER );';
+
+      util_template_replace('API SPEC');
+
+      g_code_blocks.template := '
+
+  PROCEDURE set_bulk_limit (
+    p_bulk_limit     IN PLS_INTEGER )
+  IS
+  BEGIN
+    g_bulk_limit := p_bulk_limit;
+  END set_bulk_limit;';
+
+      util_template_replace('API BODY');
+
+      util_debug_stop_one_step;
+    END gen_set_bulk_limit_prc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_xml_compare_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_xml_compare_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION util_xml_compare (
+    p_doc1 XMLTYPE,
+    p_doc2 XMLTYPE )
+  RETURN NUMBER IS
+    v_return NUMBER;
+  BEGIN
+    SELECT CASE
+             WHEN XMLEXISTS(
+                    ''declare default element namespace "http://xmlns.oracle.com/xdb/xdiff.xsd"; /xdiff/*''
+                    PASSING XMLDIFF( p_doc1, p_doc2 ) )
+             THEN 1
+             ELSE 0
+           END
+      INTO v_return
+      FROM DUAL;
+    RETURN v_return;
+  END util_xml_compare;';
+
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_xml_compare_fnc;
 
     -----------------------------------------------------------------------------
 
@@ -3622,6 +3732,263 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
     -----------------------------------------------------------------------------
 
+    PROCEDURE gen_read_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_row_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION read_row (
+    {% LIST_PK_PARAMS %} )
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  FUNCTION read_row (
+    {% LIST_PK_PARAMS %} )
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
+    v_row "{{ TABLE_NAME }}"%ROWTYPE;
+    CURSOR cur_row IS
+      SELECT *
+        FROM "{{ TABLE_NAME }}"
+       WHERE {% LIST_PK_COLUMN_COMPARE %};
+  BEGIN
+    OPEN cur_row;
+    FETCH cur_row INTO v_row;
+    CLOSE cur_row;
+    RETURN v_row;
+  END read_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_read_row_fnc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_read_rows_bulk_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_rows_bulk_fnc');
+      g_code_blocks.template := '
+
+  FUNCTION read_rows (
+    p_ref_cursor     IN t_strong_ref_cursor )
+  RETURN t_rows_tab;';
+
+      util_template_replace('API SPEC');
+
+
+      g_code_blocks.template := '
+
+  FUNCTION read_rows (
+    p_ref_cursor     IN t_strong_ref_cursor )
+  RETURN t_rows_tab
+  IS
+    v_return t_rows_tab;
+  BEGIN
+    IF (p_ref_cursor%ISOPEN)
+    THEN
+      g_bulk_completed := FALSE;
+
+      FETCH p_ref_cursor BULK COLLECT INTO v_return LIMIT g_bulk_limit;
+
+      IF (v_return.COUNT < g_bulk_limit)
+      THEN
+        g_bulk_completed := TRUE;
+      END IF;
+    END IF;
+
+    RETURN v_return;
+  END read_rows;';
+
+      util_template_replace('API BODY');
+
+      util_debug_stop_one_step;
+    END gen_read_rows_bulk_fnc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_read_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_row_prc');
+      g_code_blocks.template := '
+
+  PROCEDURE read_row (
+    {% LIST_PARAMS_W_PK_IO %} );';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  PROCEDURE read_row (
+    {% LIST_PARAMS_W_PK_IO %} )
+  IS
+    v_row "{{ TABLE_NAME }}"%ROWTYPE;
+  BEGIN
+    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
+    {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
+  END read_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_read_row_prc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_read_row_by_uk_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_read_row_by_uk_fnc');
+      IF g_uk_constraints.count > 0 THEN
+        FOR i IN g_uk_constraints.first .. g_uk_constraints.last LOOP
+          g_iterator.current_uk_constraint := g_uk_constraints(i).constraint_name;
+          g_code_blocks.template           := '
+
+  FUNCTION read_row (
+    {% LIST_UK_PARAMS %} )
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
+          util_template_replace('API SPEC');
+          g_code_blocks.template := '
+
+  FUNCTION read_row (
+    {% LIST_UK_PARAMS %} )
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
+    v_row "{{ TABLE_NAME }}"%ROWTYPE;
+    CURSOR cur_row IS
+      SELECT *
+        FROM "{{ TABLE_NAME }}"
+       WHERE {% LIST_UK_COLUMN_COMPARE %};
+  BEGIN
+    OPEN cur_row;
+    FETCH cur_row INTO v_row;
+    CLOSE cur_row;
+    RETURN v_row;
+  END;';
+          util_template_replace('API BODY');
+        END LOOP;
+      END IF;
+      util_debug_stop_one_step;
+    END gen_read_row_by_uk_fnc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_update_row_prc IS
+      v_other_cols t_tab_vc2_5k;
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_update_row_prc');
+      v_other_cols := util_generate_list(p_list_name => 'LIST_SET_COL_EQ_PARAM_WO_PK');
+
+      g_code_blocks.template := '
+
+  PROCEDURE update_row (
+    {% LIST_PARAMS_W_PK %} );';
+        util_template_replace('API SPEC');
+
+      -- check if additional columns exist that are
+      -- a) not part of PK and
+      -- b) not excluded columns
+      -- if no additional column is available for updating, update API is
+      -- will be generated with extra comments
+      IF v_other_cols.count > 0 THEN
+        g_code_blocks.template := '
+
+  PROCEDURE update_row (
+    {% LIST_PARAMS_W_PK %} )
+  IS
+    v_row   "{{ TABLE_NAME }}"%ROWTYPE;
+    {{ COUNTER_DECLARATION }}
+  BEGIN
+    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
+    -- update only, if the column values really differ
+    IF {% LIST_COLUMNS_WO_PK_COMPARE %}
+    THEN
+      UPDATE {{ TABLE_NAME }}
+         SET {% LIST_SET_COL_EQ_PARAM_WO_PK %}
+       WHERE {% LIST_PK_COLUMN_COMPARE %};
+    END IF;
+  END update_row;';
+      ELSE
+        g_code_blocks.template := '
+
+  PROCEDURE update_row (
+    {% LIST_PARAMS_W_PK %} )
+  IS
+  BEGIN
+    -- there is no column anymore to update! All remaining columns are part
+    -- of the primary key or excluded via exclude column list
+    NULL;
+  END update_row;';
+      END IF;
+
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_update_row_prc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_update_rowtype_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_update_rowtype_prc');
+      g_code_blocks.template := '
+
+  PROCEDURE update_row (
+    {{ ROWTYPE_PARAM }};';
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  PROCEDURE update_row (
+    {{ ROWTYPE_PARAM }}
+  IS
+  BEGIN
+    update_row(
+      {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
+  END update_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_update_rowtype_prc;
+
+    PROCEDURE gen_update_rows_bulk_prc IS
+      v_other_cols t_tab_vc2_5k;
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_update_rows_bulk_prc');
+      v_other_cols := util_generate_list(p_list_name => 'LIST_SET_COL_EQ_PAR_BULK_WO_PK');
+
+      g_code_blocks.template := '
+
+  PROCEDURE update_rows (
+    p_rows_tab       IN t_rows_tab );';
+      util_template_replace('API SPEC');
+
+      -- check if columns exist that are
+      -- a) not part of PK and
+      -- b) not excluded columns
+      -- if no additional column is available, update API is
+      -- useless and will be generated with extra comment
+
+      IF v_other_cols.count > 0 THEN
+        g_code_blocks.template := '
+
+  PROCEDURE update_rows (
+    p_rows_tab       IN t_rows_tab )
+  IS
+  BEGIN
+    FORALL i IN INDICES OF p_rows_tab
+      UPDATE {{ TABLE_NAME }}
+         SET {% LIST_SET_COL_EQ_PAR_BULK_WO_PK %}
+       WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};
+  END update_rows;';
+      ELSE
+        g_code_blocks.template := '
+
+  PROCEDURE update_rows (
+    p_rows_tab       IN t_rows_tab )
+  IS
+  BEGIN
+    -- there is no column anymore to update! All remaining columns are part
+    -- of the primary key or excluded via exclude column list
+    NULL;
+  END update_rows;';
+      END IF;
+
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_update_rows_bulk_prc;
+
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_createorupdate_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_row_fnc');
@@ -3702,6 +4069,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_createorupdate_rowtype_fnc;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_createorupdate_rowtype_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_prc');
@@ -3724,277 +4093,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_createorupdate_rowtype_prc;
 
-    PROCEDURE gen_read_row_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_read_row_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION read_row (
-    {% LIST_PK_PARAMS %} )
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  FUNCTION read_row (
-    {% LIST_PK_PARAMS %} )
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
-    v_row "{{ TABLE_NAME }}"%ROWTYPE;
-    CURSOR cur_row IS
-      SELECT *
-        FROM "{{ TABLE_NAME }}"
-       WHERE {% LIST_PK_COLUMN_COMPARE %};
-  BEGIN
-    OPEN cur_row;
-    FETCH cur_row INTO v_row;
-    CLOSE cur_row;
-    RETURN v_row;
-  END read_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_read_row_fnc;
-
-    PROCEDURE gen_read_rows_bulk_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_read_rows_bulk_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION read_rows (
-    p_ref_cursor     IN t_strong_ref_cursor )
-  RETURN t_rows_tab;';
-
-      util_template_replace('API SPEC');
-
-
-      g_code_blocks.template := '
-
-  FUNCTION read_rows (
-    p_ref_cursor     IN t_strong_ref_cursor )
-  RETURN t_rows_tab
-  IS
-    v_return t_rows_tab;
-  BEGIN
-    IF (p_ref_cursor%ISOPEN)
-    THEN
-      g_bulk_completed := FALSE;
-
-      FETCH p_ref_cursor BULK COLLECT INTO v_return LIMIT g_bulk_limit;
-
-      IF (v_return.COUNT < g_bulk_limit)
-      THEN
-        g_bulk_completed := TRUE;
-      END IF;
-    END IF;
-
-    RETURN v_return;
-  END read_rows;';
-
-      util_template_replace('API BODY');
-
-      util_debug_stop_one_step;
-    END gen_read_rows_bulk_fnc;
-
-    PROCEDURE gen_read_row_prc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_read_row_prc');
-      g_code_blocks.template := '
-
-  PROCEDURE read_row (
-    {% LIST_PARAMS_W_PK_IO %} );';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  PROCEDURE read_row (
-    {% LIST_PARAMS_W_PK_IO %} )
-  IS
-    v_row "{{ TABLE_NAME }}"%ROWTYPE;
-  BEGIN
-    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-    {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
-  END read_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_read_row_prc;
-
-    PROCEDURE gen_read_row_by_uk_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_read_row_by_uk_fnc');
-      IF g_uk_constraints.count > 0 THEN
-        FOR i IN g_uk_constraints.first .. g_uk_constraints.last LOOP
-          g_iterator.current_uk_constraint := g_uk_constraints(i).constraint_name;
-          g_code_blocks.template           := '
-
-  FUNCTION read_row (
-    {% LIST_UK_PARAMS %} )
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
-          util_template_replace('API SPEC');
-          g_code_blocks.template := '
-
-  FUNCTION read_row (
-    {% LIST_UK_PARAMS %} )
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
-    v_row "{{ TABLE_NAME }}"%ROWTYPE;
-    CURSOR cur_row IS
-      SELECT *
-        FROM "{{ TABLE_NAME }}"
-       WHERE {% LIST_UK_COLUMN_COMPARE %};
-  BEGIN
-    OPEN cur_row;
-    FETCH cur_row INTO v_row;
-    CLOSE cur_row;
-    RETURN v_row;
-  END;';
-          util_template_replace('API BODY');
-        END LOOP;
-      END IF;
-      util_debug_stop_one_step;
-    END gen_read_row_by_uk_fnc;
-
-    PROCEDURE gen_update_row_prc IS
-      v_other_cols t_tab_vc2_5k;
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_update_row_prc');
-      v_other_cols := util_generate_list(p_list_name => 'LIST_SET_COL_EQ_PARAM_WO_PK');
-
-      g_code_blocks.template := '
-
-  PROCEDURE update_row (
-    {% LIST_PARAMS_W_PK %} );';
-        util_template_replace('API SPEC');
-
-      -- check if additional columns exist that are
-      -- a) not part of PK and
-      -- b) not excluded columns
-      -- if no additional column is available for updating, update API is
-      -- will be generated with extra comments
-      IF v_other_cols.count > 0 THEN
-        g_code_blocks.template := '
-
-  PROCEDURE update_row (
-    {% LIST_PARAMS_W_PK %} )
-  IS
-    v_row   "{{ TABLE_NAME }}"%ROWTYPE;
-    {{ COUNTER_DECLARATION }}
-  BEGIN
-    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-    -- update only, if the column values really differ
-    IF {% LIST_COLUMNS_WO_PK_COMPARE %}
-    THEN
-      UPDATE {{ TABLE_NAME }}
-         SET {% LIST_SET_COL_EQ_PARAM_WO_PK %}
-       WHERE {% LIST_PK_COLUMN_COMPARE %};
-    END IF;
-  END update_row;';
-      ELSE
-        g_code_blocks.template := '
-
-  PROCEDURE update_row (
-    {% LIST_PARAMS_W_PK %} )
-  IS
-  BEGIN
-    -- there is no column anymore to update! All remaining columns are part
-    -- of the primary key or excluded via exclude column list
-    NULL;
-  END update_row;';
-      END IF;
-
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_update_row_prc;
-
-    PROCEDURE gen_update_rowtype_prc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_update_rowtype_prc');
-      g_code_blocks.template := '
-
-  PROCEDURE update_row (
-    {{ ROWTYPE_PARAM }};';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  PROCEDURE update_row (
-    {{ ROWTYPE_PARAM }}
-  IS
-  BEGIN
-    update_row(
-      {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
-  END update_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_update_rowtype_prc;
-
-    PROCEDURE gen_update_rows_bulk_prc IS
-      v_other_cols t_tab_vc2_5k;
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_update_rows_bulk_prc');
-      v_other_cols := util_generate_list(p_list_name => 'LIST_SET_COL_EQ_PAR_BULK_WO_PK');
-
-      g_code_blocks.template := '
-
-  PROCEDURE update_rows (
-    p_rows_tab       IN t_rows_tab );';
-      util_template_replace('API SPEC');
-
-      -- check if columns exist that are
-      -- a) not part of PK and
-      -- b) not excluded columns
-      -- if no additional column is available, update API is
-      -- useless and will be generated with extra comment
-
-      IF v_other_cols.count > 0 THEN
-        g_code_blocks.template := '
-
-  PROCEDURE update_rows (
-    p_rows_tab       IN t_rows_tab )
-  IS
-  BEGIN
-    FORALL i IN INDICES OF p_rows_tab
-      UPDATE {{ TABLE_NAME }}
-         SET {% LIST_SET_COL_EQ_PAR_BULK_WO_PK %}
-       WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};
-  END update_rows;';
-      ELSE
-        g_code_blocks.template := '
-
-  PROCEDURE update_rows (
-    p_rows_tab       IN t_rows_tab )
-  IS
-  BEGIN
-    -- there is no column anymore to update! All remaining columns are part
-    -- of the primary key or excluded via exclude column list
-    NULL;
-  END update_rows;';
-      END IF;
-
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_update_rows_bulk_prc;
-
-    PROCEDURE gen_xml_compare_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_xml_compare_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION util_xml_compare (
-    p_doc1 XMLTYPE,
-    p_doc2 XMLTYPE )
-  RETURN NUMBER IS
-    v_return NUMBER;
-  BEGIN
-    SELECT CASE
-             WHEN XMLEXISTS(
-                    ''declare default element namespace "http://xmlns.oracle.com/xdb/xdiff.xsd"; /xdiff/*''
-                    PASSING XMLDIFF( p_doc1, p_doc2 ) )
-             THEN 1
-             ELSE 0
-           END
-      INTO v_return
-      FROM DUAL;
-    RETURN v_return;
-  END util_xml_compare;';
-
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_xml_compare_fnc;
+    -----------------------------------------------------------------------------
 
     PROCEDURE gen_delete_row_prc IS
     BEGIN
@@ -4027,6 +4126,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_delete_row_prc;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_delete_rows_bulk_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_delete_row_prc');
@@ -4049,6 +4150,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_delete_rows_bulk_prc;
+
+    -----------------------------------------------------------------------------
 
     PROCEDURE gen_getter_functions IS
     BEGIN
@@ -4079,30 +4182,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_getter_functions;
 
-    PROCEDURE gen_set_bulk_limit_prc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_set_bulk_limit_prc');
-      g_code_blocks.template := '
-
-  PROCEDURE set_bulk_limit (
-    p_bulk_limit     IN PLS_INTEGER );';
-
-      util_template_replace('API SPEC');
-
-
-      g_code_blocks.template := '
-
-  PROCEDURE set_bulk_limit (
-    p_bulk_limit     IN PLS_INTEGER )
-  IS
-  BEGIN
-    g_bulk_limit := p_bulk_limit;
-  END set_bulk_limit;';
-
-      util_template_replace('API BODY');
-
-      util_debug_stop_one_step;
-    END gen_set_bulk_limit_prc;
+    ------------------------------------------------------------------------
 
     PROCEDURE gen_setter_procedures IS
     BEGIN
@@ -4163,6 +4243,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_setter_procedures;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_get_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
@@ -4188,49 +4270,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_get_a_row_fnc;
 
-    PROCEDURE gen_get_bulk_limit_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_get_bulk_limit_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION get_bulk_limit
-    RETURN PLS_INTEGER;';
-
-      util_template_replace('API SPEC');
-
-
-      g_code_blocks.template := '
-
-  FUNCTION get_bulk_limit
-    RETURN PLS_INTEGER
-  IS
-  BEGIN
-    RETURN g_bulk_limit;
-  END get_bulk_limit;';
-
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_get_bulk_limit_fnc;
-
-    PROCEDURE gen_bulk_is_complete_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_bulk_is_complete_fnc');
-      g_code_blocks.template := '
-
-  FUNCTION bulk_is_complete
-    RETURN BOOLEAN;';
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  FUNCTION bulk_is_complete
-    RETURN BOOLEAN
-  IS
-  BEGIN
-    RETURN g_bulk_completed;
-  END bulk_is_complete;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_bulk_is_complete_fnc;
+    -----------------------------------------------------------------------------
 
     PROCEDURE gen_create_a_row_fnc IS
     BEGIN
@@ -4260,6 +4300,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_create_a_row_fnc;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_create_a_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
@@ -4285,6 +4327,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_a_row_prc;
+
+    -----------------------------------------------------------------------------
 
     PROCEDURE gen_create_change_log_prc IS
     BEGIN
@@ -4320,6 +4364,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_create_change_log_prc;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_read_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
@@ -4349,6 +4395,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_read_a_row_fnc;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_footer IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_footer');
@@ -4371,6 +4419,8 @@ END "{{ API_NAME }}";';
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_footer;
+
+    -----------------------------------------------------------------------------
 
     PROCEDURE gen_dml_view IS
     BEGIN
@@ -4446,6 +4496,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       util_debug_stop_one_step;
     END gen_dml_view_trigger;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_finalize_clob_vc2_caching IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_finalize_clob_vc2_caching');
@@ -4495,7 +4547,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     gen_row_exists_yn_fnc;
 
     -- GET_PK_BY_UNIQUE_COLS functions only if no multi row pk is present
-    -- use overloaded READ_ROW functions with unique paramams instead
+    -- use overloaded READ_ROW functions with unique params instead
     IF NOT g_status.pk_is_multi_column THEN
       gen_get_pk_by_unique_cols_fnc;
     END IF;
@@ -4583,6 +4635,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
   END main_generate_code;
 
+  -----------------------------------------------------------------------------
+
   PROCEDURE main_compile_code IS
   BEGIN
     -- compile package spec
@@ -4630,11 +4684,15 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     END IF;
   END main_compile_code;
 
+  -----------------------------------------------------------------------------
+
   FUNCTION main_return_code RETURN CLOB IS
     terminator VARCHAR2(10 CHAR) := c_lf || '/' || c_lflf;
   BEGIN
     RETURN g_code_blocks.api_spec || terminator || g_code_blocks.api_body || terminator || CASE WHEN g_params.enable_dml_view THEN g_code_blocks.dml_view || terminator || g_code_blocks.dml_view_trigger || terminator ELSE NULL END;
   END main_return_code;
+
+  -----------------------------------------------------------------------------
 
   PROCEDURE compile_api
   (
@@ -4690,6 +4748,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     main_compile_code;
     util_debug_stop_one_run;
   END compile_api;
+
+  -----------------------------------------------------------------------------
 
   FUNCTION compile_api_and_get_code
   (
@@ -4750,6 +4810,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     RETURN main_return_code;
   END compile_api_and_get_code;
 
+  -----------------------------------------------------------------------------
+
   FUNCTION get_code
   (
     p_table_name                  IN all_objects.object_name%TYPE,
@@ -4805,6 +4867,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     RETURN main_return_code;
   END get_code;
 
+  -----------------------------------------------------------------------------
+
   PROCEDURE recreate_existing_apis(p_owner IN all_users.username%TYPE DEFAULT USER) IS
     v_apis t_tab_existing_apis;
 
@@ -4824,6 +4888,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       END LOOP;
     END IF;
   END;
+
+  -----------------------------------------------------------------------------
 
   FUNCTION view_existing_apis
   (
@@ -5023,6 +5089,8 @@ SELECT NULL AS errors,
 
       PIPE ROW(v_row);
   END view_existing_apis;
+
+  -----------------------------------------------------------------------------
 
   FUNCTION view_naming_conflicts(p_owner all_users.username%TYPE DEFAULT USER) RETURN t_tab_naming_conflicts
     PIPELINED IS

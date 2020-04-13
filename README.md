@@ -95,7 +95,7 @@ SIGNATURE
 ```sql
 PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.4';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.5';
 ```
 
 
@@ -150,10 +150,10 @@ to provide the table name.
 
 ```sql
 DECLARE
-  l_clob CLOB;
+  l_api_code CLOB;
 BEGIN
-  l_clob := om_tapigen.compile_api_and_get_code (p_table_name => 'EMP');
-  --> do something with the CLOB
+  l_api_code := om_tapigen.compile_api_and_get_code (p_table_name => 'EMP');
+  --> do something with the API code
 END;
 ```
 
@@ -198,10 +198,10 @@ This function is called by the oddgen wrapper for the SQL Developer integration.
 
 ```sql
 DECLARE
-  l_clob CLOB;
+  l_api_code CLOB;
 BEGIN
-  l_clob := om_tapigen.get_code (p_table_name => 'EMP');
-  --> do something with the CLOB
+  l_api_code := om_tapigen.get_code (p_table_name => 'EMP');
+  --> do something with the API code
 END;
 ```
 
@@ -251,7 +251,8 @@ END;
 SIGNATURE
 
 ```sql
-PROCEDURE recreate_existing_apis(p_owner IN all_users.username%TYPE DEFAULT USER);
+PROCEDURE recreate_existing_apis(
+  p_owner IN all_users.username%TYPE DEFAULT USER);
 ```
 
 
@@ -267,12 +268,10 @@ SELECT * FROM TABLE (om_tapigen.view_existing_apis);
 SIGNATURE
 
 ```sql
-FUNCTION view_existing_apis
-(
+FUNCTION view_existing_apis(
   p_table_name all_tables.table_name%TYPE DEFAULT NULL,
-  p_owner      all_users.username%TYPE DEFAULT USER
-) RETURN t_tab_existing_apis
-  PIPELINED;
+  p_owner      all_users.username%TYPE DEFAULT USER)
+RETURN t_tab_existing_apis PIPELINED;
 ```
 
 
@@ -291,9 +290,9 @@ SELECT * FROM TABLE (om_tapigen.view_naming_conflicts);
 SIGNATURE
 
 ```sql
-FUNCTION view_naming_conflicts(p_owner all_users.username%TYPE DEFAULT USER)
-  RETURN t_tab_naming_conflicts
-  PIPELINED;
+FUNCTION view_naming_conflicts(
+  p_owner all_users.username%TYPE DEFAULT USER)
+RETURN t_tab_naming_conflicts PIPELINED;
 ```
 
 
@@ -306,12 +305,11 @@ Helper to read a column data default from the dictionary.
 SIGNATURE
 
 ```sql
-FUNCTION util_get_column_data_default
-(
+FUNCTION util_get_column_data_default(
   p_table_name  IN VARCHAR2,
   p_column_name IN VARCHAR2,
-  p_owner       VARCHAR2 DEFAULT USER
-) RETURN VARCHAR2;
+  p_owner       VARCHAR2 DEFAULT USER)
+RETURN VARCHAR2;
 ```
 
 
@@ -325,11 +323,10 @@ user_constraints).
 SIGNATURE
 
 ```sql
-FUNCTION util_get_cons_search_condition
-(
+FUNCTION util_get_cons_search_condition(
   p_constraint_name IN VARCHAR2,
-  p_owner           IN VARCHAR2 DEFAULT USER
-) RETURN VARCHAR2;
+  p_owner           IN VARCHAR2 DEFAULT USER)
+RETURN VARCHAR2;
 ```
 
 
@@ -345,12 +342,10 @@ SELECT column_value FROM TABLE (om_tapigen.util_split_to_table('1,2,3,test'));
 SIGNATURE
 
 ```sql
-FUNCTION util_split_to_table
-(
+FUNCTION util_split_to_table(
   p_string    IN VARCHAR2,
-  p_delimiter IN VARCHAR2 DEFAULT ','
-) RETURN t_tab_vc2_4k
-  PIPELINED;
+  p_delimiter IN VARCHAR2 DEFAULT ',')
+RETURN t_tab_vc2_4k PIPELINED;
 ```
 
 
@@ -364,7 +359,8 @@ determined by a conditional compilation.
 SIGNATURE
 
 ```sql
-FUNCTION util_get_ora_max_name_len RETURN INTEGER;
+FUNCTION util_get_ora_max_name_len
+RETURN INTEGER;
 ```
 
 
@@ -417,8 +413,8 @@ SELECT * FROM TABLE(om_tapigen.util_view_debug_log);
 SIGNATURE
 
 ```sql
-FUNCTION util_view_debug_log RETURN t_tab_debug_data
-  PIPELINED;
+FUNCTION util_view_debug_log
+RETURN t_tab_debug_data PIPELINED;
 ```
 
 
@@ -436,8 +432,8 @@ SELECT * FROM TABLE(om_tapigen.util_view_columns_array);
 SIGNATURE
 
 ```sql
-FUNCTION util_view_columns_array RETURN t_tab_debug_columns
-  PIPELINED;
+FUNCTION util_view_columns_array
+RETURN t_tab_debug_columns PIPELINED;
 ```
 
 
@@ -449,12 +445,11 @@ Helper for testing to get the DDL of generated objects.
 SIGNATURE
 
 ```sql
-FUNCTION util_get_ddl
-(
+FUNCTION util_get_ddl(
   p_object_type VARCHAR2,
   p_object_name VARCHAR2,
-  p_owner       VARCHAR2 DEFAULT USER
-) RETURN CLOB;
+  p_owner       VARCHAR2 DEFAULT USER)
+RETURN CLOB;
 ```
 
 
