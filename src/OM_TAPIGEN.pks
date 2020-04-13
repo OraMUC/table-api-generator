@@ -205,9 +205,19 @@ TYPE t_rec_columns IS RECORD(
   r_column_name         all_tab_cols.column_name%TYPE);
 
 TYPE t_tab_debug_columns IS TABLE OF t_rec_columns;
-/* We use t_tab_columns as a private array/collection inside the package body
+/* We use t_tab_debug_columns as a private array/collection inside the package body
 indexed by binary_intager. For the pipelined function util_view_columns_array
 we need this additional table type. */
+
+--
+
+TYPE t_rec_package_state IS RECORD(
+  key                   varchar2(30),
+  value                 varchar2(128));
+
+TYPE t_tab_package_state IS TABLE OF t_rec_package_state;
+/* For debugging we can view some global package state
+variables with the pipelined function util_view_package_state. */
 
 --
 
@@ -495,6 +505,18 @@ generation.
 
 ```sql
 SELECT * FROM TABLE(om_tapigen.util_view_columns_array);
+```
+**/
+
+
+FUNCTION util_view_package_state
+RETURN t_tab_package_state PIPELINED;
+/**
+
+View some informations from the internal package state for debug purposes.
+
+```sql
+SELECT * FROM TABLE(om_tapigen.util_view_package_state);
 ```
 **/
 

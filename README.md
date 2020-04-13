@@ -18,6 +18,7 @@ Oracle PL/SQL Table API Generator
 - [Procedure util_set_debug_off](#util_set_debug_off)
 - [Function util_view_debug_log](#util_view_debug_log)
 - [Function util_view_columns_array](#util_view_columns_array)
+- [Function util_view_package_state](#util_view_package_state)
 - [Function util_get_ddl](#util_get_ddl)
 
 
@@ -434,6 +435,23 @@ SIGNATURE
 ```sql
 FUNCTION util_view_columns_array
 RETURN t_tab_debug_columns PIPELINED;
+```
+
+
+<h2><a id="util_view_package_state"></a>Function util_view_package_state</h2>
+<!-------------------------------------------------------------------------->
+
+View some informations from the internal package state for debug purposes.
+
+```sql
+SELECT * FROM TABLE(om_tapigen.util_view_package_state);
+```
+
+SIGNATURE
+
+```sql
+FUNCTION util_view_package_state
+RETURN t_tab_package_state PIPELINED;
 ```
 
 

@@ -781,31 +781,75 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
   FUNCTION util_view_columns_array RETURN t_tab_debug_columns
     PIPELINED IS
-    v_return t_rec_columns;
+    v_row t_rec_columns;
   BEGIN
     FOR i IN 1 .. g_columns.count LOOP
-      v_return.column_name           := g_columns(i).column_name;
-      v_return.data_type             := g_columns(i).data_type;
-      v_return.char_length           := g_columns(i).char_length;
-      v_return.data_length           := g_columns(i).data_length;
-      v_return.data_precision        := g_columns(i).data_precision;
-      v_return.data_scale            := g_columns(i).data_scale;
-      v_return.data_default          := g_columns(i).data_default;
-      v_return.data_custom_default   := g_columns(i).data_custom_default;
-      v_return.custom_default_source := g_columns(i).custom_default_source;
-      v_return.identity_type         := g_columns(i).identity_type;
-      v_return.is_pk_yn              := g_columns(i).is_pk_yn;
-      v_return.is_uk_yn              := g_columns(i).is_uk_yn;
-      v_return.is_fk_yn              := g_columns(i).is_fk_yn;
-      v_return.is_nullable_yn        := g_columns(i).is_nullable_yn;
-      v_return.is_excluded_yn        := g_columns(i).is_excluded_yn;
-      v_return.audit_type            := g_columns(i).audit_type;
-      v_return.r_owner               := g_columns(i).r_owner;
-      v_return.r_table_name          := g_columns(i).r_table_name;
-      v_return.r_column_name         := g_columns(i).r_column_name;
-      PIPE ROW(v_return);
+      v_row.column_name           := g_columns(i).column_name;
+      v_row.data_type             := g_columns(i).data_type;
+      v_row.char_length           := g_columns(i).char_length;
+      v_row.data_length           := g_columns(i).data_length;
+      v_row.data_precision        := g_columns(i).data_precision;
+      v_row.data_scale            := g_columns(i).data_scale;
+      v_row.data_default          := g_columns(i).data_default;
+      v_row.data_custom_default   := g_columns(i).data_custom_default;
+      v_row.custom_default_source := g_columns(i).custom_default_source;
+      v_row.identity_type         := g_columns(i).identity_type;
+      v_row.is_pk_yn              := g_columns(i).is_pk_yn;
+      v_row.is_uk_yn              := g_columns(i).is_uk_yn;
+      v_row.is_fk_yn              := g_columns(i).is_fk_yn;
+      v_row.is_nullable_yn        := g_columns(i).is_nullable_yn;
+      v_row.is_excluded_yn        := g_columns(i).is_excluded_yn;
+      v_row.audit_type            := g_columns(i).audit_type;
+      v_row.r_owner               := g_columns(i).r_owner;
+      v_row.r_table_name          := g_columns(i).r_table_name;
+      v_row.r_column_name         := g_columns(i).r_column_name;
+      PIPE ROW(v_row);
     END LOOP;
   END util_view_columns_array;
+
+  -----------------------------------------------------------------------------
+
+  function util_view_package_state
+  return t_tab_package_state pipelined is
+    v_row t_rec_package_state;
+  begin
+    v_row.key   := 'generator_action';
+    v_row.value := g_status.generator_action;
+    pipe row(v_row);
+    --
+    v_row.key   := 'api_name';
+    v_row.value := g_params.api_name;
+    pipe row(v_row);
+    --
+    v_row.key   := 'api_exists';
+    v_row.value := util_bool_to_string(g_status.api_exists);
+    pipe row(v_row);
+    --
+    v_row.key   := 'column_prefix';
+    v_row.value := g_status.column_prefix;
+    pipe row(v_row);
+    --
+    v_row.key   := 'pk_is_multi_column';
+    v_row.value := util_bool_to_string(g_status.pk_is_multi_column);
+    pipe row(v_row);
+    --
+    v_row.key   := 'xmltype_column_present';
+    v_row.value := util_bool_to_string(g_status.xmltype_column_present);
+    pipe row(v_row);
+    --
+    v_row.key   := 'rpad_columns';
+    v_row.value := g_status.rpad_columns;
+    pipe row(v_row);
+    --
+    v_row.key   := 'rpad_pk_columns';
+    v_row.value := g_status.rpad_pk_columns;
+    pipe row(v_row);
+    --
+    v_row.key   := 'rpad_uk_columns';
+    v_row.value := g_status.rpad_uk_columns;
+    pipe row(v_row);
+  end util_view_package_state;
+
 
   --------------------------------------------------------------------------------
 
