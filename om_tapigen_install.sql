@@ -857,40 +857,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_bool_to_string;
 
   -----------------------------------------------------------------------------
-  -- util_get_table_column_prefix is a private helper function to find out the
-  -- column prefixes of a table. We understand everything before the first
-  -- underscore "_" within the columnname as prefix. If columns have different
-  -- prefixes within a table,null will be returned.
-  -----------------------------------------------------------------------------
-  FUNCTION util_get_table_column_prefix(p_table_name IN VARCHAR2) RETURN VARCHAR2 IS
-    v_return VARCHAR2(128 CHAR);
-    v_count  PLS_INTEGER := 0;
-  BEGIN
-    FOR i IN (SELECT DISTINCT substr(column_name,
-                                     1,
-                                     CASE
-                                       WHEN instr(column_name, '_') = 0 THEN
-                                        length(column_name)
-                                       ELSE
-                                        instr(column_name, '_') - 1
-                                     END) AS prefix
-                FROM all_tab_cols
-               WHERE owner = g_params.owner
-                 AND table_name = p_table_name
-                 AND hidden_column = 'NO') LOOP
-      v_count := v_count + 1;
-
-      IF v_count > 1 THEN
-        v_return := NULL;
-        EXIT;
-      END IF;
-
-      v_return := i.prefix;
-    END LOOP;
-    RETURN v_return;
-  END util_get_table_column_prefix;
-
-  -----------------------------------------------------------------------------
   -- util_get_attribute_surrogate is a private helper function to find out a
   -- datatype dependent surrogate. This is required for comparing two
   -- values of a column e.g. old value and new value. There is the special case
@@ -3575,12 +3541,21 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
         end if;
       end;
     BEGIN
-      util_debug_start_one_step(p_action => 'init_process_audit_columns');
-      process_audit_type('CREATED');
-      process_audit_type('CREATED_BY');
-      process_audit_type('UPDATED');
-      process_audit_type('UPDATED_BY');
-      util_debug_stop_one_step;
+      if instr(g_params.audit_column_mappings, '#PREFIX#') > 0 and g_status.column_prefix is null then
+        raise_application_error(c_generator_error_number,
+          'The prefix of your column names (example: prefix_rest_of_column_name)' || c_lf ||
+          'is not unique and you used the placeholder #PREFIX# in the parameter' || c_lf ||
+          'p_audit_column_mappings. Please ensure either your column names have a' || c_lf ||
+          'unique prefix or do not use the placeholder #PREFIX# in the parameter' || c_lf ||
+          'p_audit_column_mappings.');
+      else
+        util_debug_start_one_step(p_action => 'init_process_audit_columns');
+        process_audit_type('CREATED');
+        process_audit_type('CREATED_BY');
+        process_audit_type('UPDATED');
+        process_audit_type('UPDATED_BY');
+        util_debug_stop_one_step;
+      end if;
     END init_process_audit_columns;
 
     -----------------------------------------------------------------------------
