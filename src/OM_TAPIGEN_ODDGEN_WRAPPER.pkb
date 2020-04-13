@@ -1,7 +1,6 @@
 CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
 
   c_parameter_descriptions      CONSTANT param_type := 'Detailed parameter descriptions can be found here';
-  c_reuse_existing_api_params   CONSTANT param_type := 'Reuse existing API package parameters';
   c_enable_insertion_of_rows    CONSTANT param_type := 'Enable insertion of rows';
   c_enable_column_defaults      CONSTANT param_type := 'Enable column defaults (for inserts)';
   c_enable_update_of_rows       CONSTANT param_type := 'Enable update of rows';
@@ -38,7 +37,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
 
   FUNCTION get_description RETURN VARCHAR2 IS
   BEGIN
-    RETURN 'Generates table APIs for tables found in the current schema. ' || 'ATTENTION: If you set the option "Reuse existing API package parameters" to true, ' || 'all following options are ignored when the API is already existing and the options are extractable from the spec source. ' || 'This means, if you want to change options from existing APIs you have to set this option to false.';
+    RETURN 'Generates table APIs for tables found in the current schema.';
   END get_description;
 
   FUNCTION get_object_types RETURN t_string IS
@@ -50,7 +49,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params t_param;
   BEGIN
     v_params(c_parameter_descriptions) := 'https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md';
-    v_params(c_reuse_existing_api_params) := util_bool_to_string(om_tapigen.c_true_reuse_existing_api_para);
     v_params(c_enable_insertion_of_rows) := util_bool_to_string(om_tapigen.c_true_enable_insertion_of_row);
     v_params(c_enable_column_defaults) := util_bool_to_string(om_tapigen.c_false_enable_column_defaults);
     v_params(c_enable_update_of_rows) := util_bool_to_string(om_tapigen.c_true_enable_update_of_rows);
@@ -75,7 +73,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   FUNCTION get_ordered_params RETURN t_string IS
   BEGIN
     RETURN NEW t_string(c_parameter_descriptions,
-                        c_reuse_existing_api_params,
                         c_enable_insertion_of_rows,
                         c_enable_column_defaults,
                         c_enable_update_of_rows,
@@ -99,7 +96,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   FUNCTION get_lov RETURN t_lov IS
     v_lov t_lov;
   BEGIN
-    v_lov(c_reuse_existing_api_params) := NEW t_string('true', 'false');
     v_lov(c_enable_insertion_of_rows) := NEW t_string('true', 'false');
     v_lov(c_enable_column_defaults) := NEW t_string('true', 'false');
     v_lov(c_enable_update_of_rows) := NEW t_string('true', 'false');
@@ -123,7 +119,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   ) RETURN CLOB IS
   BEGIN
     RETURN om_tapigen.get_code(p_table_name                  => in_object_name,
-                               p_reuse_existing_api_params   => util_string_to_bool(in_params(c_reuse_existing_api_params)),
                                p_enable_insertion_of_rows    => util_string_to_bool(in_params(c_enable_insertion_of_rows)),
                                p_enable_column_defaults      => util_string_to_bool(in_params(c_enable_column_defaults)),
                                p_enable_update_of_rows       => util_string_to_bool(in_params(c_enable_update_of_rows)),

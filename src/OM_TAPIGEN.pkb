@@ -19,7 +19,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   TYPE t_rec_params IS RECORD(
     table_name                  all_objects.object_name%TYPE,
     owner                       all_users.username%TYPE,
-    reuse_existing_api_params   BOOLEAN,
     enable_insertion_of_rows    BOOLEAN,
     enable_column_defaults      BOOLEAN,
     enable_update_of_rows       BOOLEAN,
@@ -45,7 +44,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     column_prefix          all_tab_cols.column_name%TYPE,
     xmltype_column_present BOOLEAN,
     generator_action       VARCHAR2(30 CHAR),
-    api_exists             BOOLEAN,
     rpad_columns           INTEGER,
     rpad_pk_columns        INTEGER,
     rpad_uk_columns        INTEGER);
@@ -149,7 +147,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
   -- records
   g_params              t_rec_params;
-  g_params_existing_api t_rec_existing_apis;
   g_iterator            t_rec_iterator;
   g_code_blocks         t_rec_code_blocks;
   g_status              t_rec_status;
@@ -818,10 +815,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --
     v_row.key   := 'api_name';
     v_row.value := g_params.api_name;
-    pipe row(v_row);
-    --
-    v_row.key   := 'api_exists';
-    v_row.value := util_bool_to_string(g_status.api_exists);
     pipe row(v_row);
     --
     v_row.key   := 'column_prefix';
@@ -2182,8 +2175,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                         ELSE
                          NULL
                       END);
-        WHEN 'REUSE_EXISTING_API_PARAMS' THEN
-          code_append(util_bool_to_string(g_params.reuse_existing_api_params));
         WHEN 'COL_PREFIX_IN_METHOD_NAMES' THEN
           code_append(util_bool_to_string(g_params.col_prefix_in_method_names));
         WHEN 'ENABLE_INSERTION_OF_ROWS' THEN
@@ -2382,7 +2373,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_generator_action            IN VARCHAR2,
     p_table_name                  IN all_objects.object_name%TYPE,
     p_owner                       IN all_users.username%TYPE,
-    p_reuse_existing_api_params   IN BOOLEAN,
     p_enable_insertion_of_rows    IN BOOLEAN,
     p_enable_column_defaults      IN BOOLEAN,
     p_enable_update_of_rows       IN BOOLEAN,
@@ -2410,7 +2400,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       util_debug_start_one_step(p_action => 'init_reset_globals');
       -- global records
       g_params              := NULL;
-      g_params_existing_api := NULL;
       g_iterator            := NULL;
       g_code_blocks         := NULL;
       g_status              := NULL;
@@ -2430,143 +2419,32 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     PROCEDURE init_process_parameters IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_process_parameters');
-      g_params.enable_insertion_of_rows := CASE
-                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_insertion_of_rows),
-                                                       c_true_enable_insertion_of_row)
-                                             ELSE
-                                              p_enable_insertion_of_rows
-                                           END;
-
-      g_params.enable_column_defaults := CASE
-                                           WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                            coalesce(util_string_to_bool(g_params_existing_api.p_enable_column_defaults),
-                                                     c_false_enable_column_defaults)
-                                           ELSE
-                                            p_enable_column_defaults
-                                         END;
-
-      g_params.enable_update_of_rows := CASE
-                                          WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                           coalesce(util_string_to_bool(g_params_existing_api.p_enable_update_of_rows),
-                                                    c_true_enable_update_of_rows)
-                                          ELSE
-                                           p_enable_update_of_rows
-                                        END;
-
-      g_params.enable_deletion_of_rows := CASE
-                                            WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                             coalesce(util_string_to_bool(g_params_existing_api.p_enable_deletion_of_rows),
-                                                      c_false_enable_deletion_of_row)
-                                            ELSE
-                                             p_enable_deletion_of_rows
-                                          END;
-
-      g_params.enable_parameter_prefixes := CASE
-                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_parameter_prefixes),
-                                                        c_true_enable_parameter_prefix)
-                                              ELSE
-                                               p_enable_parameter_prefixes
-                                            END;
-
-      g_params.enable_proc_with_out_params := CASE
-                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                 coalesce(util_string_to_bool(g_params_existing_api.p_enable_proc_with_out_params),
-                                                          c_true_enable_proc_with_out_pa)
-                                                ELSE
-                                                 p_enable_proc_with_out_params
-                                              END;
-
-      g_params.enable_getter_and_setter := CASE
-                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_getter_and_setter),
-                                                       c_true_enable_getter_and_sette)
-                                             ELSE
-                                              p_enable_getter_and_setter
-                                           END;
-
-      g_params.col_prefix_in_method_names := CASE
-                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                                coalesce(util_string_to_bool(g_params_existing_api.p_col_prefix_in_method_names),
-                                                         c_true_col_prefix_in_method_na)
-                                               ELSE
-                                                p_col_prefix_in_method_names
-                                             END;
-
-      g_params.return_row_instead_of_pk := CASE
-                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                              coalesce(util_string_to_bool(g_params_existing_api.p_return_row_instead_of_pk),
-                                                       c_false_return_row_instead_of_)
-                                             ELSE
-                                              p_return_row_instead_of_pk
-                                           END;
-
-      g_params.enable_dml_view := CASE
-                                    WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                     coalesce(util_string_to_bool(g_params_existing_api.p_enable_dml_view),
-                                              c_false_enable_dml_view)
-                                    ELSE
-                                     p_enable_dml_view
-                                  END;
-
-      g_params.enable_generic_change_log := CASE
-                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_generic_change_log),
-                                                        c_false_enable_generic_change_)
-                                              ELSE
-                                               p_enable_generic_change_log
-                                            END;
-
-      g_params.api_name := CASE
-                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists AND
-                                  g_params_existing_api.p_api_name IS NOT NULL THEN
-                              g_params_existing_api.p_api_name
-                             ELSE
-                              util_get_substituted_name(nvl(p_api_name,
-                                                            '#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'))
-                           END;
-
-      g_params.sequence_name := CASE
-                                  WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                   g_params_existing_api.p_sequence_name
-                                  ELSE
-                                   CASE
-                                     WHEN p_sequence_name IS NOT NULL THEN
-                                      util_get_substituted_name(p_sequence_name)
-                                     ELSE
-                                      NULL
-                                   END
-                                END;
-
-      g_params.exclude_column_list := CASE
-                                        WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                         g_params_existing_api.p_exclude_column_list
-                                        ELSE
-                                         p_exclude_column_list
-                                      END;
-
-      g_params.audit_column_mappings := CASE
-                                        WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                         g_params_existing_api.p_audit_column_mappings
-                                        ELSE
-                                         p_audit_column_mappings
-                                      END;
-
-      g_params.audit_user_expression := CASE
-                                        WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                         g_params_existing_api.p_audit_user_expression
-                                        ELSE
-                                         p_audit_user_expression
-                                      END;
-
-      g_params.enable_custom_defaults := CASE
-                                           WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                            coalesce(util_string_to_bool(g_params_existing_api.p_enable_custom_defaults),
-                                                     c_false_enable_custom_defaults)
-                                           ELSE
-                                            p_enable_custom_defaults
-                                         END;
+      g_params.enable_insertion_of_rows    := p_enable_insertion_of_rows;
+      g_params.enable_column_defaults      := p_enable_column_defaults;
+      g_params.enable_update_of_rows       := p_enable_update_of_rows;
+      g_params.enable_deletion_of_rows     := p_enable_deletion_of_rows;
+      g_params.enable_parameter_prefixes   := p_enable_parameter_prefixes;
+      g_params.enable_proc_with_out_params := p_enable_proc_with_out_params;
+      g_params.enable_getter_and_setter    := p_enable_getter_and_setter;
+      g_params.col_prefix_in_method_names  := p_col_prefix_in_method_names;
+      g_params.return_row_instead_of_pk    := p_return_row_instead_of_pk;
+      g_params.enable_dml_view             := p_enable_dml_view;
+      g_params.enable_generic_change_log   := p_enable_generic_change_log;
+      g_params.api_name                    := util_get_substituted_name(nvl(p_api_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'));
+      g_params.sequence_name               := CASE WHEN p_sequence_name IS NOT NULL THEN util_get_substituted_name(p_sequence_name) ELSE NULL END;
+      g_params.exclude_column_list         := p_exclude_column_list;
+      g_params.audit_column_mappings       := p_audit_column_mappings;
+      g_params.audit_user_expression       := p_audit_user_expression;
+      g_params.enable_custom_defaults      := p_enable_custom_defaults;
+      g_params.custom_default_values       :=  p_custom_default_values;
+      IF g_params.custom_default_values IS NOT NULL THEN
+        g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
+      END IF;
+      -- check for empty XML element
+      IF g_params.custom_defaults_serialized = '<defaults/>' THEN
+        g_params.custom_default_values      := NULL;
+        g_params.custom_defaults_serialized := NULL;
+      END IF;
       util_debug_stop_one_step;
     END init_process_parameters;
 
@@ -2591,28 +2469,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       END IF;
       util_debug_stop_one_step;
     END init_check_if_table_exists;
-
-    -----------------------------------------------------------------------------
-
-    PROCEDURE init_fetch_existing_api_params IS
-      CURSOR v_cur IS
-        SELECT * FROM TABLE(view_existing_apis(p_table_name => g_params.table_name, p_owner => g_params.owner));
-    BEGIN
-      util_debug_start_one_step(p_action => 'init_fetch_existing_api_params');
-      OPEN v_cur;
-      FETCH v_cur
-        INTO g_params_existing_api;
-      IF v_cur%FOUND THEN
-        g_status.api_exists := TRUE;
-      END IF;
-      CLOSE v_cur;
-      util_debug_stop_one_step;
-    EXCEPTION
-      WHEN OTHERS THEN
-        CLOSE v_cur;
-        util_debug_stop_one_step;
-        RAISE;
-    END init_fetch_existing_api_params;
 
     -----------------------------------------------------------------------------
 
@@ -3066,60 +2922,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
 
     -----------------------------------------------------------------------------
 
-    PROCEDURE init_fetch_custom_defaults IS
-      FUNCTION get_spec_custom_defaults RETURN xmltype IS
-        v_return VARCHAR2(32767);
-      BEGIN
-        FOR i IN (SELECT text
-                    FROM all_source
-                   WHERE owner = g_params.owner
-                     AND NAME = g_params.api_name
-                     AND TYPE = 'PACKAGE'
-                     AND line >= (SELECT MIN(line) AS line
-                                    FROM all_source
-                                   WHERE owner = g_params.owner
-                                     AND NAME = g_params.api_name
-                                     AND TYPE = 'PACKAGE'
-                                     AND instr(text, '<custom_defaults>') > 0)) LOOP
-          IF instr(i.text, 'source="USER"') > 0 OR instr(i.text, 'custom_defaults') > 0 THEN
-            v_return := v_return || ltrim(i.text, -- needed for backward compatibility of old comment style
-                                          ' *');
-          END IF;
-          EXIT WHEN instr(i.text, '</custom_defaults>') > 0;
-        END LOOP;
-        RETURN CASE WHEN v_return IS NULL THEN NULL ELSE xmltype(v_return) END;
-      END;
-
-    BEGIN
-      util_debug_start_one_step(p_action => 'init_fetch_custom_defaults');
-      g_params.custom_default_values := CASE
-                                          WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
-                                           CASE
-                                             WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
-                                             -- g_params_existing_api.p_custom_default_values contains only a
-                                             -- placeholder to signal that custom defaults exists, because the
-                                             -- defaults could be very large. We have to fetch the xml encoded
-                                             -- custom defaults from the end of the package spec.
-                                              get_spec_custom_defaults
-                                           END
-                                          ELSE
-                                           p_custom_default_values
-                                        END;
-
-      IF g_params.custom_default_values IS NOT NULL THEN
-        g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
-      END IF;
-
-      -- check for empty XML element
-      IF g_params.custom_defaults_serialized = '<defaults/>' THEN
-        g_params.custom_default_values      := NULL;
-        g_params.custom_defaults_serialized := NULL;
-      END IF;
-      util_debug_stop_one_step;
-    END init_fetch_custom_defaults;
-
-    -----------------------------------------------------------------------------
-
     PROCEDURE init_process_custom_defaults IS
       v_index INTEGER;
     BEGIN
@@ -3209,11 +3011,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     g_params.owner := p_owner;
     g_params.table_name := p_table_name;
     init_check_if_table_exists;
-    g_params.reuse_existing_api_params := p_reuse_existing_api_params;
-    g_status.api_exists := FALSE;
-    IF g_params.reuse_existing_api_params THEN
-      init_fetch_existing_api_params;
-    END IF;
     init_process_parameters;
     IF g_params.enable_generic_change_log THEN
       init_check_if_log_table_exists;
@@ -3234,7 +3031,6 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
     init_process_fk_columns;
     init_process_audit_columns;
     IF g_params.enable_custom_defaults THEN
-      init_fetch_custom_defaults;
       init_process_custom_defaults;
     END IF;
   END main_init;
@@ -3265,7 +3061,6 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
     generated_by="{{ GENERATED_BY }}"
     p_table_name="{{ TABLE_NAME }}"
     p_owner="{{ OWNER }}"
-    p_reuse_existing_api_params="{{ REUSE_EXISTING_API_PARAMS }}"
     p_enable_insertion_of_rows="{{ ENABLE_INSERTION_OF_ROWS }}"
     p_enable_column_defaults="{{ ENABLE_COLUMN_DEFAULTS }}"
     p_enable_update_of_rows="{{ ENABLE_UPDATE_OF_ROWS }}"
@@ -4410,8 +4205,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
                                   WHEN g_params.enable_custom_defaults THEN
                                    c_lf || '
   /*
-  Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
-  All other custom defaults are only listed for convenience and determined at runtime by the generator.
   You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
   {% LIST_SPEC_CUSTOM_DEFAULTS %}
   */'
@@ -4688,7 +4481,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   (
     p_table_name                  IN all_objects.object_name%TYPE,
     p_owner                       IN all_users.username%TYPE DEFAULT USER,
-    p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para,
     p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
     p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
     p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
@@ -4713,7 +4505,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     main_init(p_generator_action            => 'COMPILE_API',
               p_table_name                  => p_table_name,
               p_owner                       => p_owner,
-              p_reuse_existing_api_params   => p_reuse_existing_api_params,
               p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
               p_enable_column_defaults      => p_enable_column_defaults,
               p_enable_update_of_rows       => p_enable_update_of_rows,
@@ -4743,7 +4534,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   (
     p_table_name                  IN all_objects.object_name%TYPE,
     p_owner                       IN all_users.username%TYPE DEFAULT USER,
-    p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para,
     p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
     p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
     p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
@@ -4771,7 +4561,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     main_init(p_generator_action            => 'COMPILE_API_AND_GET_CODE',
               p_table_name                  => p_table_name,
               p_owner                       => p_owner,
-              p_reuse_existing_api_params   => p_reuse_existing_api_params,
               p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
               p_enable_column_defaults      => p_enable_column_defaults,
               p_enable_update_of_rows       => p_enable_update_of_rows,
@@ -4802,7 +4591,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   (
     p_table_name                  IN all_objects.object_name%TYPE,
     p_owner                       IN all_users.username%TYPE DEFAULT USER,
-    p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para,
     p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
     p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
     p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
@@ -4827,7 +4615,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     main_init(p_generator_action            => 'GET_CODE',
               p_table_name                  => p_table_name,
               p_owner                       => p_owner,
-              p_reuse_existing_api_params   => p_reuse_existing_api_params,
               p_enable_insertion_of_rows    => p_enable_insertion_of_rows,
               p_enable_column_defaults      => p_enable_column_defaults,
               p_enable_update_of_rows       => p_enable_update_of_rows,
@@ -4850,28 +4637,6 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     util_debug_stop_one_run;
     RETURN main_return_code;
   END get_code;
-
-  -----------------------------------------------------------------------------
-
-  PROCEDURE recreate_existing_apis(p_owner IN all_users.username%TYPE DEFAULT USER) IS
-    v_apis t_tab_existing_apis;
-
-    CURSOR v_cur IS
-      SELECT * FROM TABLE(view_existing_apis(p_owner => p_owner));
-  BEGIN
-    OPEN v_cur;
-
-    FETCH v_cur BULK COLLECT
-      INTO v_apis LIMIT c_bulk_collect_limit;
-
-    CLOSE v_cur;
-
-    IF v_apis.count > 0 THEN
-      FOR i IN v_apis.first .. v_apis.last LOOP
-        compile_api(p_table_name => v_apis(i).table_name, p_owner => v_apis(i).owner);
-      END LOOP;
-    END IF;
-  END;
 
   -----------------------------------------------------------------------------
 
@@ -4936,7 +4701,6 @@ WITH api_names AS (
                 x.generated_by,
                 x.p_owner,
                 x.p_table_name,
-                x.p_reuse_existing_api_params,
                 x.p_enable_insertion_of_rows,
                 x.p_enable_column_defaults,
                 x.p_enable_update_of_rows,
@@ -4967,7 +4731,6 @@ WITH api_names AS (
                            generated_by                  VARCHAR2 (128 CHAR)  PATH ''@generated_by'',
                            p_owner                       VARCHAR2 (128 CHAR)  PATH ''@p_owner'',
                            p_table_name                  VARCHAR2 (128 CHAR)  PATH ''@p_table_name'',
-                           p_reuse_existing_api_params   VARCHAR2 (5 CHAR)    PATH ''@p_reuse_existing_api_params'',
                            p_enable_insertion_of_rows    VARCHAR2 (5 CHAR)    PATH ''@p_enable_insertion_of_rows'',
                            p_enable_column_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_column_defaults'',
                            p_enable_update_of_rows       VARCHAR2 (5 CHAR)    PATH ''@p_enable_update_of_rows'',
@@ -5030,7 +4793,6 @@ SELECT NULL AS errors,
        apis.generated_by,
        apis.p_owner,
        apis.p_table_name,
-       apis.p_reuse_existing_api_params,
        apis.p_enable_insertion_of_rows,
        apis.p_enable_column_defaults,
        apis.p_enable_update_of_rows,

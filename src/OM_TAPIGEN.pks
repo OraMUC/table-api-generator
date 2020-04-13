@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.6';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.7';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -92,7 +92,6 @@ c_ora_max_name_len CONSTANT INTEGER :=
   $END;
 
 -- parameter defaults
-c_true_reuse_existing_api_para CONSTANT BOOLEAN := TRUE;
 c_true_enable_insertion_of_row CONSTANT BOOLEAN := TRUE;
 c_false_enable_column_defaults CONSTANT BOOLEAN := FALSE;
 c_true_enable_update_of_rows   CONSTANT BOOLEAN := TRUE;
@@ -132,7 +131,6 @@ TYPE t_rec_existing_apis IS RECORD(
   generated_by                  all_users.username%TYPE,
   p_owner                       all_users.username%TYPE,
   p_table_name                  all_objects.object_name%TYPE,
-  p_reuse_existing_api_params   VARCHAR2(5 CHAR),
   p_enable_insertion_of_rows    VARCHAR2(5 CHAR),
   p_enable_column_defaults      VARCHAR2(5 CHAR),
   p_enable_update_of_rows       VARCHAR2(5 CHAR),
@@ -237,7 +235,6 @@ PROCEDURE compile_api
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
   p_table_name                  IN all_objects.object_name%TYPE,
   p_owner                       IN all_users.username%TYPE DEFAULT USER,
-  p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para, -- If true, all following params are ignored when API is already existing and params are extractable from spec source.
   p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
   p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults, -- If true, the data dictionary defaults of the columns are used for the create methods.
   p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
@@ -273,7 +270,6 @@ FUNCTION compile_api_and_get_code
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
   p_table_name                  IN all_objects.object_name%TYPE,
   p_owner                       IN all_users.username%TYPE DEFAULT USER,
-  p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para, -- If true, all following params are ignored when API is already existing and params are extractable from spec source.
   p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
   p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults, -- If true, the data dictionary defaults of the columns are used for the create methods.
   p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
@@ -313,7 +309,6 @@ FUNCTION get_code
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
   p_table_name                  IN all_objects.object_name%TYPE,
   p_owner                       IN all_users.username%TYPE DEFAULT USER,
-  p_reuse_existing_api_params   IN BOOLEAN DEFAULT om_tapigen.c_true_reuse_existing_api_para, -- If true, all following params are ignored when API is already existing and params are extractable from spec source.
   p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
   p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults, -- If true, the data dictionary defaults of the columns are used for the create methods.
   p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
@@ -354,21 +349,6 @@ END;
 --------------------------------------------------------------------------------
 -- Public helper methods
 --------------------------------------------------------------------------------
-
-PROCEDURE recreate_existing_apis(
-  p_owner IN all_users.username%TYPE DEFAULT USER);
-/**
-
-Helper to recreate all APIs in the current (or another) schema with the original
-call parameters (read from the package specs).
-
-```sql
-BEGIN
-  om_tapigen.recreate_existing_apis;
-END;
-```
-**/
-
 
 FUNCTION view_existing_apis(
   p_table_name all_tables.table_name%TYPE DEFAULT NULL,
