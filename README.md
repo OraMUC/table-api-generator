@@ -9,16 +9,6 @@ Oracle PL/SQL Table API Generator
 - [Function get_code](#get_code)
 - [Function view_existing_apis](#view_existing_apis)
 - [Function view_naming_conflicts](#view_naming_conflicts)
-- [Function util_get_column_data_default](#util_get_column_data_default)
-- [Function util_get_cons_search_condition](#util_get_cons_search_condition)
-- [Function util_split_to_table](#util_split_to_table)
-- [Function util_get_ora_max_name_len](#util_get_ora_max_name_len)
-- [Procedure util_set_debug_on](#util_set_debug_on)
-- [Procedure util_set_debug_off](#util_set_debug_off)
-- [Function util_view_debug_log](#util_view_debug_log)
-- [Function util_view_columns_array](#util_view_columns_array)
-- [Function util_view_package_state](#util_view_package_state)
-- [Function util_get_ddl](#util_get_ddl)
 
 
 <h2><a id="om_tapigen"></a>Package om_tapigen</h2>
@@ -95,7 +85,7 @@ SIGNATURE
 ```sql
 PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.7';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.8';
 ```
 
 
@@ -128,7 +118,6 @@ PROCEDURE compile_api
   p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na, -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
   p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
   p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-  p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_false_enable_generic_change_,
   p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
@@ -172,7 +161,6 @@ FUNCTION compile_api_and_get_code
   p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na, -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
   p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
   p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-  p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_false_enable_generic_change_,
   p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
@@ -218,7 +206,6 @@ FUNCTION get_code
   p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na, -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
   p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
   p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-  p_enable_generic_change_log   IN BOOLEAN DEFAULT om_tapigen.c_false_enable_generic_change_,
   p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
   p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
@@ -267,180 +254,6 @@ SIGNATURE
 FUNCTION view_naming_conflicts(
   p_owner all_users.username%TYPE DEFAULT USER)
 RETURN t_tab_naming_conflicts PIPELINED;
-```
-
-
-<h2><a id="util_get_column_data_default"></a>Function util_get_column_data_default</h2>
-<!------------------------------------------------------------------------------------>
-
-Helper to read a column data default from the dictionary.
-[Working with long columns](http://www.oracle-developer.net/display.php?id=430).
-
-SIGNATURE
-
-```sql
-FUNCTION util_get_column_data_default(
-  p_table_name  IN VARCHAR2,
-  p_column_name IN VARCHAR2,
-  p_owner       VARCHAR2 DEFAULT USER)
-RETURN VARCHAR2;
-```
-
-
-<h2><a id="util_get_cons_search_condition"></a>Function util_get_cons_search_condition</h2>
-<!---------------------------------------------------------------------------------------->
-
-Helper to read a constraint search condition from the dictionary (not needed
-in 12cR1 and above, there we have a column search_condition_vc in
-user_constraints).
-
-SIGNATURE
-
-```sql
-FUNCTION util_get_cons_search_condition(
-  p_constraint_name IN VARCHAR2,
-  p_owner           IN VARCHAR2 DEFAULT USER)
-RETURN VARCHAR2;
-```
-
-
-<h2><a id="util_split_to_table"></a>Function util_split_to_table</h2>
-<!------------------------------------------------------------------>
-
-Helper function to split a string to a selectable table.
-
-```sql
-SELECT column_value FROM TABLE (om_tapigen.util_split_to_table('1,2,3,test'));
-```
-
-SIGNATURE
-
-```sql
-FUNCTION util_split_to_table(
-  p_string    IN VARCHAR2,
-  p_delimiter IN VARCHAR2 DEFAULT ',')
-RETURN t_tab_vc2_4k PIPELINED;
-```
-
-
-<h2><a id="util_get_ora_max_name_len"></a>Function util_get_ora_max_name_len</h2>
-<!------------------------------------------------------------------------------>
-
-Helper function to determine the maximum length for an identifier name (e.g.
-column name). Returns the package constant c_ora_max_name_len, which is
-determined by a conditional compilation.
-
-SIGNATURE
-
-```sql
-FUNCTION util_get_ora_max_name_len
-RETURN INTEGER;
-```
-
-
-<h2><a id="util_set_debug_on"></a>Procedure util_set_debug_on</h2>
-<!--------------------------------------------------------------->
-
-Enable (and reset) the debugging (previous debug data will be lost)
-
-```sql
-BEGIN
-  om_tapigen.util_set_debug_on;
-END;
-```
-
-SIGNATURE
-
-```sql
-PROCEDURE util_set_debug_on;
-```
-
-
-<h2><a id="util_set_debug_off"></a>Procedure util_set_debug_off</h2>
-<!----------------------------------------------------------------->
-
-Disable the debugging
-
-```sql
-BEGIN
-  om_tapigen.util_set_debug_off;
-END;
-```
-
-SIGNATURE
-
-```sql
-PROCEDURE util_set_debug_off;
-```
-
-
-<h2><a id="util_view_debug_log"></a>Function util_view_debug_log</h2>
-<!------------------------------------------------------------------>
-
-View the debug details. Maximum 999 API creations are captured for memory
-reasons. You can reset the debugging by calling `om_tapigen.util_set_debug_on`.
-
-```sql
-SELECT * FROM TABLE(om_tapigen.util_view_debug_log);
-```
-
-SIGNATURE
-
-```sql
-FUNCTION util_view_debug_log
-RETURN t_tab_debug_data PIPELINED;
-```
-
-
-<h2><a id="util_view_columns_array"></a>Function util_view_columns_array</h2>
-<!-------------------------------------------------------------------------->
-
-View the internal columns array from the last API generation. This view is
-independend from the debug mode, because this array is resetted for each API
-generation.
-
-```sql
-SELECT * FROM TABLE(om_tapigen.util_view_columns_array);
-```
-
-SIGNATURE
-
-```sql
-FUNCTION util_view_columns_array
-RETURN t_tab_debug_columns PIPELINED;
-```
-
-
-<h2><a id="util_view_package_state"></a>Function util_view_package_state</h2>
-<!-------------------------------------------------------------------------->
-
-View some informations from the internal package state for debug purposes.
-
-```sql
-SELECT * FROM TABLE(om_tapigen.util_view_package_state);
-```
-
-SIGNATURE
-
-```sql
-FUNCTION util_view_package_state
-RETURN t_tab_package_state PIPELINED;
-```
-
-
-<h2><a id="util_get_ddl"></a>Function util_get_ddl</h2>
-<!---------------------------------------------------->
-
-Helper for testing to get the DDL of generated objects.
-
-SIGNATURE
-
-```sql
-FUNCTION util_get_ddl(
-  p_object_type VARCHAR2,
-  p_object_name VARCHAR2,
-  p_owner       VARCHAR2 DEFAULT USER)
-RETURN CLOB;
 ```
 
 

@@ -11,7 +11,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_col_prefix_in_method_names  CONSTANT param_type := 'Keep column prefix in getter/setter method names';
   c_return_row_instead_of_pk    CONSTANT param_type := 'Return row instead of pk (for create functions)';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
-  c_enable_generic_change_log   CONSTANT param_type := 'Enable generic change log';
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
   c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #TABLE_NAME_26#_SEQ)';
   c_exclude_column_list         CONSTANT param_type := 'Exclude column list (comma separated)';
@@ -59,7 +58,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_col_prefix_in_method_names) := util_bool_to_string(om_tapigen.c_true_col_prefix_in_method_na);
     v_params(c_return_row_instead_of_pk) := util_bool_to_string(om_tapigen.c_false_return_row_instead_of_);
     v_params(c_enable_dml_view) := util_bool_to_string(om_tapigen.c_false_enable_dml_view);
-    v_params(c_enable_generic_change_log) := util_bool_to_string(om_tapigen.c_false_enable_generic_change_);
     v_params(c_api_name) := NULL;
     v_params(c_sequence_name) := NULL;
     v_params(c_exclude_column_list) := NULL;
@@ -83,7 +81,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
                         c_col_prefix_in_method_names,
                         c_return_row_instead_of_pk,
                         c_enable_dml_view,
-                        c_enable_generic_change_log,
                         c_api_name,
                         c_sequence_name,
                         c_exclude_column_list,
@@ -106,7 +103,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_lov(c_col_prefix_in_method_names) := NEW t_string('true', 'false');
     v_lov(c_return_row_instead_of_pk) := NEW t_string('true', 'false');
     v_lov(c_enable_dml_view) := NEW t_string('true', 'false');
-    v_lov(c_enable_generic_change_log) := NEW t_string('true', 'false');
     v_lov(c_enable_custom_defaults) := NEW t_string('true', 'false');
     RETURN v_lov;
   END get_lov;
@@ -129,7 +125,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
                                p_col_prefix_in_method_names  => util_string_to_bool(in_params(c_col_prefix_in_method_names)),
                                p_return_row_instead_of_pk    => util_string_to_bool(in_params(c_return_row_instead_of_pk)),
                                p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
-                               p_enable_generic_change_log   => util_string_to_bool(in_params(c_enable_generic_change_log)),
                                p_api_name                    => in_params(c_api_name),
                                p_sequence_name               => in_params(c_sequence_name),
                                p_exclude_column_list         => in_params(c_exclude_column_list),
