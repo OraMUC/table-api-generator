@@ -9,7 +9,7 @@ prompt ============================================================
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.8';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.0.9';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -100,18 +100,6 @@ c_ora_max_name_len CONSTANT INTEGER :=
     $END
   $END;
 
--- parameter defaults
-c_true_enable_insertion_of_row CONSTANT BOOLEAN := TRUE;
-c_false_enable_column_defaults CONSTANT BOOLEAN := FALSE;
-c_true_enable_update_of_rows   CONSTANT BOOLEAN := TRUE;
-c_false_enable_deletion_of_row CONSTANT BOOLEAN := FALSE;
-c_true_enable_parameter_prefix CONSTANT BOOLEAN := TRUE;
-c_true_enable_proc_with_out_pa CONSTANT BOOLEAN := TRUE;
-c_true_enable_getter_and_sette CONSTANT BOOLEAN := TRUE;
-c_true_col_prefix_in_method_na CONSTANT BOOLEAN := TRUE;
-c_false_return_row_instead_of_ CONSTANT BOOLEAN := FALSE;
-c_false_enable_dml_view        CONSTANT BOOLEAN := FALSE;
-c_false_enable_custom_defaults CONSTANT BOOLEAN := FALSE;
 c_audit_user_expression        CONSTANT VARCHAR2(128 CHAR) := q'[coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'))]';
 
 --------------------------------------------------------------------------------
@@ -197,6 +185,7 @@ TYPE t_rec_columns IS RECORD(
   data_custom_default   VARCHAR2(4000 CHAR),
   custom_default_source VARCHAR2(15 CHAR),
   identity_type         VARCHAR2(15 CHAR),
+  default_on_null_yn    VARCHAR2(1 CHAR),
   is_pk_yn              VARCHAR2(1 CHAR),
   is_uk_yn              VARCHAR2(1 CHAR),
   is_fk_yn              VARCHAR2(1 CHAR),
@@ -240,25 +229,25 @@ TYPE t_tab_vc2_4k IS TABLE OF VARCHAR2(4000);
 
 PROCEDURE compile_api
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
-  p_table_name                  IN all_objects.object_name%TYPE,
-  p_owner                       IN all_users.username%TYPE DEFAULT USER,
-  p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
-  p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults, -- If true, the data dictionary defaults of the columns are used for the create methods.
-  p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
-  p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
-  p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix, -- If true, the param names of methods will be prefixed with 'p_'.
-  p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa, -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
-  p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette, -- prefixedIf true, for each column get and set methods are created.
-  p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na, -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
-  p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
-  p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-  p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
-  p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
-  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
-  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
-  p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
-  p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_table_name                  IN VARCHAR2,
+  p_owner                       IN VARCHAR2 DEFAULT USER,
+  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,
+  p_enable_column_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, the data dictionary defaults of the columns are used for the create methods.
+  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,
+  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE,
+  p_enable_parameter_prefixes   IN BOOLEAN  DEFAULT TRUE,  -- If true, the param names of methods will be prefixed with 'p_'.
+  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
+  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- prefixedIf true, for each column get and set methods are created.
+  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
+  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE,
+  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE,
+  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
+  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
+  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
+  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
+  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
+  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 );
 /**
 
@@ -274,25 +263,25 @@ END;
 
 FUNCTION compile_api_and_get_code
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
-  p_table_name                  IN all_objects.object_name%TYPE,
-  p_owner                       IN all_users.username%TYPE DEFAULT USER,
-  p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
-  p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults, -- If true, the data dictionary defaults of the columns are used for the create methods.
-  p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
-  p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
-  p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix, -- If true, the param names of methods will be prefixed with 'p_'.
-  p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa, -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
-  p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette, -- prefixedIf true, for each column get and set methods are created.
-  p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na, -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
-  p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
-  p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-  p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
-  p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
-  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
-  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
-  p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
-  p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_table_name                  IN VARCHAR2,
+  p_owner                       IN VARCHAR2 DEFAULT USER,
+  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,
+  p_enable_column_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, the data dictionary defaults of the columns are used for the create methods.
+  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,
+  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE,
+  p_enable_parameter_prefixes   IN BOOLEAN  DEFAULT TRUE,  -- If true, the param names of methods will be prefixed with 'p_'.
+  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
+  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- prefixedIf true, for each column get and set methods are created.
+  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
+  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE,
+  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE,
+  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
+  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
+  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
+  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
+  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
+  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 ) RETURN CLOB;
 /**
 
@@ -312,25 +301,25 @@ END;
 
 FUNCTION get_code
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
-  p_table_name                  IN all_objects.object_name%TYPE,
-  p_owner                       IN all_users.username%TYPE DEFAULT USER,
-  p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
-  p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults, -- If true, the data dictionary defaults of the columns are used for the create methods.
-  p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
-  p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
-  p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix, -- If true, the param names of methods will be prefixed with 'p_'.
-  p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa, -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
-  p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette, -- If true, for each column get and set methods are created.
-  p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na, -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
-  p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
-  p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-  p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
-  p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,                 -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
-  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
-  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,                                     -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
-  p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,       -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
-  p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype DEFAULT NULL                                       -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_table_name                  IN VARCHAR2,
+  p_owner                       IN VARCHAR2 DEFAULT USER,
+  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,
+  p_enable_column_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, the data dictionary defaults of the columns are used for the create methods.
+  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,
+  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE,
+  p_enable_parameter_prefixes   IN BOOLEAN  DEFAULT TRUE,  -- If true, the param names of methods will be prefixed with 'p_'.
+  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
+  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- prefixedIf true, for each column get and set methods are created.
+  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
+  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE,
+  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE,
+  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
+  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
+  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
+  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
+  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
+  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 ) RETURN CLOB;
 /**
 
@@ -355,8 +344,8 @@ END;
 --------------------------------------------------------------------------------
 
 FUNCTION view_existing_apis(
-  p_table_name all_tables.table_name%TYPE DEFAULT NULL,
-  p_owner      all_users.username%TYPE DEFAULT USER)
+  p_table_name VARCHAR2 DEFAULT NULL,
+  p_owner      VARCHAR2 DEFAULT USER)
 RETURN t_tab_existing_apis PIPELINED;
 /**
 
@@ -369,7 +358,7 @@ SELECT * FROM TABLE (om_tapigen.view_existing_apis);
 
 
 FUNCTION view_naming_conflicts(
-  p_owner all_users.username%TYPE DEFAULT USER)
+  p_owner VARCHAR2 DEFAULT USER)
 RETURN t_tab_naming_conflicts PIPELINED;
 /**
 
@@ -522,7 +511,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   -- private global constants (c_*)
   -----------------------------------------------------------------------------
   c_generator_error_number      CONSTANT PLS_INTEGER := -20000;
-  c_bulk_collect_limit          CONSTANT NUMBER := 10000;
   c_lf                          CONSTANT VARCHAR2(2 CHAR) := chr(10);
   c_lflf                        CONSTANT VARCHAR2(3 CHAR) := chr(10) || chr(10);
   c_list_delimiter              CONSTANT VARCHAR2(3 CHAR) := ',' || c_lf;
@@ -557,11 +545,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     custom_defaults_serialized  VARCHAR2(32767 CHAR));
 
   TYPE t_rec_status IS RECORD(
-    pk_is_multi_column     BOOLEAN,
-    column_prefix          all_tab_cols.column_name%TYPE,
-    number_of_data_columns integer,
-    xmltype_column_present BOOLEAN,
     generator_action       VARCHAR2(30 CHAR),
+    column_prefix          all_tab_cols.column_name%TYPE,
+    pk_is_multi_column     BOOLEAN,
+    xmltype_column_present BOOLEAN,
+    number_of_data_columns integer,
+    number_of_pk_columns   integer,
+    number_of_uk_columns   integer,
+    number_of_fk_columns   integer,
     rpad_columns           INTEGER,
     rpad_pk_columns        INTEGER,
     rpad_uk_columns        INTEGER);
@@ -625,7 +616,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     column_name           all_tab_cols.column_name%TYPE,
     method_name           all_tab_cols.column_name%TYPE,
     parameter_name        all_tab_cols.column_name%TYPE,
-    column_compare        VARCHAR2(512 CHAR),
     old_value             VARCHAR2(512 CHAR),
     new_value             VARCHAR2(512 CHAR),
     current_uk_constraint all_objects.object_name%TYPE);
@@ -718,7 +708,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     identity_columns AS
      (
       $IF dbms_db_version.ver_le_11_1 $THEN
-      SELECT 'DUMMY_COLUMN_NAME' AS column_name_identity, NULL AS identity_type
+      SELECT 'DUMMY_COLUMN_NAME' AS column_name_identity,
+             NULL AS identity_type
         FROM dual
               $ELSE
               $IF dbms_db_version.ver_le_11_2 $THEN
@@ -744,6 +735,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                       data_precision,
                       data_scale,
                       identity_type,
+                      $IF dbms_db_version.ver_le_11_1 $THEN
+                      'N' as default_on_null_yn,
+                      $ELSE $IF dbms_db_version.ver_le_11_2 $THEN
+                      'N' as default_on_null_yn,
+                      $ELSE
+                      case when default_on_null = 'YES' then 'Y' else 'N' end as default_on_null_yn,
+                      $END $END
                       CASE
                         WHEN data_default IS NOT NULL THEN
                          (SELECT om_tapigen.util_get_column_data_default(p_owner       => g_params.owner,
@@ -785,6 +783,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
            NULL AS data_custom_default,
            NULL AS custom_default_source,
            identity_type,
+           default_on_null_yn,
            'N' AS is_pk_yn,
            'N' AS is_uk_yn,
            'N' AS is_fk_yn,
@@ -880,8 +879,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   -----------------------------------------------------------------------------
   -- util_get_attribute_compare is a private helper function to deliver the
   -- described (take a look at function util_get_attribute_surrogate) compare
-  -- code for two attributes. In addition to that,the compare operation must
-  -- be dynamically,because e.g. "=" or "<>" or other operations are required.
+  -- code for two attributes. In addition to that, the compare operation must
+  -- be dynamically, because e.g. "=" or "<>" or other operations are required.
   -----------------------------------------------------------------------------
   FUNCTION util_get_attribute_compare
   (
@@ -1211,8 +1210,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   PROCEDURE util_debug_start_one_run
   (
     p_generator_action VARCHAR2,
-    p_table_name       all_objects.object_name%TYPE,
-    p_owner            all_users.username%TYPE
+    p_table_name       VARCHAR2,
+    p_owner            VARCHAR2
   ) IS
   BEGIN
     g_debug_module := c_generator || ' v' || c_generator_version || ': ' || p_generator_action;
@@ -1308,6 +1307,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_row.data_custom_default   := g_columns(i).data_custom_default;
       v_row.custom_default_source := g_columns(i).custom_default_source;
       v_row.identity_type         := g_columns(i).identity_type;
+      v_row.default_on_null_yn    := g_columns(i).default_on_null_yn;
       v_row.is_pk_yn              := g_columns(i).is_pk_yn;
       v_row.is_uk_yn              := g_columns(i).is_uk_yn;
       v_row.is_fk_yn              := g_columns(i).is_fk_yn;
@@ -1349,6 +1349,18 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --
     v_row.key   := 'number_of_data_columns';
     v_row.value := to_char(g_status.number_of_data_columns);
+    pipe row(v_row);
+    --
+    v_row.key   := 'number_of_pk_columns';
+    v_row.value := to_char(g_status.number_of_pk_columns);
+    pipe row(v_row);
+    --
+    v_row.key   := 'number_of_uk_columns';
+    v_row.value := to_char(g_status.number_of_uk_columns);
+    pipe row(v_row);
+    --
+    v_row.key   := 'number_of_fk_columns';
+    v_row.value := to_char(g_status.number_of_fk_columns);
     pipe row(v_row);
     --
     v_row.key   := 'rpad_columns';
@@ -1639,50 +1651,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       RETURN v_result;
     END list_columns_w_pk_full;
 
-    -----------------------------------------------------------------------------
-    -- A block of code which compares new and old column values (without PK column) and
-    -- counts the number  of differences:
-    --    {% LIST_COLUMNS_WO_PK_COMPARE %}
-    -- Example:
-    --    IF COALESCE( v_row.test_number,-9999.9999 ) <> COALESCE( p_test_number,-9999.9999 ) THEN
-    --        v_count := v_count + 1;
-    --        create_change_log_entry( p_table     => 'map_users_roles'
-    --                         ,p_column    => 'mur_u_id'
-    --                         ,p_pk_id     => v_row.mur_id
-    --                         ,p_old_value => to_char(v_row.mur_u_id)
-    --                         ,p_new_value => to_char(p_mur_u_id) );
-    --    END IF;
-    --    IF DBMS_LOB.compare(COALESCE(v_row.test_clob,TO_CLOB('$$$$')),COALESCE(p_test_clob,TO_CLOB('$$$$'))) <> 0 THEN
-    --        v_count := v_count + 1;
-    --        create_change_log_entry( p_table     => 'map_users_roles'
-    --                         ,p_column    => 'mur_u_id'
-    --                         ,p_pk_id     => v_row.mur_id
-    --                         ,p_old_value => to_char(v_row.mur_u_id)
-    --                         ,p_new_value => to_char(p_mur_u_id) );
-    --    END IF;
-    --    ...
-    -----------------------------------------------------------------------------
-    FUNCTION list_columns_wo_pk_compare RETURN t_tab_vc2_5k IS
-      v_result t_tab_vc2_5k;
-    BEGIN
-      FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
-          AND g_columns(i).audit_type is null
-          AND g_columns(i).is_pk_yn = 'N'
-        THEN
-          v_result(v_result.count + 1) := CASE
-                                            WHEN i != v_result.first THEN
-                                              '      OR '
-                                          END || util_get_attribute_compare(p_data_type         => g_columns(i).data_type,
-                                                                            p_nullable          => util_string_to_bool(g_columns(i).is_nullable_yn),
-                                                                            p_first_attribute   => 'v_row."' || g_columns(i).column_name || '"',
-                                                                            p_second_attribute  => util_get_parameter_name(g_columns(i).column_name,
-                                                                                                                           NULL),
-                                                                            p_compare_operation => '<>') || c_lf;
-        END IF;
-      END LOOP;
-      RETURN v_result;
-    END list_columns_wo_pk_compare;
 
     -----------------------------------------------------------------------------
     -- Columns as parameter definition for create_row,update_row with PK:
@@ -1961,7 +1929,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           g_columns(i).audit_type like 'UPDATED%')
         THEN
           v_result(v_result.count + 1) :=
-            '             ' ||
+            '           ' ||
             rpad('"' || g_columns(i).column_name || '"', g_status.rpad_columns + 2) ||
             ' = ' ||
             case
@@ -2466,8 +2434,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_columns_w_pk_full;
       WHEN 'LIST_ROWCOLS_W_CUST_DEFAULTS' THEN
         RETURN list_rowcols_w_cust_defaults;
-      WHEN 'LIST_COLUMNS_WO_PK_COMPARE' THEN
-        RETURN list_columns_wo_pk_compare;
       WHEN 'LIST_MAP_PAR_EQ_NEWCOL_W_PK' THEN
         RETURN list_map_par_eq_newcol_w_pk;
       WHEN 'LIST_MAP_PAR_EQ_PARAM_W_PK' THEN
@@ -2727,8 +2693,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(g_iterator.method_name);
         WHEN 'I_PARAMETER_NAME' THEN
           code_append(g_iterator.parameter_name);
-        WHEN 'I_COLUMN_COMPARE' THEN
-          code_append(g_iterator.column_compare);
         WHEN 'I_OLD_VALUE' THEN
           code_append(g_iterator.old_value);
         WHEN 'I_NEW_VALUE' THEN
@@ -2843,8 +2807,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   PROCEDURE main_init
   (
     p_generator_action            IN VARCHAR2,
-    p_table_name                  IN all_objects.object_name%TYPE,
-    p_owner                       IN all_users.username%TYPE,
+    p_table_name                  IN VARCHAR2,
+    p_owner                       IN VARCHAR2,
     p_enable_insertion_of_rows    IN BOOLEAN,
     p_enable_column_defaults      IN BOOLEAN,
     p_enable_update_of_rows       IN BOOLEAN,
@@ -2855,8 +2819,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_col_prefix_in_method_names  IN BOOLEAN,
     p_return_row_instead_of_pk    IN BOOLEAN,
     p_enable_dml_view             IN BOOLEAN,
-    p_api_name                    IN all_objects.object_name%TYPE,
-    p_sequence_name               IN all_objects.object_name%TYPE,
+    p_api_name                    IN VARCHAR2,
+    p_sequence_name               IN VARCHAR2,
     p_exclude_column_list         IN VARCHAR2,
     p_audit_column_mappings       IN VARCHAR2,
     p_audit_user_expression       IN VARCHAR2,
@@ -3008,7 +2972,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       util_debug_start_one_step(p_action => 'init_fetch_columns');
       OPEN g_cur_columns;
       FETCH g_cur_columns BULK COLLECT
-        INTO g_columns LIMIT c_bulk_collect_limit;
+        INTO g_columns;
       CLOSE g_cur_columns;
       util_debug_stop_one_step;
     EXCEPTION
@@ -3299,19 +3263,31 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
     -----------------------------------------------------------------------------
 
-    PROCEDURE init_count_data_columns IS
+    PROCEDURE init_count_column_types IS
     BEGIN
-      util_debug_start_one_step(p_action => 'init_count_data_columns');
+      util_debug_start_one_step(p_action => 'init_count_column_types');
       g_status.number_of_data_columns := 0;
+      g_status.number_of_pk_columns := 0;
+      g_status.number_of_uk_columns := 0;
+      g_status.number_of_fk_columns := 0;
       FOR i IN g_columns.first .. g_columns.last LOOP
         if g_columns(i).is_pk_yn = 'N' and
         g_columns(i).is_excluded_yn = 'N' and
         g_columns(i).audit_type is null then
           g_status.number_of_data_columns := g_status.number_of_data_columns + 1;
         end if;
+        if g_columns(i).is_pk_yn = 'Y' then
+          g_status.number_of_pk_columns := g_status.number_of_pk_columns + 1;
+        end if;
+        if g_columns(i).is_uk_yn = 'Y' then
+          g_status.number_of_uk_columns := g_status.number_of_uk_columns + 1;
+        end if;
+        if g_columns(i).is_fk_yn = 'Y' then
+          g_status.number_of_fk_columns := g_status.number_of_fk_columns + 1;
+        end if;
       END LOOP;
       util_debug_stop_one_step;
-    END init_count_data_columns;
+    END init_count_column_types;
 
     -----------------------------------------------------------------------------
 
@@ -3420,7 +3396,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     init_process_uk_columns;
     init_process_fk_columns;
     init_process_audit_columns;
-    init_count_data_columns;
+    init_count_column_types;
     IF g_params.enable_custom_defaults THEN
       init_process_custom_defaults;
     END IF;
@@ -4345,23 +4321,15 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_setter_procedures');
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N' THEN
+        IF g_columns(i).is_excluded_yn = 'N' AND
+        g_columns(i).is_pk_yn = 'N' and g_columns(i).audit_type is null THEN
           g_iterator.column_name    := g_columns(i).column_name;
           g_iterator.method_name    := util_get_method_name(g_columns(i).column_name);
           g_iterator.parameter_name := util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns);
-
-          g_iterator.column_compare := util_get_attribute_compare(p_data_type         => g_columns(i).data_type,
-                                                                  p_nullable          => util_string_to_bool(g_columns(i).is_nullable_yn),
-                                                                  p_first_attribute   => 'v_row."' || g_columns(i).column_name || '"',
-                                                                  p_second_attribute  => TRIM(g_iterator.parameter_name),
-                                                                  p_compare_operation => '<>');
-
           g_iterator.old_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
                                                               p_attribute_name => 'v_row."' || g_columns(i).column_name || '"');
-
           g_iterator.new_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
                                                               p_attribute_name => g_iterator.parameter_name);
-
           g_code_blocks.template := '
 
   PROCEDURE set_{{ I_METHOD_NAME }} (
@@ -4376,13 +4344,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   IS
     v_row "{{ TABLE_NAME }}"%ROWTYPE;
   BEGIN
-    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-    -- update only,if the column value really differs
-    IF {{ I_COLUMN_COMPARE }} THEN
-      UPDATE {{ TABLE_NAME }}
-         SET "{{ I_COLUMN_NAME }}" = {{ I_PARAMETER_NAME }}
-       WHERE {% LIST_PK_COLUMNS_WHERE_CLAUSE %};' || '
-    END IF;
+    UPDATE {{ TABLE_NAME }}
+       SET "{{ I_COLUMN_NAME }}" = {{ I_PARAMETER_NAME }}
+     WHERE {% LIST_PK_COLUMNS_WHERE_CLAUSE %};' || '
   END set_{{ I_METHOD_NAME }};';
 
           util_template_replace('API BODY');
@@ -4786,24 +4750,24 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
   PROCEDURE compile_api
   (
-    p_table_name                  IN all_objects.object_name%TYPE,
-    p_owner                       IN all_users.username%TYPE DEFAULT USER,
-    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
-    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
-    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
-    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
-    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix,
-    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa,
-    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette,
-    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na,
-    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
-    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-    p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,
-    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_table_name                  IN VARCHAR2,
+    p_owner                       IN VARCHAR2 DEFAULT USER,
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT TRUE,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT FALSE,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT TRUE,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT FALSE,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT TRUE,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT TRUE,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT TRUE,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT TRUE,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
+    p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_api_name                    IN VARCHAR2 DEFAULT NULL,
+    p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
-    p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,
-    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
+    p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT FALSE,
     p_custom_default_values       IN xmltype DEFAULT NULL
   ) IS
   BEGIN
@@ -4837,24 +4801,24 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
   FUNCTION compile_api_and_get_code
   (
-    p_table_name                  IN all_objects.object_name%TYPE,
-    p_owner                       IN all_users.username%TYPE DEFAULT USER,
-    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
-    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
-    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
-    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
-    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix,
-    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa,
-    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette,
-    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na,
-    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
-    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-    p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,
-    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_table_name                  IN VARCHAR2,
+    p_owner                       IN VARCHAR2 DEFAULT USER,
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT TRUE,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT FALSE,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT TRUE,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT FALSE,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT TRUE,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT TRUE,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT TRUE,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT TRUE,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
+    p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_api_name                    IN VARCHAR2 DEFAULT NULL,
+    p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
-    p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,
-    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
+    p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT FALSE,
     p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
   BEGIN
@@ -4892,24 +4856,24 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
   FUNCTION get_code
   (
-    p_table_name                  IN all_objects.object_name%TYPE,
-    p_owner                       IN all_users.username%TYPE DEFAULT USER,
-    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_insertion_of_row,
-    p_enable_column_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_column_defaults,
-    p_enable_update_of_rows       IN BOOLEAN DEFAULT om_tapigen.c_true_enable_update_of_rows,
-    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT om_tapigen.c_false_enable_deletion_of_row,
-    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT om_tapigen.c_true_enable_parameter_prefix,
-    p_enable_proc_with_out_params IN BOOLEAN DEFAULT om_tapigen.c_true_enable_proc_with_out_pa,
-    p_enable_getter_and_setter    IN BOOLEAN DEFAULT om_tapigen.c_true_enable_getter_and_sette,
-    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT om_tapigen.c_true_col_prefix_in_method_na,
-    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT om_tapigen.c_false_return_row_instead_of_,
-    p_enable_dml_view             IN BOOLEAN DEFAULT om_tapigen.c_false_enable_dml_view,
-    p_api_name                    IN all_objects.object_name%TYPE DEFAULT NULL,
-    p_sequence_name               IN all_objects.object_name%TYPE DEFAULT NULL,
+    p_table_name                  IN VARCHAR2,
+    p_owner                       IN VARCHAR2 DEFAULT USER,
+    p_enable_insertion_of_rows    IN BOOLEAN DEFAULT TRUE,
+    p_enable_column_defaults      IN BOOLEAN DEFAULT FALSE,
+    p_enable_update_of_rows       IN BOOLEAN DEFAULT TRUE,
+    p_enable_deletion_of_rows     IN BOOLEAN DEFAULT FALSE,
+    p_enable_parameter_prefixes   IN BOOLEAN DEFAULT TRUE,
+    p_enable_proc_with_out_params IN BOOLEAN DEFAULT TRUE,
+    p_enable_getter_and_setter    IN BOOLEAN DEFAULT TRUE,
+    p_col_prefix_in_method_names  IN BOOLEAN DEFAULT TRUE,
+    p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
+    p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_api_name                    IN VARCHAR2 DEFAULT NULL,
+    p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
-    p_audit_user_expression       IN VARCHAR2 DEFAULT om_tapigen.c_audit_user_expression,
-    p_enable_custom_defaults      IN BOOLEAN DEFAULT om_tapigen.c_false_enable_custom_defaults,
+    p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
+    p_enable_custom_defaults      IN BOOLEAN DEFAULT FALSE,
     p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
   BEGIN
@@ -4943,8 +4907,8 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
   FUNCTION view_existing_apis
   (
-    p_table_name all_tables.table_name%TYPE DEFAULT NULL,
-    p_owner      all_users.username%TYPE DEFAULT USER
+    p_table_name VARCHAR2 DEFAULT NULL,
+    p_owner      VARCHAR2 DEFAULT USER
   ) RETURN t_tab_existing_apis
     PIPELINED IS
     v_tab t_tab_existing_apis;
@@ -5133,7 +5097,7 @@ SELECT NULL AS errors,
 
   -----------------------------------------------------------------------------
 
-  FUNCTION view_naming_conflicts(p_owner all_users.username%TYPE DEFAULT USER) RETURN t_tab_naming_conflicts
+  FUNCTION view_naming_conflicts(p_owner VARCHAR2 DEFAULT USER) RETURN t_tab_naming_conflicts
     PIPELINED IS
   BEGIN
     FOR i IN (WITH ut AS
@@ -5146,19 +5110,7 @@ SELECT NULL AS errors,
                    FROM ut
                  UNION ALL
                  SELECT substr(table_name, 1, (SELECT om_tapigen.util_get_ora_max_name_len FROM dual) - 6) || '_IOIUD'
-                   FROM ut
-                 UNION ALL
-                 SELECT 'GENERIC_CHANGE_LOG'
-                   FROM dual
-                 UNION ALL
-                 SELECT 'GENERIC_CHANGE_LOG_SEQ'
-                   FROM dual
-                 UNION ALL
-                 SELECT 'GENERIC_CHANGE_LOG_PK'
-                   FROM dual
-                 UNION ALL
-                 SELECT 'GENERIC_CHANGE_LOG_IDX'
-                   FROM dual)
+                   FROM ut)
                 SELECT uo.object_name, uo.object_type, uo.status, uo.last_ddl_time
                   FROM all_objects uo
                  WHERE owner = p_owner
@@ -5254,22 +5206,22 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params t_param;
   BEGIN
     v_params(c_parameter_descriptions) := 'https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md';
-    v_params(c_enable_insertion_of_rows) := util_bool_to_string(om_tapigen.c_true_enable_insertion_of_row);
-    v_params(c_enable_column_defaults) := util_bool_to_string(om_tapigen.c_false_enable_column_defaults);
-    v_params(c_enable_update_of_rows) := util_bool_to_string(om_tapigen.c_true_enable_update_of_rows);
-    v_params(c_enable_deletion_of_rows) := util_bool_to_string(om_tapigen.c_false_enable_deletion_of_row);
-    v_params(c_enable_parameter_prefixes) := util_bool_to_string(om_tapigen.c_true_enable_parameter_prefix);
-    v_params(c_enable_proc_with_out_params) := util_bool_to_string(om_tapigen.c_true_enable_proc_with_out_pa);
-    v_params(c_enable_getter_and_setter) := util_bool_to_string(om_tapigen.c_true_enable_getter_and_sette);
-    v_params(c_col_prefix_in_method_names) := util_bool_to_string(om_tapigen.c_true_col_prefix_in_method_na);
-    v_params(c_return_row_instead_of_pk) := util_bool_to_string(om_tapigen.c_false_return_row_instead_of_);
-    v_params(c_enable_dml_view) := util_bool_to_string(om_tapigen.c_false_enable_dml_view);
+    v_params(c_enable_insertion_of_rows) := 'TRUE';
+    v_params(c_enable_column_defaults) := 'FALSE';
+    v_params(c_enable_update_of_rows) := 'TRUE';
+    v_params(c_enable_deletion_of_rows) := 'FALSE';
+    v_params(c_enable_parameter_prefixes) := 'TRUE';
+    v_params(c_enable_proc_with_out_params) := 'TRUE';
+    v_params(c_enable_getter_and_setter) := 'TRUE';
+    v_params(c_col_prefix_in_method_names) := 'TRUE';
+    v_params(c_return_row_instead_of_pk) := 'FALSE';
+    v_params(c_enable_dml_view) := 'FALSE';
     v_params(c_api_name) := NULL;
     v_params(c_sequence_name) := NULL;
     v_params(c_exclude_column_list) := NULL;
     v_params(c_audit_column_mappings) := NULL;
     v_params(c_audit_user_expression) := om_tapigen.c_audit_user_expression;
-    v_params(c_enable_custom_defaults) := util_bool_to_string(om_tapigen.c_false_enable_custom_defaults);
+    v_params(c_enable_custom_defaults) := 'FALSE';
     v_params(c_custom_default_values) := NULL;
     RETURN v_params;
   END get_params;
