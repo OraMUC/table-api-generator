@@ -353,7 +353,7 @@ FUNCTION view_naming_conflicts(
 RETURN t_tab_naming_conflicts PIPELINED;
 /**
 
-Helper to check possible naming conflicts before the first usage of the API generator.
+Helper to check possible naming conflicts before the very first usage of the API generator.
 
 Also see the [naming conventions](https://github.com/OraMUC/table-api-generator/blob/master/docs/naming-conventions.md) of the generator.
 

@@ -362,7 +362,7 @@ FUNCTION view_naming_conflicts(
 RETURN t_tab_naming_conflicts PIPELINED;
 /**
 
-Helper to check possible naming conflicts before the first usage of the API generator.
+Helper to check possible naming conflicts before the very first usage of the API generator.
 
 Also see the [naming conventions](https://github.com/OraMUC/table-api-generator/blob/master/docs/naming-conventions.md) of the generator.
 
@@ -2686,7 +2686,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                          NULL
                       END);
         WHEN 'ROWTYPE_PARAM' THEN
-          code_append(rpad('p_row', g_status.rpad_columns + 2) || ' IN "' || g_params.table_name || '"%ROWTYPE )');
+          code_append(rpad('p_row', g_status.rpad_columns + 2) || ' IN "' || g_params.table_name || '"%ROWTYPE');
+        WHEN 'BULK_LIMIT_PARAM' THEN
+          code_append(rpad('p_bulk_limit', g_status.rpad_columns + 2) || ' IN PLS_INTEGER');
+        WHEN 'TABTYPE_PARAM' THEN
+          code_append(rpad('p_rows_tab', g_status.rpad_columns + 2) || ' IN t_rows_tab');
+        WHEN 'REFCURSOR_PARAM' THEN
+          code_append(rpad('p_ref_cursor', g_status.rpad_columns + 2) || ' IN t_strong_ref_cursor');
         WHEN 'I_COLUMN_NAME' THEN
           code_append(g_iterator.column_name);
         WHEN 'I_METHOD_NAME' THEN
@@ -3555,14 +3561,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   PROCEDURE set_bulk_limit (
-    p_bulk_limit     IN PLS_INTEGER );';
+    {{ BULK_LIMIT_PARAM }} );';
 
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
 
   PROCEDURE set_bulk_limit (
-    p_bulk_limit     IN PLS_INTEGER )
+    {{ BULK_LIMIT_PARAM }} )
   IS
   BEGIN
     g_bulk_limit := p_bulk_limit;
@@ -3744,13 +3750,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   FUNCTION create_rows (
-    p_rows_tab       IN t_rows_tab )
+    {{ TABTYPE_PARAM }} )
   RETURN t_rows_tab;';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   FUNCTION create_rows (
-    p_rows_tab       IN t_rows_tab )
+    {{ TABTYPE_PARAM }} )
   RETURN t_rows_tab IS
     v_return t_rows_tab;' || CASE WHEN g_status.xmltype_column_present THEN '
 
@@ -3797,12 +3803,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   PROCEDURE create_rows(
-    p_rows_tab       IN t_rows_tab );';
+    {{ TABTYPE_PARAM }} );';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   PROCEDURE create_rows(
-    p_rows_tab       IN t_rows_tab )
+    {{ TABTYPE_PARAM }} )
   IS
     v_return t_rows_tab;
   BEGIN
@@ -3845,13 +3851,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   FUNCTION create_row (
-    {{ ROWTYPE_PARAM }}
+    {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }};';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   FUNCTION create_row (
-    {{ ROWTYPE_PARAM }}
+    {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }} IS
     v_return {{ RETURN_TYPE }};
   BEGIN
@@ -3871,12 +3877,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   PROCEDURE create_row (
-    {{ ROWTYPE_PARAM }};';
+    {{ ROWTYPE_PARAM }} );';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   PROCEDURE create_row (
-    {{ ROWTYPE_PARAM }}
+    {{ ROWTYPE_PARAM }} )
   IS
     v_return {{ RETURN_TYPE }};
   BEGIN
@@ -3926,7 +3932,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   FUNCTION read_rows (
-    p_ref_cursor     IN t_strong_ref_cursor )
+    {{ REFCURSOR_PARAM }} )
   RETURN t_rows_tab;';
 
       util_template_replace('API SPEC');
@@ -3935,7 +3941,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   FUNCTION read_rows (
-    p_ref_cursor     IN t_strong_ref_cursor )
+    {{ REFCURSOR_PARAM }} )
   RETURN t_rows_tab
   IS
     v_return t_rows_tab;
@@ -4069,12 +4075,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   PROCEDURE update_row (
-    {{ ROWTYPE_PARAM }};';
+    {{ ROWTYPE_PARAM }} );';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   PROCEDURE update_row (
-    {{ ROWTYPE_PARAM }}
+    {{ ROWTYPE_PARAM }} )
   IS
   BEGIN
     update_row(
@@ -4090,7 +4096,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   PROCEDURE update_rows (
-    p_rows_tab       IN t_rows_tab );';
+    {{ TABTYPE_PARAM }} );';
       util_template_replace('API SPEC');
 
       -- check if columns exist that are
@@ -4104,7 +4110,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
         g_code_blocks.template := '
 
   PROCEDURE update_rows (
-    p_rows_tab       IN t_rows_tab )
+    {{ TABTYPE_PARAM }} )
   IS
   BEGIN
     FORALL i IN INDICES OF p_rows_tab
@@ -4116,7 +4122,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
         g_code_blocks.template := '
 
   PROCEDURE update_rows (
-    p_rows_tab       IN t_rows_tab )
+    {{ TABTYPE_PARAM }} )
   IS
   BEGIN
     -- there is no column anymore to update! All remaining columns are part
@@ -4193,13 +4199,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
-    {{ ROWTYPE_PARAM }}
+    {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }};';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   FUNCTION create_or_update_row (
-    {{ ROWTYPE_PARAM }}
+    {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }} IS
     v_return {{ RETURN_TYPE }};
   BEGIN
@@ -4219,12 +4225,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
-    {{ ROWTYPE_PARAM }};';
+    {{ ROWTYPE_PARAM }} );';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   PROCEDURE create_or_update_row (
-    {{ ROWTYPE_PARAM }}
+    {{ ROWTYPE_PARAM }} )
   IS
     v_return {{ RETURN_TYPE }};
   BEGIN
@@ -4267,12 +4273,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   PROCEDURE delete_rows (
-    p_rows_tab       IN t_rows_tab );';
+    {{ TABTYPE_PARAM }} );';
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
   PROCEDURE delete_rows (
-    p_rows_tab       IN t_rows_tab )
+    {{ TABTYPE_PARAM }} )
   IS
   BEGIN
     FORALL i IN INDICES OF p_rows_tab

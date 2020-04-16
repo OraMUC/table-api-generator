@@ -239,7 +239,7 @@ RETURN t_tab_existing_apis PIPELINED;
 <h2><a id="view_naming_conflicts"></a>Function view_naming_conflicts</h2>
 <!---------------------------------------------------------------------->
 
-Helper to check possible naming conflicts before the first usage of the API generator.
+Helper to check possible naming conflicts before the very first usage of the API generator.
 
 Also see the [naming conventions](https://github.com/OraMUC/table-api-generator/blob/master/docs/naming-conventions.md) of the generator.
 
