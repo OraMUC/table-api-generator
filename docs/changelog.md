@@ -9,6 +9,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
+- [0.5.1 (2020-04-19)](#051-2020-04-19)
 - [0.5.0 (2018-12-23)](#050-2018-12-23)
 - [0.4.1 (2017-05-27)](#041-2017-05-27)
 - [0.4.0 (2017-03-30)](#040-2017-03-30)
@@ -17,6 +18,11 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - [0.1.0 (not published)](#010-not-published)
 
 <!-- tocstop -->
+
+## 0.5.1 (2020-04-19)
+
+Fixes #29: Primary key not returned on create_row when XMLTYPE column is present - thanks to PaoloM (github.com/softinn72) to report this issue.
+
 
 ## 0.5.0 (2018-12-23)
 

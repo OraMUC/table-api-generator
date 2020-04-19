@@ -1800,7 +1800,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         util_clob_append(g_code_blocks.dml_view_trigger, g_code_blocks.dml_view_trigger_varchar_cache, p_code_snippet);
       END IF;
     END code_append;
-  
+    
     -----------------------------------------------------------------------------
   
     PROCEDURE process_static_match IS
@@ -1908,9 +1908,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         WHEN 'RETURN_TYPE_READ_ROW' THEN
           code_append(CASE
                         WHEN NOT g_params.return_row_instead_of_pk AND NOT g_status.pk_is_multi_column THEN
-                         '."' || g_pk_columns(1).column_name || '"'
+                          '."' || g_pk_columns(1).column_name || '"'
                         ELSE
-                         NULL
+                          NULL
                       END);
         WHEN 'COUNTER_DECLARATION' THEN
           code_append(CASE
@@ -1992,11 +1992,37 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       IF v_match LIKE 'LIST%' THEN
         v_dynamic_result := util_generate_list(v_match);
       
-      ELSIF v_match = 'RETURN_VALUE' THEN
-        IF g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column THEN
+      ELSIF v_match = 'RETURN_CLAUSE' THEN
+
+        IF (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column) AND NOT g_status.xmltype_column_present THEN
           v_dynamic_result := util_generate_list('LIST_COLUMNS_W_PK_FULL');
+          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '      v_return;';
+
+        ELSIF (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column) AND g_status.xmltype_column_present THEN
+          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+            v_dynamic_result(v_dynamic_result.count + 1) := '      "' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
+          END LOOP;
+          v_dynamic_result(v_dynamic_result.first) := ltrim(v_dynamic_result(v_dynamic_result.first));
+          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
+          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+            v_dynamic_result(v_dynamic_result.count + 1) := '      v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
+          END LOOP;
+          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || ';' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    /* return clause does not support XMLTYPE column, so we have to do here an extra fetch */' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    v_return := read_row (' || c_lf;
+          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+            v_dynamic_result(v_dynamic_result.count + 1) := '      ' || 
+              util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) || 
+              ' => v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
+          END LOOP;
+          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || ' );';
+
         ELSE
-          v_dynamic_result(1) := '"' || g_pk_columns(1).column_name || '"';
+          v_dynamic_result(v_dynamic_result.count + 1) := '"' || g_pk_columns(1).column_name || '"' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '      v_return;';
         END IF;
       ELSE
         raise_application_error(c_generator_error_number,
@@ -2011,7 +2037,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     
       v_current_pos := v_match_pos_dynamic + v_match_len + 4;
     END process_dynamic_match;
-  
+
     -----------------------------------------------------------------------------
   
   BEGIN
@@ -2556,6 +2582,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       util_debug_start_one_step(p_action => 'init_process_columns');
       -- init rpad
       g_status.rpad_columns := 0;
+      g_status.xmltype_column_present := FALSE;
       FOR i IN g_columns.first .. g_columns.last LOOP
         -- calc rpad length
         IF length(g_columns(i).column_name) > g_status.rpad_columns THEN
@@ -3069,19 +3096,10 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     INSERT INTO "{{ TABLE_NAME }}" (
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
     VALUES (
-      {% LIST_INSERT_PARAMS hide_identity_columns=true %} )' || CASE
-                                  WHEN g_status.xmltype_column_present THEN
-                                   ';
-    -- returning clause does not support XMLTYPE,so we do here an extra fetch
-    v_return := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} ){{ RETURN_TYPE_READ_ROW }};'
-                                  ELSE
-                                   '
+      {% LIST_INSERT_PARAMS hide_identity_columns=true %} )
     RETURN
-      {% RETURN_VALUE %}
-    INTO v_return;'
-                                END || CASE
-                                  WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
-                                   '
+      {% RETURN_CLAUSE %}' ||   CASE WHEN g_params.enable_generic_change_log AND 
+                                          NOT g_status.pk_is_multi_column THEN '
     create_change_log_entry (
       p_table     => ''{{ TABLE_NAME }}'',
       p_column    => ''{{ PK_COLUMN }}'',
