@@ -2033,7 +2033,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   -- * appends the slices to the resulting clobs for spec, body, view and trigger
   -- * uses a varchar2 cache to speed up the clob processing
   -----------------------------------------------------------------------------
-  PROCEDURE util_template_replace(p_scope IN VARCHAR2 DEFAULT NULL) IS
+  PROCEDURE util_template_replace(
+    p_scope                 IN VARCHAR2 DEFAULT NULL,
+    p_add_blank_line_before in boolean  default true) IS
     v_current_pos       PLS_INTEGER := 1;
     v_match_pos_static  PLS_INTEGER := 0;
     v_match_pos_dynamic PLS_INTEGER := 0;
@@ -2174,9 +2176,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         WHEN 'RETURN_TYPE_READ_ROW' THEN
           code_append(CASE
                         WHEN NOT g_params.return_row_instead_of_pk AND NOT g_status.pk_is_multi_column THEN
-                         '."' || g_pk_columns(1).column_name || '"'
+                          '."' || g_pk_columns(1).column_name || '"'
                         ELSE
-                         NULL
+                          NULL
                       END);
         WHEN 'ROWTYPE_PARAM' THEN
           code_append(rpad('p_row', g_status.rpad_columns + 2) || ' IN "' || g_params.table_name || '"%ROWTYPE');
@@ -2255,14 +2257,38 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       IF v_match LIKE 'LIST%' THEN
         v_dynamic_result := util_generate_list(v_match);
 
-      ELSIF v_match = 'RETURN_VALUE' THEN
-        IF g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column THEN
+      ELSIF v_match = 'RETURN_CLAUSE' THEN
+        IF (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column) AND NOT g_status.xmltype_column_present THEN
           v_dynamic_result := util_generate_list('LIST_COLUMNS_W_PK_FULL');
+          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '      v_return;';
+
+        ELSIF (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column) AND g_status.xmltype_column_present THEN
+          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+            v_dynamic_result(v_dynamic_result.count + 1) := '      "' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
+          END LOOP;
+          v_dynamic_result(v_dynamic_result.first) := ltrim(v_dynamic_result(v_dynamic_result.first));
+          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
+          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+            v_dynamic_result(v_dynamic_result.count + 1) := '      v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
+          END LOOP;
+          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || ';' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    /* return clause does not support XMLTYPE column, so we have to do here an extra fetch */' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    v_return := read_row (' || c_lf;
+          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+            v_dynamic_result(v_dynamic_result.count + 1) := '      ' ||
+              util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) ||
+              ' => v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
+          END LOOP;
+          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || ' );';
+
         ELSE
-          v_dynamic_result(1) := '"' || g_pk_columns(1).column_name || '"';
+          v_dynamic_result(v_dynamic_result.count + 1) := '"' || g_pk_columns(1).column_name || '"' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
+          v_dynamic_result(v_dynamic_result.count + 1) := '      v_return;';
         END IF;
-      ELSIF v_match = 'RETURN_VALUE_BULK' THEN
-        v_dynamic_result := util_generate_list('LIST_COLUMNS_W_PK_FULL');
+
       ELSE
         raise_application_error(c_generator_error_number,
                                 'FIXME: Bug - dynamic substitution ' || v_match || ' not defined');
@@ -2280,6 +2306,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     -----------------------------------------------------------------------------
 
   BEGIN
+    if p_add_blank_line_before then
+      code_append(c_lf);
+    end if;
+
     -- plus one is needed to correct difference between length and position
     v_tpl_len := length(g_code_blocks.template) + 1;
     get_match_pos;
@@ -2604,7 +2634,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_column_prefix_tab v_varchar_tab;
     BEGIN
       util_debug_start_one_step(p_action => 'init_process_columns');
-      -- init rpad
+      -- init
       g_status.rpad_columns := 0;
       g_status.xmltype_column_present := FALSE;
 
@@ -2956,12 +2986,11 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
   is calling simply this "{{ API_NAME }}".
   */' || case when g_status.xmltype_column_present then '
 
-  /*This is required to handle column of datatype XMLTYPE for single row processing*/
+  /*this is required to handle column of datatype XMLTYPE for single row processing*/
   TYPE t_pk_rec IS RECORD (
-    {% LIST_PK_COLUMNS %}
-  );' else null end;
+    {% LIST_PK_COLUMNS %} );' end;
+      util_template_replace('API SPEC', false);
 
-      util_template_replace('API SPEC');
       g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   /**
@@ -2971,8 +3000,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
    * generated_at="{{ GENERATED_AT }}"
    * generated_by="{{ GENERATED_BY }}"
    */';
-
-      util_template_replace('API BODY');
+      util_template_replace('API BODY', false);
       util_debug_stop_one_step;
     END gen_header;
 
@@ -2981,20 +3009,17 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_header_bulk IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_header_bulk');
-      g_code_blocks.template := case when g_status.xmltype_column_present then '
-  /*This is required to handle column of datatype XMLTYPE for bulk processing*/
-  TYPE t_pk_tab IS TABLE OF t_pk_rec;' else null end || '
 
+      g_code_blocks.template := case when g_status.xmltype_column_present then '
+  /*this is required to handle XMLTYPE column for bulk processing*/
+  TYPE t_pk_tab IS TABLE OF t_pk_rec;' end || '
   TYPE t_strong_ref_cursor IS REF CURSOR RETURN "{{ TABLE_NAME }}"%ROWTYPE;
   TYPE t_rows_tab IS TABLE OF "{{ TABLE_NAME }}"%ROWTYPE; ';
-
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
-
   g_bulk_limit     PLS_INTEGER := 10000;
   g_bulk_completed BOOLEAN     := FALSE;';
-
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
@@ -3005,19 +3030,20 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_bulk_is_complete_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_bulk_is_complete_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION bulk_is_complete
   RETURN BOOLEAN;';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION bulk_is_complete
   RETURN BOOLEAN IS
   BEGIN
     RETURN g_bulk_completed;
   END bulk_is_complete;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_bulk_is_complete_fnc;
 
@@ -3026,23 +3052,20 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_get_bulk_limit_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_get_bulk_limit_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION get_bulk_limit
   RETURN PLS_INTEGER;';
-
       util_template_replace('API SPEC');
 
-
       g_code_blocks.template := '
-
   FUNCTION get_bulk_limit
   RETURN PLS_INTEGER IS
   BEGIN
     RETURN g_bulk_limit;
   END get_bulk_limit;';
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_get_bulk_limit_fnc;
 
@@ -3051,22 +3074,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_set_bulk_limit_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_set_bulk_limit_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE set_bulk_limit (
     {{ BULK_LIMIT_PARAM }} );';
-
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
-
   PROCEDURE set_bulk_limit (
     {{ BULK_LIMIT_PARAM }} )
   IS
   BEGIN
     g_bulk_limit := p_bulk_limit;
   END set_bulk_limit;';
-
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
@@ -3077,8 +3097,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_xml_compare_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_xml_compare_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION util_xml_compare (
     p_doc1 XMLTYPE,
     p_doc2 XMLTYPE )
@@ -3096,8 +3116,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       FROM DUAL;
     RETURN v_return;
   END util_xml_compare;';
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_xml_compare_fnc;
 
@@ -3106,14 +3126,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_row_exists_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_row_exists_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION row_exists (
     {% LIST_PK_PARAMS %} )
   RETURN BOOLEAN;';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION row_exists (
     {% LIST_PK_PARAMS %} )
   RETURN BOOLEAN
@@ -3134,6 +3154,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_return;
   END;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_row_exists_fnc;
 
@@ -3142,14 +3163,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_row_exists_yn_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_row_exists_yn_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION row_exists_yn (
     {% LIST_PK_PARAMS %} )
   RETURN VARCHAR2;';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION row_exists_yn (
     {% LIST_PK_PARAMS %} )
   RETURN VARCHAR2
@@ -3161,6 +3182,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
            END;
   END;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_row_exists_yn_fnc;
 
@@ -3172,14 +3194,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       IF g_uk_constraints.count > 0 THEN
         FOR i IN g_uk_constraints.first .. g_uk_constraints.last LOOP
           g_iterator.current_uk_constraint := g_uk_constraints(i).constraint_name;
-          g_code_blocks.template           := '
 
+          g_code_blocks.template           := '
   FUNCTION get_pk_by_unique_cols (
     {% LIST_UK_PARAMS %} )
   RETURN {{ RETURN_TYPE }};';
           util_template_replace('API SPEC');
-          g_code_blocks.template := '
 
+          g_code_blocks.template := '
   FUNCTION get_pk_by_unique_cols (
     {% LIST_UK_PARAMS %} )
   RETURN {{ RETURN_TYPE }} IS
@@ -3189,6 +3211,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_return;
   END get_pk_by_unique_cols;';
           util_template_replace('API BODY');
+
         END LOOP;
       END IF;
       util_debug_stop_one_step;
@@ -3199,39 +3222,32 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_create_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_row_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
   RETURN {{ RETURN_TYPE }};';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
   RETURN {{ RETURN_TYPE }} IS
     v_return {{ RETURN_TYPE }}; ' || CASE WHEN g_status.xmltype_column_present AND g_params.return_row_instead_of_pk THEN '
 
-    /*This is required to handle column of datatype XMLTYPE for single row processing*/
-    v_pk_rec t_pk_rec;' ELSE NULL END || '
+    /*this is required to handle column of datatype XMLTYPE for single row processing*/
+    v_pk_rec t_pk_rec;' END || '
   BEGIN
     INSERT INTO "{{ TABLE_NAME }}" (
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
     VALUES (
       {% LIST_INSERT_PARAMS hide_identity_columns=true %} )
-    RETURN ' || CASE WHEN NOT g_status.xmltype_column_present OR NOT g_params.return_row_instead_of_pk THEN '
-      {% RETURN_VALUE %}
-    INTO v_return;' ELSE '
-      {% LIST_PK_NAMES %}
-    INTO v_pk_rec;
-
-    /*Record has to be fetched again, because XMLType column can not be returned*/
-    v_return := read_row({% LIST_PK_COLUMN_FETCH %});' end || '
-
+    RETURN
+      {% RETURN_CLAUSE %}
     RETURN v_return;
   END create_row;';
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_row_fnc;
 
@@ -3241,13 +3257,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_rows_bulk_fnc');
       g_code_blocks.template := '
-
   FUNCTION create_rows (
     {{ TABTYPE_PARAM }} )
   RETURN t_rows_tab;';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_rows (
     {{ TABTYPE_PARAM }} )
   RETURN t_rows_tab IS
@@ -3255,36 +3270,39 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
     /*This is required to handle column of datatype XMLTYPE for bulk processing*/
     v_pk_tab t_pk_tab;
-    v_strong_ref_cursor t_strong_ref_cursor;' ELSE NULL END || '
+    v_strong_ref_cursor t_strong_ref_cursor;' END || '
   BEGIN
     FORALL i IN INDICES OF p_rows_tab
     INSERT INTO "{{ TABLE_NAME }}" (
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
     VALUES (
-      {% LIST_INSERT_BULK_PARAMS hide_identity_columns=true %} ) ' || CASE WHEN NOT g_status.xmltype_column_present THEN '
-    RETURN
-      {% RETURN_VALUE_BULK %}
-    BULK COLLECT INTO v_return;' ELSE '
-    RETURN
+      {% LIST_INSERT_BULK_PARAMS hide_identity_columns=true %} )
+    RETURN ' || CASE
+                  WHEN NOT g_status.xmltype_column_present THEN '
+      {% LIST_COLUMNS_W_PK_FULL %}
+    BULK COLLECT INTO v_return;'
+                ELSE '
       {% LIST_PK_NAMES %}
     BULK COLLECT INTO v_pk_tab;
 
-    /*Records have to be bulk-fetched again, because
-      XMLType column can not be returned*/
-    OPEN v_strong_ref_cursor FOR SELECT data_table.*
-                                   FROM "{{ TABLE_NAME }}" data_table INNER JOIN TABLE(v_pk_tab) pk_collection
-                                     ON {% LIST_PK_COLUMN_BULK_FETCH %};
+    /*records have to be bulk-fetched again, because XMLType column can not be returned*/
+    OPEN v_strong_ref_cursor FOR
+      SELECT
+        data_table.*
+      FROM
+        "{{ TABLE_NAME }}" data_table
+        INNER JOIN TABLE(v_pk_tab) pk_collection
+          ON {% LIST_PK_COLUMN_BULK_FETCH %};
 
-    /*no loop required here, because maximum bulk limit already given by
-      the size of p_rows_tab*/
+    /*no loop required here, because maximum bulk limit already given by the size of p_rows_tab*/
     v_return := read_rows (
       p_ref_cursor => v_strong_ref_cursor );
 
     CLOSE v_strong_ref_cursor;' END || '
     RETURN v_return;
   END create_rows;';
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_rows_bulk_fnc;
 
@@ -3293,22 +3311,22 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_create_rows_bulk_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_rows_bulk_prc');
-      g_code_blocks.template := '
 
-  PROCEDURE create_rows(
+      g_code_blocks.template := '
+  PROCEDURE create_rows (
     {{ TABTYPE_PARAM }} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
-  PROCEDURE create_rows(
+      g_code_blocks.template := '
+  PROCEDURE create_rows (
     {{ TABTYPE_PARAM }} )
   IS
     v_return t_rows_tab;
   BEGIN
     v_return := create_rows(p_rows_tab => p_rows_tab);
   END create_rows;';
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_rows_bulk_prc;
 
@@ -3317,13 +3335,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_create_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_row_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_row (
     {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_row (
     {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
   IS
@@ -3333,6 +3351,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_MAP_PAR_EQ_PARAM_W_PK hide_identity_columns=true %} );
   END create_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_row_prc;
 
@@ -3341,14 +3360,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_create_rowtype_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_rowtype_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_row (
     {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }};';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_row (
     {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }} IS
@@ -3359,6 +3378,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_return;
   END create_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_rowtype_fnc;
 
@@ -3367,13 +3387,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_create_rowtype_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_rowtype_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_row (
     {{ ROWTYPE_PARAM }} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_row (
     {{ ROWTYPE_PARAM }} )
   IS
@@ -3383,6 +3403,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK hide_identity_columns=true %} );
   END create_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_rowtype_prc;
 
@@ -3391,14 +3412,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_read_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_row_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION read_row (
     {% LIST_PK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION read_row (
     {% LIST_PK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
@@ -3414,6 +3435,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_row;
   END read_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_read_row_fnc;
 
@@ -3422,17 +3444,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_read_rows_bulk_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_rows_bulk_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION read_rows (
     {{ REFCURSOR_PARAM }} )
   RETURN t_rows_tab;';
-
       util_template_replace('API SPEC');
 
-
       g_code_blocks.template := '
-
   FUNCTION read_rows (
     {{ REFCURSOR_PARAM }} )
   RETURN t_rows_tab
@@ -3448,7 +3467,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     END IF;
     RETURN v_return;
   END read_rows;';
-
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
@@ -3459,13 +3477,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_read_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_row_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE read_row (
     {% LIST_PARAMS_W_PK_IO %} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE read_row (
     {% LIST_PARAMS_W_PK_IO %} )
   IS
@@ -3475,6 +3493,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
   END read_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_read_row_prc;
 
@@ -3486,14 +3505,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       IF g_uk_constraints.count > 0 THEN
         FOR i IN g_uk_constraints.first .. g_uk_constraints.last LOOP
           g_iterator.current_uk_constraint := g_uk_constraints(i).constraint_name;
-          g_code_blocks.template           := '
 
+          g_code_blocks.template           := '
   FUNCTION read_row (
     {% LIST_UK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;';
           util_template_replace('API SPEC');
-          g_code_blocks.template := '
 
+          g_code_blocks.template := '
   FUNCTION read_row (
     {% LIST_UK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
@@ -3509,6 +3528,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_row;
   END;';
           util_template_replace('API BODY');
+
         END LOOP;
       END IF;
       util_debug_stop_one_step;
@@ -3519,8 +3539,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_update_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_update_row_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE update_row (
     {% LIST_PARAMS_W_PK %} );';
         util_template_replace('API SPEC');
@@ -3533,7 +3553,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       -- will be generated with extra comments
       IF g_status.number_of_data_columns > 0 THEN
         g_code_blocks.template := '
-
   PROCEDURE update_row (
     {% LIST_PARAMS_W_PK %} )
   IS
@@ -3544,7 +3563,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   END update_row;';
       ELSE
         g_code_blocks.template := '
-
   PROCEDURE update_row (
     {% LIST_PARAMS_W_PK %} )
   IS
@@ -3555,8 +3573,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     NULL;
   END update_row;';
       END IF;
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_update_row_prc;
 
@@ -3565,13 +3583,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_update_rowtype_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_update_rowtype_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE update_row (
     {{ ROWTYPE_PARAM }} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE update_row (
     {{ ROWTYPE_PARAM }} )
   IS
@@ -3580,14 +3598,15 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END update_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_update_rowtype_prc;
 
     PROCEDURE gen_update_rows_bulk_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_update_rows_bulk_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE update_rows (
     {{ TABTYPE_PARAM }} );';
       util_template_replace('API SPEC');
@@ -3601,7 +3620,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       IF g_status.number_of_data_columns > 0 THEN
         g_code_blocks.template := '
-
   PROCEDURE update_rows (
     {{ TABTYPE_PARAM }} )
   IS
@@ -3613,7 +3631,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   END update_rows;';
       ELSE
         g_code_blocks.template := '
-
   PROCEDURE update_rows (
     {{ TABTYPE_PARAM }} )
   IS
@@ -3623,8 +3640,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     NULL;
   END update_rows;';
       END IF;
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_update_rows_bulk_prc;
 
@@ -3633,14 +3650,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_createorupdate_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_row_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
   RETURN {{ RETURN_TYPE }};';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
   RETURN {{ RETURN_TYPE }} IS
@@ -3657,6 +3674,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_return;
   END create_or_update_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_createorupdate_row_fnc;
 
@@ -3665,13 +3683,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_createorupdate_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_row_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_or_update_row (
     {% LIST_PARAMS_W_PK %} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
   IS
@@ -3681,6 +3699,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
   END create_or_update_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_createorupdate_row_prc;
 
@@ -3689,14 +3708,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_createorupdate_rowtype_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_or_update_row (
     {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }};';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_or_update_row (
     {{ ROWTYPE_PARAM }} )
   RETURN {{ RETURN_TYPE }} IS
@@ -3707,6 +3726,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_return;
   END create_or_update_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_createorupdate_rowtype_fnc;
 
@@ -3715,13 +3735,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_createorupdate_rowtype_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_or_update_row (
     {{ ROWTYPE_PARAM }} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_or_update_row (
     {{ ROWTYPE_PARAM }} )
   IS
@@ -3731,6 +3751,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END create_or_update_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_createorupdate_rowtype_prc;
 
@@ -3739,13 +3760,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_delete_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_delete_row_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE delete_row (
     {% LIST_PK_PARAMS %} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE delete_row (
     {% LIST_PK_PARAMS %} )
   IS
@@ -3753,8 +3774,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     DELETE FROM {{ TABLE_NAME }}
      WHERE {% LIST_PK_COLUMNS_WHERE_CLAUSE %};' || '
   END delete_row;';
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_delete_row_prc;
 
@@ -3763,13 +3784,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_delete_rows_bulk_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_delete_row_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE delete_rows (
     {{ TABTYPE_PARAM }} );';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE delete_rows (
     {{ TABTYPE_PARAM }} )
   IS
@@ -3778,8 +3799,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       DELETE FROM {{ TABLE_NAME }}
        WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};
   END delete_rows;';
-
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_delete_rows_bulk_prc;
 
@@ -3792,14 +3813,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
         IF g_columns(i).is_pk_yn = 'N' THEN
           g_iterator.column_name := g_columns(i).column_name;
           g_iterator.method_name := util_get_method_name(g_columns(i).column_name);
-          g_code_blocks.template := '
 
+          g_code_blocks.template := '
   FUNCTION get_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"."{{ I_COLUMN_NAME }}"%TYPE;';
           util_template_replace('API SPEC');
-          g_code_blocks.template := '
 
+          g_code_blocks.template := '
   FUNCTION get_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"."{{ I_COLUMN_NAME }}"%TYPE IS
@@ -3809,6 +3830,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_row."{{ I_COLUMN_NAME }}";
   END get_{{ I_METHOD_NAME }};';
           util_template_replace('API BODY');
+
         END IF;
       END LOOP;
       util_debug_stop_one_step;
@@ -3829,14 +3851,14 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
                                                               p_attribute_name => 'v_row."' || g_columns(i).column_name || '"');
           g_iterator.new_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
                                                               p_attribute_name => g_iterator.parameter_name);
-          g_code_blocks.template := '
 
+          g_code_blocks.template := '
   PROCEDURE set_{{ I_METHOD_NAME }} (
     {% LIST_PK_PARAMS %},
     {{ I_PARAMETER_NAME }} IN "{{ TABLE_NAME }}"."{{ I_COLUMN_NAME }}"%TYPE );';
           util_template_replace('API SPEC');
-          g_code_blocks.template := '
 
+          g_code_blocks.template := '
   PROCEDURE set_{{ I_METHOD_NAME }} (
     {% LIST_PK_PARAMS %},
     {{ I_PARAMETER_NAME }} IN "{{ TABLE_NAME }}"."{{ I_COLUMN_NAME }}"%TYPE )
@@ -3847,8 +3869,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
        SET "{{ I_COLUMN_NAME }}" = {{ I_PARAMETER_NAME }}
      WHERE {% LIST_PK_COLUMNS_WHERE_CLAUSE %};' || '
   END set_{{ I_METHOD_NAME }};';
-
           util_template_replace('API BODY');
+
         END IF;
       END LOOP;
       util_debug_stop_one_step;
@@ -3859,8 +3881,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_get_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION get_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;
   /**
@@ -3868,8 +3890,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
    * Returns a row with (hopefully) complete default data.
    */';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION get_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
     v_row "{{ TABLE_NAME }}"%ROWTYPE;
@@ -3878,6 +3900,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     return v_row;
   END get_a_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_get_a_row_fnc;
 
@@ -3886,8 +3909,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_create_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_a_row_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} )
   RETURN {{ RETURN_TYPE }};
@@ -3896,8 +3919,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
    * Create a new row without (hopefully) providing any parameters.
    */';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} )
   RETURN {{ RETURN_TYPE }} IS
@@ -3908,6 +3931,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_return;
   END create_a_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_a_row_fnc;
 
@@ -3916,8 +3940,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_create_a_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} );
   /**
@@ -3925,8 +3949,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
    * Create a new row without (hopefully) providing any parameters.
    */';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   PROCEDURE create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} )
   IS
@@ -3936,6 +3960,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_MAP_PAR_EQ_PARAM_W_PK hide_identity_columns=true %} );
   END create_a_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_create_a_row_prc;
 
@@ -3944,8 +3969,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_read_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION read_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;
   /**
@@ -3954,8 +3979,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
    * a primary key parameter.
    */';
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
   FUNCTION read_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
     v_row  "{{ TABLE_NAME }}"%ROWTYPE;
@@ -3967,6 +3992,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     RETURN v_row;
   END read_a_row;';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_read_a_row_fnc;
 
@@ -3975,6 +4001,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     PROCEDURE gen_footer IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_footer');
+
       g_code_blocks.template := CASE
                                   WHEN g_params.enable_custom_defaults THEN
                                    c_lf || '
@@ -3984,12 +4011,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   */'
                                 END || '
 END "{{ API_NAME }}";';
-
       util_template_replace('API SPEC');
-      g_code_blocks.template := '
 
+      g_code_blocks.template := '
 END "{{ API_NAME }}";';
       util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_footer;
 
@@ -3998,6 +4025,7 @@ END "{{ API_NAME }}";';
     PROCEDURE gen_dml_view IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_dml_view');
+
       g_code_blocks.template := '
 CREATE OR REPLACE VIEW "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_DML_V" AS
 SELECT {% LIST_COLUMNS_W_PK_FULL %}
@@ -4011,6 +4039,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
    */
     ';
       util_template_replace('VIEW');
+
       util_debug_stop_one_step;
     END gen_dml_view;
 
@@ -4019,6 +4048,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     PROCEDURE gen_dml_view_trigger IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_dml_view_trigger');
+
       g_code_blocks.template := '
 CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
@@ -4066,6 +4096,7 @@ BEGIN
 END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
       util_template_replace('TRIGGER');
+
       util_debug_stop_one_step;
     END gen_dml_view_trigger;
 

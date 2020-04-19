@@ -9,6 +9,8 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
+- [0.6.0 (2020-xx-xx)](#060-2020-xx-xx)
+- [0.5.1 (2020-04-19)](#051-2020-04-19)
 - [0.5.0 (2018-12-23)](#050-2018-12-23)
 - [0.4.1 (2017-05-27)](#041-2017-05-27)
 - [0.4.0 (2017-03-30)](#040-2017-03-30)
@@ -17,6 +19,18 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - [0.1.0 (not published)](#010-not-published)
 
 <!-- tocstop -->
+
+## 0.6.0 (2020-xx-xx)
+
+- added: support for bulk processing
+- removed: parameter p_enable_generic_change_log (makes no sense anymore with bulk processing and multi column pks)
+- removed: prevent updates if columns do not differ (needed to support all column types)
+- removed: procedure recreate_existing_apis
+
+## 0.5.1 (2020-04-19)
+
+Fixes #29: Primary key not returned on create_row when XMLTYPE column is present - thanks to PaoloM (github.com/softinn72) to report this issue.
+
 
 ## 0.5.0 (2018-12-23)
 
