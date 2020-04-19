@@ -3,9 +3,11 @@ c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
 c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1';
 /**
 
-_This is an Oracle PL/SQL Table API Generator. It can be integrated in the
-Oracle SQL-Developer with an additional wrapper package for the 
-[oddgen](https://www.oddgen.org/) extension._
+Oracle PL/SQL Table API Generator
+=================================
+
+_This table API generator can be integrated in the Oracle SQL-Developer with an
+additional wrapper package for the [SQL Developer extension oddgen](https://www.oddgen.org/)._
 
 The effort of generated API's is to reduce your PL/SQL code by calling standard
 procedures and functions for usual DML operations on tables. So the generated
@@ -384,12 +386,12 @@ FUNCTION util_get_column_data_default
   p_column_name IN VARCHAR2,
   p_owner       VARCHAR2 DEFAULT USER
 ) RETURN VARCHAR2;
-/**
+/*
 
 Helper to read a column data default from the dictionary.
 [Working with long columns](http://www.oracle-developer.net/display.php?id=430).
 
-**/
+*/
 
 
 FUNCTION util_get_cons_search_condition
@@ -397,13 +399,13 @@ FUNCTION util_get_cons_search_condition
   p_constraint_name IN VARCHAR2,
   p_owner           IN VARCHAR2 DEFAULT USER
 ) RETURN VARCHAR2;
-/**
+/*
 
 Helper to read a constraint search condition from the dictionary (not needed 
 in 12cR1 and above, there we have a column search_condition_vc in 
 user_constraints).
 
-**/
+*/
 
 
 FUNCTION util_split_to_table
@@ -412,28 +414,28 @@ FUNCTION util_split_to_table
   p_delimiter IN VARCHAR2 DEFAULT ','
 ) RETURN t_tab_vc2_4k
   PIPELINED;
-/**
+/*
 
 Helper function to split a string to a selectable table.
 
 ```sql
 SELECT column_value FROM TABLE (om_tapigen.util_split_to_table('1,2,3,test'));
 ```
-**/
+*/
 
 
 FUNCTION util_get_ora_max_name_len RETURN INTEGER;
-/**
+/*
 
 Helper function to determine the maximum length for an identifier name (e.g. 
 column name). Returns the package constant c_ora_max_name_len, which is
 determined by a conditional compilation.
 
-**/
+*/
 
 
 PROCEDURE util_set_debug_on;
-/**
+/*
 
 Enable (and reset) the debugging (previous debug data will be lost)
 
@@ -442,11 +444,11 @@ BEGIN
   om_tapigen.util_set_debug_on;
 END;
 ```
-**/
+*/
 
 
 PROCEDURE util_set_debug_off;
-/**
+/*
 
 Disable the debugging
 
@@ -455,12 +457,12 @@ BEGIN
   om_tapigen.util_set_debug_off;
 END;
 ```
-**/
+*/
 
 
 FUNCTION util_view_debug_log RETURN t_tab_debug_data
   PIPELINED;
-/**
+/*
 
 View the debug details. Maximum 999 API creations are captured for memory 
 reasons. You can reset the debugging by calling `om_tapigen.util_set_debug_on`.
@@ -468,12 +470,12 @@ reasons. You can reset the debugging by calling `om_tapigen.util_set_debug_on`.
 ```sql
 SELECT * FROM TABLE(om_tapigen.util_view_debug_log);
 ```
-**/
+*/
 
 
 FUNCTION util_view_columns_array RETURN t_tab_debug_columns
   PIPELINED;
-/**
+/*
 
 View the internal columns array from the last API generation. This view is
 independend from the debug mode, because this array is resetted for each API
@@ -482,7 +484,7 @@ generation.
 ```sql
 SELECT * FROM TABLE(om_tapigen.util_view_columns_array);
 ```
-**/
+*/
 
 FUNCTION util_get_ddl
 (
@@ -490,11 +492,11 @@ FUNCTION util_get_ddl
   p_object_name VARCHAR2,
   p_owner       VARCHAR2 DEFAULT USER
 ) RETURN CLOB;
-/**
+/*
 
 Helper for testing to get the DDL of generated objects.
 
-**/
+*/
 
 END om_tapigen;
 /
