@@ -968,14 +968,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   FUNCTION util_generate_list(p_list_name VARCHAR2) RETURN t_tab_vc2_5k IS
 
     -----------------------------------------------------------------------------
-    -- Columns as flat list for insert - without p_column_exclude_list:
-    -- {% LIST_INSERT_COLUMNS %}
-    -- Example:
-    --   col1,
-    --   col2,
-    --   col3,
-    --   ...
-    -----------------------------------------------------------------------------
+
     function get_audit_value (
       p_column_index integer)
     return varchar2 is
@@ -995,6 +988,24 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             g_params.audit_user_expression
         end;
     end;
+
+    -----------------------------------------------------------------------------
+
+    procedure trim_list(p_list in out nocopy t_tab_vc2_5k) is
+    begin
+      if p_list.count > 0 then
+        p_list(p_list.first) := ltrim(p_list(p_list.first));
+        if substr(p_list(p_list.first), 1, 4) = 'AND ' then
+            p_list(p_list.first) := substr(p_list(p_list.first), 5);
+        end if;
+        if substr(p_list(p_list.first), 1, 2) = ', ' then
+            p_list(p_list.first) := substr(p_list(p_list.first), 3);
+        end if;
+        p_list(p_list.last) := rtrim(p_list(p_list.last), c_lf || c_list_delimiter);
+      end if;
+    end;
+
+    -----------------------------------------------------------------------------
 
     FUNCTION list_insert_columns RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
@@ -1018,10 +1029,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_insert_columns;
 
@@ -1063,10 +1071,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_insert_params;
 
@@ -1112,10 +1117,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             END || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_insert_bulk_params;
 
@@ -1139,8 +1141,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           CASE WHEN g_columns(i).is_fk_yn = 'Y' THEN ' /*FK*/' END ||
           c_list_delimiter;
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_columns_w_pk_full;
 
@@ -1200,10 +1201,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_params_w_pk;
 
@@ -1242,10 +1240,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_params_w_pk_cust_defaults;
 
@@ -1280,8 +1275,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                            ' /*FK*/'
                                         END || c_list_delimiter;
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_params_w_pk_io;
 
@@ -1315,10 +1309,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_map_par_eq_newcol_w_pk;
 
@@ -1360,10 +1351,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_map_par_eq_param_w_pk;
 
@@ -1396,10 +1384,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_map_par_eq_rowtypcol_w_pk;
 
@@ -1437,10 +1422,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             c_list_delimiter;
         END IF;
       END LOOP;
-      IF v_result.count > 0 THEN
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      END IF;
+      trim_list(v_result);
       RETURN v_result;
     END list_set_col_eq_param_wo_pk;
 
@@ -1478,10 +1460,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_set_col_eq_par_bulk_wo_pk;
 
@@ -1507,10 +1486,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             || ' := v_row."' || g_columns(i).column_name || '"; ' || c_lf;
         END IF;
       END LOOP;
-      IF v_result.count > 0 THEN
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
-      END IF;
+      trim_list(v_result);
       RETURN v_result;
     END list_set_par_eq_rowtycol_wo_pk;
 
@@ -1533,8 +1509,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           || ' IN "' || g_params.table_name || '"."' || g_pk_columns(i).column_name
           || '"%TYPE /*PK*/' || c_list_delimiter;
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_params;
 
@@ -1556,8 +1531,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           || g_params.table_name || '"."' || g_pk_columns(i).column_name
           || '"%TYPE /*PK*/' || c_list_delimiter;
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_columns;
 
@@ -1578,8 +1552,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           '     "' || g_pk_columns(i).column_name
           || '" /*PK*/' || c_list_delimiter;
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_names;
 
@@ -1600,8 +1573,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           '    v_return(i)."' || g_pk_columns(i).column_name
           || '" := v_pk_tab(i)."' || g_pk_columns(i).column_name || '"; /*PK*/';
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_return_columns_bulk;
 
@@ -1627,8 +1599,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             p_second_attribute  => util_get_parameter_name(g_pk_columns(i).column_name, NULL),
             p_compare_operation => '=') || c_lf;
       END LOOP;
-      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), 'AND ');
-      v_result(v_result.last)  := rtrim(v_result(v_result.last), c_lf);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_columns_where_clause;
 
@@ -1653,8 +1624,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             p_second_attribute  => 'p_rows_tab(i)."' || g_pk_columns(i).column_name || '"',
             p_compare_operation => '=') || c_lf;
       END LOOP;
-      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), 'AND ');
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_column_bulk_compare;
 
@@ -1678,8 +1648,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             p_second_attribute  => 'v_pk_rec."' || g_pk_columns(i).column_name || '"',
             p_compare_operation => '=>');
       END LOOP;
-      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), ', ');
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_column_fetch;
 
@@ -1704,8 +1673,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             p_second_attribute  => 'pk_collection."' || g_pk_columns(i).column_name || '"',
             p_compare_operation => '=') || c_lf;
       END LOOP;
-      v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), '                     AND ');
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_column_bulk_fetch;
 
@@ -1731,8 +1699,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           || util_get_parameter_name(g_pk_columns(i).column_name, NULL)
           || c_list_delimiter;
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_map_param_eq_param;
 
@@ -1757,8 +1724,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           || ' => ' || ':old."' || g_pk_columns(i).column_name || '"'
           || c_list_delimiter;
       END LOOP;
-      v_result(v_result.first) := ltrim(v_result(v_result.first));
-      v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
+      trim_list(v_result);
       RETURN v_result;
     END list_pk_map_param_eq_oldcol;
 
@@ -1784,10 +1750,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             || '"%TYPE /*UK*/' || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_uk_params;
 
@@ -1815,10 +1778,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
               p_compare_operation => '=') || c_lf;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), 'AND ');
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_uk_column_compare;
 
@@ -1845,10 +1805,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
               || c_list_delimiter;
         END IF;
       END LOOP;
-      if v_result.count > 0 then
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-      end if;
+      trim_list(v_result);
       RETURN v_result;
     END list_uk_map_param_eq_param;
 
@@ -1877,10 +1834,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             || ';' || c_lf;
         END IF;
       END LOOP;
-      IF v_result.count > 0 THEN
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
-      END IF;
+      trim_list(v_result);
       RETURN v_result;
     END list_rowcols_w_cust_defaults;
 
@@ -2092,6 +2046,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(c_generator_version);
         WHEN 'GENERATOR_ACTION' THEN
           code_append(g_status.generator_action);
+        WHEN 'GENERATOR_ERROR_NUMBER' THEN
+          code_append(c_generator_error_number);
         WHEN 'GENERATED_AT' THEN
           code_append(to_char(SYSDATE, 'yyyy-mm-dd hh24:mi:ss'));
         WHEN 'GENERATED_BY' THEN
@@ -2306,9 +2262,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     -----------------------------------------------------------------------------
 
   BEGIN
-    if p_add_blank_line_before then
-      code_append(c_lf);
-    end if;
+    -- add a blank line before each template block
+    code_append(c_lf);
 
     -- plus one is needed to correct difference between length and position
     v_tpl_len := length(g_code_blocks.template) + 1;
@@ -2940,6 +2895,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     PROCEDURE gen_header IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_header');
+
       g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
   /*
@@ -2974,22 +2930,12 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
     p_audit_user_expression="{{ AUDIT_USER_EXPRESSION }}"
     p_enable_custom_defaults="{{ ENABLE_CUSTOM_DEFAULTS }}"
     p_custom_default_values="{{ CUSTOM_DEFAULTS }}"/>
-
-  This API provides DML functionality that can be easily called from APEX.
-  Target of the table API is to encapsulate the table DML source code for
-  security (UI schema needs only the execute right for the API and the
-  read/write right for the {{ TABLE_NAME_MINUS_6 }}_DML_V, tables can be
-  hidden in extra data schema) and easy readability of the business logic
-  (all DML is then written in the same style). For APEX automatic row
-  processing like tabular forms you can optionally use the
-  {{ TABLE_NAME_MINUS_6 }}_DML_V. The instead of trigger for this view
-  is calling simply this "{{ API_NAME }}".
   */' || case when g_status.xmltype_column_present then '
 
-  /*this is required to handle column of datatype XMLTYPE for single row processing*/
+  /*this is required to handle XMLTYPE column for single row processing*/
   TYPE t_pk_rec IS RECORD (
     {% LIST_PK_COLUMNS %} );' end;
-      util_template_replace('API SPEC', false);
+      util_template_replace('API SPEC');
 
       g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
@@ -3000,15 +2946,16 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
    * generated_at="{{ GENERATED_AT }}"
    * generated_by="{{ GENERATED_BY }}"
    */';
-      util_template_replace('API BODY', false);
+      util_template_replace('API BODY');
+
       util_debug_stop_one_step;
     END gen_header;
 
     -----------------------------------------------------------------------------
 
-    PROCEDURE gen_header_bulk IS
+    PROCEDURE gen_bulk_types IS
     BEGIN
-      util_debug_start_one_step(p_action => 'gen_header_bulk');
+      util_debug_start_one_step(p_action => 'gen_bulk_types');
 
       g_code_blocks.template := case when g_status.xmltype_column_present then '
   /*this is required to handle XMLTYPE column for bulk processing*/
@@ -3023,7 +2970,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
-    END gen_header_bulk;
+    END gen_bulk_types;
 
     -----------------------------------------------------------------------------
 
@@ -3176,10 +3123,11 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   RETURN VARCHAR2
   IS
   BEGIN
-    RETURN CASE WHEN row_exists( {% LIST_PK_MAP_PARAM_EQ_PARAM %} )
-             THEN ''Y''
-             ELSE ''N''
-           END;
+    RETURN
+      CASE WHEN row_exists( {% LIST_PK_MAP_PARAM_EQ_PARAM %} )
+        THEN ''Y''
+        ELSE ''N''
+      END;
   END;';
       util_template_replace('API BODY');
 
@@ -3277,8 +3225,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
     VALUES (
       {% LIST_INSERT_BULK_PARAMS hide_identity_columns=true %} )
-    RETURN ' || CASE
-                  WHEN NOT g_status.xmltype_column_present THEN '
+    RETURN ' || CASE WHEN NOT g_status.xmltype_column_present THEN '
       {% LIST_COLUMNS_W_PK_FULL %}
     BULK COLLECT INTO v_return;'
                 ELSE '
@@ -3545,34 +3492,21 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     {% LIST_PARAMS_W_PK %} );';
         util_template_replace('API SPEC');
 
-      -- check if additional columns exist that are
-      -- a) not part of PK and
-      -- b) not excluded columns
-      -- c) not audit columns
-      -- if no additional column is available for updating, update API is
-      -- will be generated with extra comments
-      IF g_status.number_of_data_columns > 0 THEN
         g_code_blocks.template := '
   PROCEDURE update_row (
     {% LIST_PARAMS_W_PK %} )
   IS
-  BEGIN
+  BEGIN' || case when g_status.number_of_data_columns > 0 then '
     UPDATE {{ TABLE_NAME }}
        SET {% LIST_SET_COL_EQ_PARAM_WO_PK %}
-     WHERE {% LIST_PK_COLUMNS_WHERE_CLAUSE %};
+     WHERE {% LIST_PK_COLUMNS_WHERE_CLAUSE %};'
+            else '
+    /*
+    There is no column anymore to update! All remaining columns are part of the
+    primary key, audit columns or excluded via exclude column list
+    */
+    NULL;'  end || '
   END update_row;';
-      ELSE
-        g_code_blocks.template := '
-  PROCEDURE update_row (
-    {% LIST_PARAMS_W_PK %} )
-  IS
-  BEGIN
-    -- There is no column anymore to update! All remaining columns are part
-    -- of the primary key or excluded via exclude column list or audit column
-    -- mappings.
-    NULL;
-  END update_row;';
-      END IF;
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
@@ -3602,6 +3536,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_update_rowtype_prc;
 
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_update_rows_bulk_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_update_rows_bulk_prc');
@@ -3611,35 +3547,22 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     {{ TABTYPE_PARAM }} );';
       util_template_replace('API SPEC');
 
-      -- check if columns exist that are
-      -- a) not part of PK and
-      -- b) not excluded columns
-      -- c) not audit columns
-      -- if no additional column is available, update API is
-      -- useless and will be generated with extra comment
-
-      IF g_status.number_of_data_columns > 0 THEN
-        g_code_blocks.template := '
+      g_code_blocks.template := '
   PROCEDURE update_rows (
     {{ TABTYPE_PARAM }} )
   IS
-  BEGIN
+  BEGIN' || case when g_status.number_of_data_columns > 0 then '
     FORALL i IN INDICES OF p_rows_tab
       UPDATE {{ TABLE_NAME }}
          SET {% LIST_SET_COL_EQ_PAR_BULK_WO_PK %}
-       WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};
+       WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};'
+            else '
+    /*
+    There is no column anymore to update! All remaining columns are part of the
+    primary key, audit columns or excluded via exclude column list.
+    */
+    NULL;'  end || '
   END update_rows;';
-      ELSE
-        g_code_blocks.template := '
-  PROCEDURE update_rows (
-    {{ TABTYPE_PARAM }} )
-  IS
-  BEGIN
-    -- there is no column anymore to update! All remaining columns are part
-    -- of the primary key or excluded via exclude column list
-    NULL;
-  END update_rows;';
-      END IF;
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
@@ -3824,10 +3747,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   FUNCTION get_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %} )
   RETURN "{{ TABLE_NAME }}"."{{ I_COLUMN_NAME }}"%TYPE IS
-    v_row "{{ TABLE_NAME }}"%ROWTYPE;
   BEGIN
-    v_row := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} );
-    RETURN v_row."{{ I_COLUMN_NAME }}";
+    RETURN read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} )."{{ I_COLUMN_NAME }}";
   END get_{{ I_METHOD_NAME }};';
           util_template_replace('API BODY');
 
@@ -3842,8 +3763,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_setter_procedures');
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND
-        g_columns(i).is_pk_yn = 'N' and g_columns(i).audit_type is null THEN
+        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N' and g_columns(i).audit_type is null THEN
           g_iterator.column_name    := g_columns(i).column_name;
           g_iterator.method_name    := util_get_method_name(g_columns(i).column_name);
           g_iterator.parameter_name := util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns);
@@ -4002,14 +3922,11 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_footer');
 
-      g_code_blocks.template := CASE
-                                  WHEN g_params.enable_custom_defaults THEN
-                                   c_lf || '
+      g_code_blocks.template := CASE WHEN g_params.enable_custom_defaults THEN '
   /*
   You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
   {% LIST_SPEC_CUSTOM_DEFAULTS %}
-  */'
-                                END || '
+  */'                           END || '
 END "{{ API_NAME }}";';
       util_template_replace('API SPEC');
 
@@ -4062,39 +3979,26 @@ CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
    * generated_by="{{ GENERATED_BY }}"
    */
 BEGIN
-  IF INSERTING THEN' || CASE
-                                  WHEN g_params.enable_insertion_of_rows THEN
-                                   '
+  IF INSERTING THEN' || CASE WHEN g_params.enable_insertion_of_rows THEN '
     "{{ API_NAME }}".create_row (
       {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %} );'
-                                  ELSE
-                                   '
-    raise_application_error (' || c_generator_error_number ||
-                                   ', ''Insertion of a row is not allowed.'');'
-                                END || '
-  ELSIF UPDATING THEN' || CASE
-                                  WHEN g_params.enable_update_of_rows THEN
-                                   '
+                        ELSE '
+    raise_application_error ({{ GENERATOR_ERROR_NUMBER }}, ''Insertion of a row is not allowed.'');'
+                        END || '
+  ELSIF UPDATING THEN' || CASE WHEN g_params.enable_update_of_rows THEN '
     "{{ API_NAME }}".update_row (
       {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %} );'
-                                  ELSE
-                                   '
-    raise_application_error (' || c_generator_error_number ||
-                                   ', ''Update of a row is not allowed.'');'
-                                END || '
-  ELSIF DELETING THEN' || CASE
-                                  WHEN g_params.enable_deletion_of_rows THEN
-                                   '
+                          ELSE '
+    raise_application_error ({{ GENERATOR_ERROR_NUMBER }}, ''Update of a row is not allowed.'');'
+                          END || '
+  ELSIF DELETING THEN' || CASE WHEN g_params.enable_deletion_of_rows THEN '
     "{{ API_NAME }}".delete_row (
       {% LIST_PK_MAP_PARAM_EQ_OLDCOL %} );'
-                                  ELSE
-                                   '
-    raise_application_error (' || c_generator_error_number ||
-                                   ', ''Deletion of a row is not allowed.'');'
-                                END || '
+                          ELSE '
+    raise_application_error ({{ GENERATOR_ERROR_NUMBER }}, ''Deletion of a row is not allowed.'');'
+                          END || '
   END IF;
 END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
-
       util_template_replace('TRIGGER');
 
       util_debug_stop_one_step;
@@ -4132,7 +4036,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     gen_header;
 
     -- bulk header if choosen
-    gen_header_bulk;
+    gen_bulk_types;
     gen_bulk_is_complete_fnc;
     gen_set_bulk_limit_prc;
     gen_get_bulk_limit_fnc;
