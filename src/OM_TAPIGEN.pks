@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.11';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.12';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -133,6 +133,7 @@ TYPE t_rec_existing_apis IS RECORD(
   p_exclude_column_list         VARCHAR2(4000 CHAR),
   p_audit_column_mappings       VARCHAR2(4000 CHAR),
   p_audit_user_expression       VARCHAR2(4000 CHAR),
+  p_row_version_column_mapping  VARCHAR2(4000 CHAR),
   p_enable_custom_defaults      VARCHAR2(5 CHAR),
   p_custom_default_values       VARCHAR2(30 CHAR));
 
@@ -166,26 +167,27 @@ TYPE t_tab_debug_data IS TABLE OF t_rec_debug_data;
 --
 
 TYPE t_rec_columns IS RECORD(
-  column_name           all_tab_cols.column_name%TYPE,
-  data_type             all_tab_cols.data_type%TYPE,
-  char_length           all_tab_cols.char_length%TYPE,
-  data_length           all_tab_cols.data_length%TYPE,
-  data_precision        all_tab_cols.data_precision%TYPE,
-  data_scale            all_tab_cols.data_scale%TYPE,
-  data_default          VARCHAR2(4000 CHAR),
-  data_custom_default   VARCHAR2(4000 CHAR),
-  custom_default_source VARCHAR2(15 CHAR),
-  identity_type         VARCHAR2(15 CHAR),
-  default_on_null_yn    VARCHAR2(1 CHAR),
-  is_pk_yn              VARCHAR2(1 CHAR),
-  is_uk_yn              VARCHAR2(1 CHAR),
-  is_fk_yn              VARCHAR2(1 CHAR),
-  is_nullable_yn        VARCHAR2(1 CHAR),
-  is_excluded_yn        VARCHAR2(1 CHAR),
-  audit_type            VARCHAR2(15 CHAR),
-  r_owner               all_users.username%TYPE,
-  r_table_name          all_objects.object_name%TYPE,
-  r_column_name         all_tab_cols.column_name%TYPE);
+  column_name            all_tab_cols.column_name%TYPE,
+  data_type              all_tab_cols.data_type%TYPE,
+  char_length            all_tab_cols.char_length%TYPE,
+  data_length            all_tab_cols.data_length%TYPE,
+  data_precision         all_tab_cols.data_precision%TYPE,
+  data_scale             all_tab_cols.data_scale%TYPE,
+  data_default           VARCHAR2(4000 CHAR),
+  data_custom_default    VARCHAR2(4000 CHAR),
+  custom_default_source  VARCHAR2(15 CHAR),
+  identity_type          VARCHAR2(15 CHAR),
+  default_on_null_yn     VARCHAR2(1 CHAR),
+  is_pk_yn               VARCHAR2(1 CHAR),
+  is_uk_yn               VARCHAR2(1 CHAR),
+  is_fk_yn               VARCHAR2(1 CHAR),
+  is_nullable_yn         VARCHAR2(1 CHAR),
+  is_excluded_yn         VARCHAR2(1 CHAR),
+  audit_type             VARCHAR2(15 CHAR),
+  row_version_expression VARCHAR2(4000 CHAR),
+  r_owner                all_users.username%TYPE,
+  r_table_name           all_objects.object_name%TYPE,
+  r_column_name          all_tab_cols.column_name%TYPE);
 
 TYPE t_tab_debug_columns IS TABLE OF t_rec_columns;
 /* We use t_tab_debug_columns as a private array/collection inside the package body
@@ -237,6 +239,7 @@ PROCEDURE compile_api
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
+  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier)
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
   p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 );
@@ -271,6 +274,7 @@ FUNCTION compile_api_and_get_code
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
+  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier)
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
   p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 ) RETURN CLOB;
@@ -309,6 +313,7 @@ FUNCTION get_code
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
+  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier)
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
   p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
 ) RETURN CLOB;

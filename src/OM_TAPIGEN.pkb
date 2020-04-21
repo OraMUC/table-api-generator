@@ -33,6 +33,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     exclude_column_list         VARCHAR2(4000 CHAR),
     audit_column_mappings       VARCHAR2(4000 CHAR),
     audit_user_expression       VARCHAR2(4000 CHAR),
+    row_version_column_mapping  VARCHAR2(4000 CHAR),
     enable_custom_defaults      BOOLEAN,
     custom_default_values       xmltype,
     custom_defaults_serialized  VARCHAR2(32767 CHAR));
@@ -283,6 +284,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
            is_nullable_yn,
            is_excluded_yn,
            NULL AS audit_type,
+           NULL AS row_version_expression,
            NULL AS r_owner,
            NULL AS r_table_name,
            NULL AS r_column_name
@@ -790,26 +792,27 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     v_row t_rec_columns;
   BEGIN
     FOR i IN 1 .. g_columns.count LOOP
-      v_row.column_name           := g_columns(i).column_name;
-      v_row.data_type             := g_columns(i).data_type;
-      v_row.char_length           := g_columns(i).char_length;
-      v_row.data_length           := g_columns(i).data_length;
-      v_row.data_precision        := g_columns(i).data_precision;
-      v_row.data_scale            := g_columns(i).data_scale;
-      v_row.data_default          := g_columns(i).data_default;
-      v_row.data_custom_default   := g_columns(i).data_custom_default;
-      v_row.custom_default_source := g_columns(i).custom_default_source;
-      v_row.identity_type         := g_columns(i).identity_type;
-      v_row.default_on_null_yn    := g_columns(i).default_on_null_yn;
-      v_row.is_pk_yn              := g_columns(i).is_pk_yn;
-      v_row.is_uk_yn              := g_columns(i).is_uk_yn;
-      v_row.is_fk_yn              := g_columns(i).is_fk_yn;
-      v_row.is_nullable_yn        := g_columns(i).is_nullable_yn;
-      v_row.is_excluded_yn        := g_columns(i).is_excluded_yn;
-      v_row.audit_type            := g_columns(i).audit_type;
-      v_row.r_owner               := g_columns(i).r_owner;
-      v_row.r_table_name          := g_columns(i).r_table_name;
-      v_row.r_column_name         := g_columns(i).r_column_name;
+      v_row.column_name            := g_columns(i).column_name;
+      v_row.data_type              := g_columns(i).data_type;
+      v_row.char_length            := g_columns(i).char_length;
+      v_row.data_length            := g_columns(i).data_length;
+      v_row.data_precision         := g_columns(i).data_precision;
+      v_row.data_scale             := g_columns(i).data_scale;
+      v_row.data_default           := g_columns(i).data_default;
+      v_row.data_custom_default    := g_columns(i).data_custom_default;
+      v_row.custom_default_source  := g_columns(i).custom_default_source;
+      v_row.identity_type          := g_columns(i).identity_type;
+      v_row.default_on_null_yn     := g_columns(i).default_on_null_yn;
+      v_row.is_pk_yn               := g_columns(i).is_pk_yn;
+      v_row.is_uk_yn               := g_columns(i).is_uk_yn;
+      v_row.is_fk_yn               := g_columns(i).is_fk_yn;
+      v_row.is_nullable_yn         := g_columns(i).is_nullable_yn;
+      v_row.is_excluded_yn         := g_columns(i).is_excluded_yn;
+      v_row.audit_type             := g_columns(i).audit_type;
+      v_row.row_version_expression := g_columns(i).row_version_expression;
+      v_row.r_owner                := g_columns(i).r_owner;
+      v_row.r_table_name           := g_columns(i).r_table_name;
+      v_row.r_column_name          := g_columns(i).r_column_name;
       PIPE ROW(v_row);
     END LOOP;
   END util_view_columns_array;
@@ -1065,6 +1068,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                 || ', "' || g_params.sequence_name || '".nextval )'
               when g_columns(i).audit_type is not null then
                 get_audit_value(i)
+              when g_columns(i).row_version_expression is not null then
+                g_columns(i).row_version_expression
               else
                 util_get_parameter_name(g_columns(i).column_name, NULL)
             END
@@ -1101,17 +1106,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           v_result(v_result.count + 1) :=
             '      ' ||
             CASE
-              WHEN
-                g_columns(i).is_pk_yn = 'Y' AND
-                NOT g_status.pk_is_multi_column AND
-                g_params.sequence_name IS NOT NULL
-              THEN
+              WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_params.sequence_name IS NOT NULL THEN
                 'COALESCE( p_rows_tab(i)."' || g_columns(i).column_name || '", "'
                 || g_params.sequence_name || '".nextval )'
-              when
-                g_columns(i).audit_type is not null
-              then
+              when g_columns(i).audit_type is not null then
                 get_audit_value(i)
+              when g_columns(i).row_version_expression is not null then
+                g_columns(i).row_version_expression
               ELSE
                 'p_rows_tab(i)."' || g_columns(i).column_name || '"'
             END || c_list_delimiter;
@@ -1161,6 +1162,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
+          AND g_columns(i).row_version_expression is null
           AND NOT (
             g_template_options.hide_identity_columns
             AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
@@ -1220,6 +1222,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
+          AND g_columns(i).row_version_expression is null
           AND NOT (
             g_template_options.hide_identity_columns
             AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
@@ -1294,6 +1297,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
+          AND g_columns(i).row_version_expression is null
         THEN
           v_result(v_result.count + 1) := '      ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
@@ -1328,6 +1332,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
+          AND g_columns(i).row_version_expression is null
           AND NOT (
             g_template_options.hide_identity_columns
             AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
@@ -1370,6 +1375,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
+          AND g_columns(i).row_version_expression is null
           AND NOT (
             g_template_options.hide_identity_columns
             AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
@@ -1413,6 +1419,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             case
               when g_columns(i).audit_type is not null then
                 get_audit_value(i)
+              when g_columns(i).row_version_expression is not null then
+                g_columns(i).row_version_expression
               else
                 util_get_parameter_name(g_columns(i).column_name, NULL)
             end ||
@@ -1451,6 +1459,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             case
               when g_columns(i).audit_type is not null then
                 get_audit_value(i)
+              when g_columns(i).row_version_expression is not null then
+                g_columns(i).row_version_expression
               else
                 'p_rows_tab(i)."' || g_columns(i).column_name || '"'
             end ||
@@ -1478,6 +1488,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
+          AND g_columns(i).row_version_expression is null
           AND g_columns(i).is_pk_yn = 'N'
         THEN
           v_result(v_result.count + 1) :=
@@ -2115,6 +2126,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(g_params.audit_column_mappings);
         WHEN 'AUDIT_USER_EXPRESSION' THEN
           code_append(g_params.audit_user_expression);
+        WHEN 'ROW_VERSION_COLUMN_MAPPING' THEN
+          code_append(g_params.row_version_column_mapping);
         WHEN 'RETURN_TYPE' THEN
           code_append('"' || g_params.table_name || '"' || CASE
                         WHEN g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column THEN
@@ -2308,6 +2321,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_exclude_column_list         IN VARCHAR2,
     p_audit_column_mappings       IN VARCHAR2,
     p_audit_user_expression       IN VARCHAR2,
+    p_row_version_column_mapping  IN VARCHAR2,
     p_enable_custom_defaults      IN BOOLEAN,
     p_custom_default_values       IN xmltype
   ) IS
@@ -2353,6 +2367,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_params.exclude_column_list         := p_exclude_column_list;
       g_params.audit_column_mappings       := p_audit_column_mappings;
       g_params.audit_user_expression       := p_audit_user_expression;
+      g_params.row_version_column_mapping  := p_row_version_column_mapping;
       g_params.enable_custom_defaults      := p_enable_custom_defaults;
       g_params.custom_default_values       :=  p_custom_default_values;
       IF g_params.custom_default_values IS NOT NULL THEN
@@ -2747,6 +2762,52 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
     -----------------------------------------------------------------------------
 
+    PROCEDURE init_process_row_version_column IS
+      v_idx         PLS_INTEGER;
+      v_column_name all_tab_cols.column_name%TYPE;
+      v_expression  varchar2(4000 char);
+    BEGIN
+      if instr(g_params.row_version_column_mapping, '#PREFIX#') > 0 and g_status.column_prefix is null then
+        raise_application_error(c_generator_error_number,
+          'The prefix of your column names (example: prefix_rest_of_column_name)' || c_lf ||
+          'is not unique and you used the placeholder #PREFIX# in the parameter' || c_lf ||
+          'p_row_version_column_mapping. Please ensure either your column names' || c_lf ||
+          'have a unique prefix or do not use the placeholder #PREFIX# in the' || c_lf ||
+          'parameter p_row_version_column_mapping.');
+      else
+        util_debug_start_one_step(p_action => 'init_process_row_version_column');
+        v_idx := instr(g_params.row_version_column_mapping, '=');
+        if v_idx > 0 then
+          v_column_name := trim(substr(g_params.row_version_column_mapping, 1, v_idx - 1));
+          v_expression :=  trim(substr(g_params.row_version_column_mapping, v_idx + 1));
+          v_column_name := replace(v_column_name, '#PREFIX#', g_status.column_prefix);
+          if v_column_name is null or v_expression is null then
+            raise_application_error(c_generator_error_number,
+              'Invalid parameter p_row_version_column_mapping - the resulting' || c_lf ||
+              'column name or SQL expression is null. Please have a look in' || c_lf ||
+              'the docs and provide a valid string e.g.' || c_lf ||
+              '#PREFIX#_MY_COLUMN_NAME=my_version_sequence.nextval');
+          end if;
+          begin
+            v_idx := g_columns_reverse_index(v_column_name);
+            g_columns(v_idx).row_version_expression := v_expression;
+          exception
+            when no_data_found then null;
+            when others then raise;
+          end;
+          if v_idx is null then
+            raise_application_error(c_generator_error_number,
+              'Invalid column name provided in the parameter' || c_lf ||
+              'p_row_version_column_mapping.' || c_lf ||
+              '#PREFIX#_MY_COLUMN_NAME=my_version_sequence.nextval');
+          end if;
+          util_debug_stop_one_step;
+        end if;
+      end if;
+    END init_process_row_version_column;
+
+    -----------------------------------------------------------------------------
+
     PROCEDURE init_count_column_types IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_count_column_types');
@@ -2755,9 +2816,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_status.number_of_uk_columns := 0;
       g_status.number_of_fk_columns := 0;
       FOR i IN g_columns.first .. g_columns.last LOOP
-        if g_columns(i).is_pk_yn = 'N' and
-        g_columns(i).is_excluded_yn = 'N' and
-        g_columns(i).audit_type is null then
+        if g_columns(i).is_pk_yn = 'N'
+        and g_columns(i).is_excluded_yn = 'N'
+        and g_columns(i).audit_type is null
+        AND g_columns(i).row_version_expression is null then
           g_status.number_of_data_columns := g_status.number_of_data_columns + 1;
         end if;
         if g_columns(i).is_pk_yn = 'Y' then
@@ -2879,7 +2941,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     init_process_pk_columns;
     init_process_uk_columns;
     init_process_fk_columns;
-    init_process_audit_columns;
+    if g_params.audit_column_mappings is not null then
+      init_process_audit_columns;
+    end if;
+    if g_params.row_version_column_mapping is not null then
+      init_process_row_version_column;
+    end if;
     init_count_column_types;
     IF g_params.enable_custom_defaults THEN
       init_process_custom_defaults;
@@ -2928,6 +2995,7 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
     p_exclude_column_list="{{ EXCLUDE_COLUMN_LIST }}"
     p_audit_column_mappings="{{ AUDIT_COLUMN_MAPPINGS }}"
     p_audit_user_expression="{{ AUDIT_USER_EXPRESSION }}"
+    p_row_version_column_mapping="{{ ROW_VERSION_COLUMN_MAPPING }}"
     p_enable_custom_defaults="{{ ENABLE_CUSTOM_DEFAULTS }}"
     p_custom_default_values="{{ CUSTOM_DEFAULTS }}"/>
   */' || case when g_status.xmltype_column_present then '
@@ -3763,7 +3831,10 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_setter_procedures');
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND g_columns(i).is_pk_yn = 'N' and g_columns(i).audit_type is null THEN
+        IF g_columns(i).is_excluded_yn = 'N'
+        AND g_columns(i).is_pk_yn = 'N'
+        and g_columns(i).audit_type is null
+        AND g_columns(i).row_version_expression is null THEN
           g_iterator.column_name    := g_columns(i).column_name;
           g_iterator.method_name    := util_get_method_name(g_columns(i).column_name);
           g_iterator.parameter_name := util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns);
@@ -4201,6 +4272,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
+    p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,
     p_enable_custom_defaults      IN BOOLEAN DEFAULT FALSE,
     p_custom_default_values       IN xmltype DEFAULT NULL
   ) IS
@@ -4224,6 +4296,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_exclude_column_list         => p_exclude_column_list,
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
+              p_row_version_column_mapping  => p_row_version_column_mapping,
               p_enable_custom_defaults      => p_enable_custom_defaults,
               p_custom_default_values       => p_custom_default_values);
     main_generate_code;
@@ -4252,6 +4325,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
+    p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,
     p_enable_custom_defaults      IN BOOLEAN DEFAULT FALSE,
     p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
@@ -4278,6 +4352,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_exclude_column_list         => p_exclude_column_list,
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
+              p_row_version_column_mapping  => p_row_version_column_mapping,
               p_enable_custom_defaults      => p_enable_custom_defaults,
               p_custom_default_values       => p_custom_default_values);
     main_generate_code;
@@ -4307,6 +4382,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
+    p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,
     p_enable_custom_defaults      IN BOOLEAN DEFAULT FALSE,
     p_custom_default_values       IN xmltype DEFAULT NULL
   ) RETURN CLOB IS
@@ -4330,6 +4406,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_exclude_column_list         => p_exclude_column_list,
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
+              p_row_version_column_mapping  => p_row_version_column_mapping,
               p_enable_custom_defaults      => p_enable_custom_defaults,
               p_custom_default_values       => p_custom_default_values);
     main_generate_code;
@@ -4415,6 +4492,7 @@ WITH api_names AS (
                 x.p_exclude_column_list,
                 x.p_audit_column_mappings,
                 x.p_audit_user_expression,
+                x.p_row_version_column_mapping,
                 x.p_enable_custom_defaults,
                 x.p_custom_default_values
            FROM sources t
@@ -4444,6 +4522,7 @@ WITH api_names AS (
                            p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH ''@p_exclude_column_list'',
                            p_audit_column_mappings       VARCHAR2 (4000 CHAR) PATH ''@p_audit_column_mappings'',
                            p_audit_user_expression       VARCHAR2 (4000 CHAR) PATH ''@p_audit_user_expression'',
+                           p_row_version_column_mapping  VARCHAR2 (4000 CHAR) PATH ''@p_row_version_column_mapping'',
                            p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_custom_defaults'',
                            p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'') x
      ) -- select * from apis;
@@ -4505,6 +4584,7 @@ SELECT NULL AS errors,
        apis.p_exclude_column_list,
        apis.p_audit_column_mappings,
        apis.p_audit_user_expression,
+       apis.p_row_version_column_mapping,
        apis.p_enable_custom_defaults,
        apis.p_custom_default_values
   FROM apis JOIN objects ON apis.package_name = objects.package_name

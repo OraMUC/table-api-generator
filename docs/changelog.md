@@ -23,9 +23,12 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 ## 0.6.0 (2020-xx-xx)
 
 - added: support for bulk processing
-- removed: parameter p_enable_generic_change_log (makes no sense anymore with bulk processing and multi column pks)
-- removed: prevent updates if columns do not differ (needed to support all column types)
-- removed: procedure recreate_existing_apis
+- added: support for audit columns
+- added: support for a row version column (https://stackoverflow.com/questions/20487657/sql-server-rowversion-equivalent-in-oracle)
+- removed: parameter p_enable_generic_change_log (makes no sense anymore with bulk processing and multi column primary keys)
+- removed: parameter p_reuse_existing_api_params (usage was was not logic, simply provide always your needed parameters and create scripts or a wrapper)
+- removed: prevent updates if columns do not differ (needed to support all possible column types and for performance reasons)
+- removed: procedure recreate_existing_apis (this was a parmeterless option which reused the existing API parameters, you can still do this with the help of the pipelined function view_existing_apis)
 
 ## 0.5.1 (2020-04-19)
 
