@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.12';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.14';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -1513,7 +1513,19 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           else
             g_params.audit_user_expression
         end;
-    end;
+    end get_audit_value;
+
+    -----------------------------------------------------------------------------
+
+    function get_column_comment (
+      p_column_index integer)
+    return varchar2 is
+    begin
+      return
+        CASE WHEN g_columns(p_column_index).is_pk_yn = 'Y' THEN ' /*PK*/' END ||
+        CASE WHEN g_columns(p_column_index).is_uk_yn = 'Y' THEN ' /*UK*/' END ||
+        CASE WHEN g_columns(p_column_index).is_fk_yn = 'Y' THEN ' /*FK*/' END;
+    end get_column_comment;
 
     -----------------------------------------------------------------------------
 
@@ -1529,7 +1541,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         end if;
         p_list(p_list.last) := rtrim(p_list(p_list.last), c_lf || c_list_delimiter);
       end if;
-    end;
+    end trim_list;
 
     -----------------------------------------------------------------------------
 
@@ -1549,10 +1561,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         THEN
           v_result(v_result.count + 1) :=
             '      ' || '"' || g_columns(i).column_name || '"' ||
-            CASE WHEN g_columns(i).is_pk_yn = 'Y' THEN ' /*PK*/' END ||
-            CASE WHEN g_columns(i).is_uk_yn = 'Y' THEN ' /*UK*/' END ||
-            CASE WHEN g_columns(i).is_fk_yn = 'Y' THEN ' /*FK*/' END ||
-            c_list_delimiter;
+            get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -1660,10 +1669,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         v_result(v_result.count + 1) :=
           '       ' || '"' || g_columns(i).column_name || '"' ||
-          CASE WHEN g_columns(i).is_pk_yn = 'Y' THEN ' /*PK*/' END ||
-          CASE WHEN g_columns(i).is_uk_yn = 'Y' THEN ' /*UK*/' END ||
-          CASE WHEN g_columns(i).is_fk_yn = 'Y' THEN ' /*FK*/' END ||
-          c_list_delimiter;
+          get_column_comment(i) || c_list_delimiter;
       END LOOP;
       trim_list(v_result);
       RETURN v_result;
@@ -1714,16 +1720,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                ELSE
                                                 ' '
                                              END
-                                          END || CASE
-                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                             ' /*PK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_uk_yn = 'Y' THEN
-                                             ' /*UK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_fk_yn = 'Y' THEN
-                                             ' /*FK*/'
-                                          END || c_list_delimiter;
+                                          END || get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -1754,16 +1751,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
                                           ' IN "' || g_params.table_name || '".' ||
                                           rpad('"' || g_columns(i).column_name || '"%TYPE', g_status.rpad_columns + 7) ||
-                                          ' DEFAULT get_a_row()."' || g_columns(i).column_name || '"' || CASE
-                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                             ' /*PK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_uk_yn = 'Y' THEN
-                                             ' /*UK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_fk_yn = 'Y' THEN
-                                             ' /*FK*/'
-                                          END || c_list_delimiter;
+                                          ' DEFAULT get_a_row()."' || g_columns(i).column_name || '"' ||
+                                          get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -1790,16 +1779,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           ELSE
                                            '    OUT NOCOPY '
                                         END || '"' || g_params.table_name || '"."' || g_columns(i).column_name ||
-                                        '"%TYPE' || CASE
-                                          WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                           ' /*PK*/'
-                                        END || CASE
-                                          WHEN g_columns(i).is_uk_yn = 'Y' THEN
-                                           ' /*UK*/'
-                                        END || CASE
-                                          WHEN g_columns(i).is_fk_yn = 'Y' THEN
-                                           ' /*FK*/'
-                                        END || c_list_delimiter;
+                                        '"%TYPE' || get_column_comment(i) || c_list_delimiter;
       END LOOP;
       trim_list(v_result);
       RETURN v_result;
@@ -1822,18 +1802,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           AND g_columns(i).audit_type is null
           AND g_columns(i).row_version_expression is null
         THEN
-          v_result(v_result.count + 1) := '      ' ||
-                                          util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
-                                          ' => :new."' || g_columns(i).column_name || '"' || CASE
-                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                             ' /*PK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_uk_yn = 'Y' THEN
-                                             ' /*UK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_fk_yn = 'Y' THEN
-                                             ' /*FK*/'
-                                          END || c_list_delimiter;
+          v_result(v_result.count + 1) :=
+            '      ' ||
+            util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
+            ' => :new."' || g_columns(i).column_name || '"' ||
+            get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -1860,23 +1833,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             g_template_options.hide_identity_columns
             AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
         THEN
-          v_result(v_result.count + 1) := CASE
-                                            WHEN g_template_options.padding IS NOT NULL THEN
-                                             rpad(' ', g_template_options.padding)
-                                            ELSE
-                                             '      '
-                                          END ||
-                                          util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
-                                          ' => ' || util_get_parameter_name(g_columns(i).column_name, NULL) || CASE
-                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                             ' /*PK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_uk_yn = 'Y' THEN
-                                             ' /*UK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_fk_yn = 'Y' THEN
-                                             ' /*FK*/'
-                                          END || c_list_delimiter;
+          v_result(v_result.count + 1) :=
+            CASE WHEN g_template_options.padding IS NOT NULL
+              THEN rpad(' ', g_template_options.padding)
+              ELSE '      '
+            END ||
+            util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
+            ' => ' || util_get_parameter_name(g_columns(i).column_name, NULL) ||
+            get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -1907,9 +1871,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             '      '
             || util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns)
             || ' => p_row."' || g_columns(i).column_name || '"'
-            || CASE WHEN g_columns(i).is_pk_yn = 'Y' THEN ' /*PK*/' END
-            || CASE WHEN g_columns(i).is_uk_yn = 'Y' THEN ' /*UK*/' END
-            || CASE WHEN g_columns(i).is_fk_yn = 'Y' THEN ' /*FK*/' END
+            || get_column_comment(i)
             || c_list_delimiter;
         END IF;
       END LOOP;
@@ -1947,10 +1909,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
               else
                 util_get_parameter_name(g_columns(i).column_name, NULL)
             end ||
-            CASE WHEN g_columns(i).is_pk_yn = 'Y' THEN ' /*PK*/' END ||
-            CASE WHEN g_columns(i).is_uk_yn = 'Y' THEN ' /*UK*/' END ||
-            CASE WHEN g_columns(i).is_fk_yn = 'Y' THEN ' /*FK*/' END ||
-            c_list_delimiter;
+            get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -1987,10 +1946,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
               else
                 'p_rows_tab(i)."' || g_columns(i).column_name || '"'
             end ||
-            CASE WHEN g_columns(i).is_pk_yn = 'Y' THEN ' /*PK*/' END ||
-            CASE WHEN g_columns(i).is_uk_yn = 'Y' THEN ' /*UK*/' END ||
-            CASE WHEN g_columns(i).is_fk_yn = 'Y' THEN ' /*FK*/' END ||
-            c_list_delimiter;
+            get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -2091,8 +2047,28 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     END list_pk_names;
 
     -----------------------------------------------------------------------------
-    -- Primary key column definition for create_row:
-    -- {% LIST_PARAMS_PK %}
+    -- Primary key columns for return clause:
+    -- {% LIST_PK_RETURN_COLUMNS %}
+    -- Example:
+    --   v_return.col1,
+    --   v_return.col2,
+    --   v_return.col3,
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_pk_return_columns RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+        v_result(v_result.count + 1) :=
+          '    v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
+      END LOOP;
+      trim_list(v_result);
+      RETURN v_result;
+    END list_pk_return_columns;
+
+    -----------------------------------------------------------------------------
+    -- Primary key column definition for create_rows:
+    -- {% LIST_PK_RETURN_COLUMNS_BULK %}
     -- Example:
     --   v_return(i).col1 := v_pk_tab.col1;
     --   v_return(i).col2 := v_pk_tab.col2;
@@ -2105,12 +2081,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
         v_result(v_result.count + 1) :=
           '    v_return(i)."' || g_pk_columns(i).column_name
-          || '" := v_pk_tab(i)."' || g_pk_columns(i).column_name || '"; /*PK*/';
+          || '" := v_pk_tab(i)."' || g_pk_columns(i).column_name || '"; /*PK*/' || c_lf;
       END LOOP;
       trim_list(v_result);
       RETURN v_result;
     END list_pk_return_columns_bulk;
-
 
     -----------------------------------------------------------------------------
     -- Primary key columns parameter compare for get_pk_by_unique_cols functions:
@@ -2219,7 +2194,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   p_col2 => p_col2,
     --   ...
     -----------------------------------------------------------------------------
-
     FUNCTION list_pk_map_param_eq_param RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -2238,6 +2212,30 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     END list_pk_map_param_eq_param;
 
     -----------------------------------------------------------------------------
+    -- Primary key columns as "parameter => parameter" mapping for read_row functions:
+    -- {% LIST_PK_MAP_PARAM_EQ_PARAM %}
+    -- Example:
+    --   p_col1 => p_col1,
+    --   p_col2 => p_col2,
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_pk_map_param_eq_return RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+      FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
+        v_result(v_result.count + 1) :=
+          '    '
+          || util_get_parameter_name(
+            g_pk_columns(i).column_name,
+            CASE WHEN g_status.pk_is_multi_column THEN g_status.rpad_pk_columns ELSE NULL END)
+          || ' => v_return."' || g_pk_columns(i).column_name || '"' ||
+          c_list_delimiter;
+      END LOOP;
+      trim_list(v_result);
+      RETURN v_result;
+    END list_pk_map_param_eq_return;
+
+    -----------------------------------------------------------------------------
     -- Primary key columns as "parameter => :old.column" mapping for DML view trigger:
     -- {% LIST_PK_MAP_PARAM_EQ_OLDCOL %}
     -- Example:
@@ -2245,7 +2243,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   p_col2 => :old.col2,
     --   ...
     -----------------------------------------------------------------------------
-
     FUNCTION list_pk_map_param_eq_oldcol RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -2362,10 +2359,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             '    ' || 'v_row.'
             || rpad('"' || g_columns(i).column_name || '"', g_status.rpad_columns + 2)
             || ' := ' || nvl(g_columns(i).data_custom_default, g_columns(i).data_default)
-            || CASE WHEN g_columns(i).is_pk_yn = 'Y' THEN ' /*PK*/' END
-            || CASE WHEN g_columns(i).is_uk_yn = 'Y' THEN ' /*UK*/' END
-            || CASE WHEN g_columns(i).is_fk_yn = 'Y' THEN ' /*FK*/' END
-            || ';' || c_lf;
+            || get_column_comment(i) || ';' || c_lf;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -2443,6 +2437,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_pk_columns;
       WHEN 'LIST_PK_NAMES' THEN
         RETURN list_pk_names;
+      WHEN 'LIST_PK_RETURN_COLUMNS' THEN
+        RETURN list_pk_return_columns;
       WHEN 'LIST_PK_RETURN_COLUMNS_BULK' THEN
         RETURN list_pk_return_columns_bulk;
       WHEN 'LIST_PK_COLUMNS_WHERE_CLAUSE' THEN
@@ -2455,6 +2451,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_pk_column_bulk_fetch;
       WHEN 'LIST_PK_MAP_PARAM_EQ_PARAM' THEN
         RETURN list_pk_map_param_eq_param;
+      WHEN 'LIST_PK_MAP_PARAM_EQ_RETURN' THEN
+        RETURN list_pk_map_param_eq_return;
       WHEN 'LIST_PK_MAP_PARAM_EQ_OLDCOL' THEN
         RETURN list_pk_map_param_eq_oldcol;
       WHEN 'LIST_UK_PARAMS' THEN
@@ -2748,38 +2746,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
       IF v_match LIKE 'LIST%' THEN
         v_dynamic_result := util_generate_list(v_match);
-
-      ELSIF v_match = 'RETURN_CLAUSE' THEN
-        IF (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column) AND NOT g_status.xmltype_column_present THEN
-          v_dynamic_result := util_generate_list('LIST_COLUMNS_W_PK_FULL');
-          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
-          v_dynamic_result(v_dynamic_result.count + 1) := '      v_return;';
-
-        ELSIF (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column) AND g_status.xmltype_column_present THEN
-          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
-            v_dynamic_result(v_dynamic_result.count + 1) := '      "' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
-          END LOOP;
-          v_dynamic_result(v_dynamic_result.first) := ltrim(v_dynamic_result(v_dynamic_result.first));
-          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || c_lf;
-          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
-          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
-            v_dynamic_result(v_dynamic_result.count + 1) := '      v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
-          END LOOP;
-          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || ';' || c_lf;
-          v_dynamic_result(v_dynamic_result.count + 1) := '    /* return clause does not support XMLTYPE column, so we have to do here an extra fetch */' || c_lf;
-          v_dynamic_result(v_dynamic_result.count + 1) := '    v_return := read_row (' || c_lf;
-          FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
-            v_dynamic_result(v_dynamic_result.count + 1) := '      ' ||
-              util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) ||
-              ' => v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
-          END LOOP;
-          v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || ' );';
-
-        ELSE
-          v_dynamic_result(v_dynamic_result.count + 1) := '"' || g_pk_columns(1).column_name || '"' || c_lf;
-          v_dynamic_result(v_dynamic_result.count + 1) := '    INTO' || c_lf;
-          v_dynamic_result(v_dynamic_result.count + 1) := '      v_return;';
-        END IF;
 
       ELSE
         raise_application_error(c_generator_error_number,
@@ -3772,8 +3738,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
   RETURN {{ RETURN_TYPE }} IS
-    v_return {{ RETURN_TYPE }}; ' || CASE WHEN g_status.xmltype_column_present AND g_params.return_row_instead_of_pk THEN '
-
+    v_return {{ RETURN_TYPE }}; ' || CASE WHEN g_status.xmltype_column_present
+                                          AND g_params.return_row_instead_of_pk THEN '
     /*this is required to handle column of datatype XMLTYPE for single row processing*/
     v_pk_rec t_pk_rec;' END || '
   BEGIN
@@ -3781,8 +3747,22 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
     VALUES (
       {% LIST_INSERT_PARAMS hide_identity_columns=true %} )
-    RETURN
-      {% RETURN_CLAUSE %}
+    RETURN '  || CASE WHEN (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column)
+                      AND NOT g_status.xmltype_column_present THEN '
+      {% LIST_COLUMNS_W_PK_FULL %}
+    INTO
+      v_return; ' WHEN (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column)
+                  AND g_status.xmltype_column_present THEN '
+      {% LIST_PK_NAMES %}
+    INTO
+      {% LIST_PK_RETURN_COLUMNS %}
+    /* return clause does not support XMLTYPE column, so we have to do here an extra fetch */
+    v_return := read_row (
+      {% LIST_PK_MAP_PARAM_EQ_RETURN %} ); '
+                  ELSE '
+      {{ PK_COLUMN }}
+    INTO
+      v_return;' END || '
     RETURN v_return;
   END create_row;';
       util_template_replace('API BODY');

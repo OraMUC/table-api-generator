@@ -1,3 +1,4 @@
+set linesize 240 feedback on serveroutput on
 drop table app_users;
 drop sequence global_version_sequence;
 
@@ -37,9 +38,9 @@ end;
 -- parameter based create and update
 begin
   app_users_api.create_row(
-    p_au_first_name => 'Markus',
-    p_au_last_name  => 'Dötsch',
-    p_au_email      => 'markus.doetsch@mt-ag.de',
+    p_au_first_name => 'Dummy',
+    p_au_last_name  => 'User',
+    p_au_email      => 'dummy.user@world.com',
     p_au_number     => null,
     p_au_float      => null,
     p_au_xmltype    => null,
@@ -47,10 +48,10 @@ begin
     p_au_blob       => null);
   --
   app_users_api.update_row(
-    p_au_id         => app_users_api.get_pk_by_unique_cols(p_au_email => 'markus.doetsch@mt-ag.de'),
-    p_au_first_name => 'Markus',
-    p_au_last_name  => 'Dötsch',
-    p_au_email      => 'markus.doetsch@mt-ag.com',
+    p_au_id         => app_users_api.get_pk_by_unique_cols(p_au_email => 'dummy.user@world.com'),
+    p_au_first_name => 'Dummy',
+    p_au_last_name  => 'User',
+    p_au_email      => 'dummy.user@world.net',
     p_au_number     => null,
     p_au_float      => null,
     p_au_xmltype    => xmltype('<test/>'),
@@ -62,47 +63,36 @@ end;
 declare
   v_row app_users%rowtype;
 begin
-  v_row.au_email := 'test@test.de';
+  v_row.au_email := 'test@test.com';
   app_users_api.create_row(v_row);
   -- you get a read method for each primary/unique key
-  v_row := app_users_api.read_row(p_au_email => 'test@test.de');
-  v_row.au_last_name := 'hugendubel';
+  v_row := app_users_api.read_row(p_au_email => 'test@test.com');
+  v_row.au_last_name := 'dummy';
   app_users_api.update_row(v_row);
 end;
 /
 
-select * from app_users;
+commit;
 
-select app_users_api.get_au_xmltype(1) from dual;
+SELECT
+  au_id,
+  au_first_name,
+  au_last_name,
+  au_email,
+  au_version_id,
+  au_created_on,
+  au_created_by,
+  au_updated_at,
+  au_updated_by
+FROM
+  app_users;
 
-prompt Check invalid objects
-DECLARE
-  V_COUNT   PLS_INTEGER;
-  V_OBJECTS VARCHAR2(4000);
-  V_LFLF    VARCHAR2(10) := CHR(10) || CHR(10);
-BEGIN
-  SELECT COUNT(*),
-         LISTAGG(OBJECT_NAME, ', ') WITHIN GROUP(ORDER BY OBJECT_NAME)
-    INTO V_COUNT, V_OBJECTS
-    FROM USER_OBJECTS
-   WHERE STATUS = 'INVALID';
+select app_users_api.get_au_xmltype(1) as au_xmltype_id_1 from dual;
 
-  IF V_COUNT > 0 THEN
-    RAISE_APPLICATION_ERROR(-20000,
-                            V_LFLF || 'Found ' || V_COUNT ||
-                            ' invalid object' || CASE
-                              WHEN V_COUNT > 1 THEN
-                               's'
-                            END || ' :-( ' || V_OBJECTS || ' )' || V_LFLF ||
-                            'Try this first: exec dbms_utility.compile_schema(schema => user, compile_all => false, reuse_settings => true);' ||
-                            V_LFLF ||
-                            'Check then the result: SELECT * FROM user_objects WHERE status = ''INVALID'';' ||
-                            V_LFLF);
+SELECT LISTAGG(OBJECT_NAME, ', ') WITHIN GROUP(ORDER BY OBJECT_NAME) as invalid_objects
+  FROM USER_OBJECTS
+ WHERE STATUS = 'INVALID';
 
-  END IF;
-
-END;
-/
 
 /*
 select * from table(om_tapigen.util_view_columns_array);
