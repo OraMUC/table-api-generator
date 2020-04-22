@@ -1,10 +1,34 @@
-set define off feedback off
+set define off feedback off serveroutput on
 whenever sqlerror exit sql.sqlcode rollback
-whenever oserror exit 1 rollback
 
 prompt
 prompt Install github.com/OraMUC/table-api-generator
 prompt ============================================================
+
+prompt Set compiler flags
+declare
+  v_db_version varchar2(10);
+begin
+  select replace(regexp_substr(version, '\d+\.\d+'), '.', null) as db_version
+    into v_db_version
+    from product_component_version
+   where product like 'Oracle Database%';
+  if to_number(v_db_version) >= 180 then
+    execute immediate q'[
+      select replace(regexp_substr(version_full, '\d+\.\d+'), '.', null) as db_version
+        from product_component_version
+       where product like 'Oracle Database%' ]'
+      into v_db_version;
+  end if;
+  -- Show unset compiler flags as errors (results for example in errors like "PLW-06003: unknown inquiry directive '$$DB_VERSION'")
+  execute immediate q'[alter session set plsql_warnings = 'ENABLE:6003']';
+  -- Finally set compiler flags
+  execute immediate replace(
+    q'[alter session set plsql_ccflags = 'db_version:#DB_VERSION#']',
+    '#DB_VERSION#',
+    v_db_version);
+end;
+/
 
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
@@ -688,20 +712,18 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                 TRIM(both '"' FROM column_name_nn)
              END AS column_name_nn
         FROM (SELECT regexp_substr(
-                                   $IF dbms_db_version.ver_le_11_1 $THEN om_tapigen.util_get_cons_search_condition(p_owner           => USER,
-                                                                              p_constraint_name => constraint_name)
-                                   $ELSE
-                                   $IF dbms_db_version.ver_le_11_2 $THEN
-                                    om_tapigen.util_get_cons_search_condition(p_owner           => USER,
-                                                                              p_constraint_name => constraint_name)
-                                   $ELSE search_condition_vc
-                                   $END
-                                   $END,
-                                    '^\s*("[^"]+"|[a-zA-Z0-9_#$]+)\s+is\s+not\s+null\s*$',
-                                   1,
-                                   1,
-                                   'i',
-                                   1) AS column_name_nn
+                       $IF $$db_version < 121 $THEN
+                       om_tapigen.util_get_cons_search_condition(
+                         p_owner           => USER,
+                         p_constraint_name => constraint_name)
+                       $ELSE
+                       search_condition_vc
+                       $END,
+                       '^\s*("[^"]+"|[a-zA-Z0-9_#$]+)\s+is\s+not\s+null\s*$',
+                       1,
+                       1,
+                       'i',
+                       1) AS column_name_nn
                 FROM all_constraints
                WHERE owner = g_params.owner
                  AND table_name = g_params.table_name
@@ -712,26 +734,17 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
      (SELECT column_value AS column_name_excluded
         FROM TABLE(om_tapigen.util_split_to_table(g_params.exclude_column_list))),
     identity_columns AS
-     (
-      $IF dbms_db_version.ver_le_11_1 $THEN
+     ($IF $$db_version < 121 $THEN
       SELECT 'DUMMY_COLUMN_NAME' AS column_name_identity,
-             NULL AS identity_type
+              NULL AS identity_type
         FROM dual
-              $ELSE
-              $IF dbms_db_version.ver_le_11_2 $THEN
-                SELECT 'DUMMY_COLUMN_NAME' AS column_name_identity, NULL AS identity_type
-                  FROM dual
-                       $ELSE
-                         SELECT column_name AS column_name_identity, generation_type AS identity_type
-                           FROM all_tab_identity_cols
-                          WHERE owner = g_params.owner
-                            AND table_name = g_params.table_name
-                         $END
-                         $END
-
-
-
-      ),
+      $ELSE
+      SELECT column_name AS column_name_identity,
+             generation_type AS identity_type
+        FROM all_tab_identity_cols
+       WHERE owner = g_params.owner
+         AND table_name = g_params.table_name
+      $END),
     t AS
      (SELECT DISTINCT column_id,
                       column_name,
@@ -741,13 +754,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                       data_precision,
                       data_scale,
                       identity_type,
-                      $IF dbms_db_version.ver_le_11_1 $THEN
-                      'N' as default_on_null_yn,
-                      $ELSE $IF dbms_db_version.ver_le_11_2 $THEN
+                      $IF $$db_version < 121 $THEN
                       'N' as default_on_null_yn,
                       $ELSE
                       case when default_on_null = 'YES' then 'Y' else 'N' end as default_on_null_yn,
-                      $END $END
+                      $END
                       CASE
                         WHEN data_default IS NOT NULL THEN
                          (SELECT om_tapigen.util_get_column_data_default(p_owner       => g_params.owner,

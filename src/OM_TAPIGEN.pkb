@@ -176,20 +176,18 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                 TRIM(both '"' FROM column_name_nn)
              END AS column_name_nn
         FROM (SELECT regexp_substr(
-                                   $IF dbms_db_version.ver_le_11_1 $THEN om_tapigen.util_get_cons_search_condition(p_owner           => USER,
-                                                                              p_constraint_name => constraint_name)
-                                   $ELSE
-                                   $IF dbms_db_version.ver_le_11_2 $THEN
-                                    om_tapigen.util_get_cons_search_condition(p_owner           => USER,
-                                                                              p_constraint_name => constraint_name)
-                                   $ELSE search_condition_vc
-                                   $END
-                                   $END,
-                                    '^\s*("[^"]+"|[a-zA-Z0-9_#$]+)\s+is\s+not\s+null\s*$',
-                                   1,
-                                   1,
-                                   'i',
-                                   1) AS column_name_nn
+                       $IF $$db_version < 121 $THEN
+                       om_tapigen.util_get_cons_search_condition(
+                         p_owner           => USER,
+                         p_constraint_name => constraint_name)
+                       $ELSE
+                       search_condition_vc
+                       $END,
+                       '^\s*("[^"]+"|[a-zA-Z0-9_#$]+)\s+is\s+not\s+null\s*$',
+                       1,
+                       1,
+                       'i',
+                       1) AS column_name_nn
                 FROM all_constraints
                WHERE owner = g_params.owner
                  AND table_name = g_params.table_name
@@ -200,26 +198,17 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
      (SELECT column_value AS column_name_excluded
         FROM TABLE(om_tapigen.util_split_to_table(g_params.exclude_column_list))),
     identity_columns AS
-     (
-      $IF dbms_db_version.ver_le_11_1 $THEN
+     ($IF $$db_version < 121 $THEN
       SELECT 'DUMMY_COLUMN_NAME' AS column_name_identity,
-             NULL AS identity_type
+              NULL AS identity_type
         FROM dual
-              $ELSE
-              $IF dbms_db_version.ver_le_11_2 $THEN
-                SELECT 'DUMMY_COLUMN_NAME' AS column_name_identity, NULL AS identity_type
-                  FROM dual
-                       $ELSE
-                         SELECT column_name AS column_name_identity, generation_type AS identity_type
-                           FROM all_tab_identity_cols
-                          WHERE owner = g_params.owner
-                            AND table_name = g_params.table_name
-                         $END
-                         $END
-
-
-
-      ),
+      $ELSE
+      SELECT column_name AS column_name_identity,
+             generation_type AS identity_type
+        FROM all_tab_identity_cols
+       WHERE owner = g_params.owner
+         AND table_name = g_params.table_name
+      $END),
     t AS
      (SELECT DISTINCT column_id,
                       column_name,
@@ -229,13 +218,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                       data_precision,
                       data_scale,
                       identity_type,
-                      $IF dbms_db_version.ver_le_11_1 $THEN
-                      'N' as default_on_null_yn,
-                      $ELSE $IF dbms_db_version.ver_le_11_2 $THEN
+                      $IF $$db_version < 121 $THEN
                       'N' as default_on_null_yn,
                       $ELSE
                       case when default_on_null = 'YES' then 'Y' else 'N' end as default_on_null_yn,
-                      $END $END
+                      $END
                       CASE
                         WHEN data_default IS NOT NULL THEN
                          (SELECT om_tapigen.util_get_column_data_default(p_owner       => g_params.owner,

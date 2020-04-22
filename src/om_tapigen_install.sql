@@ -1,10 +1,34 @@
-set define off feedback off
+set define off feedback off serveroutput on
 whenever sqlerror exit sql.sqlcode rollback
-whenever oserror exit 1 rollback
 
 prompt
 prompt Install github.com/OraMUC/table-api-generator
 prompt ============================================================
+
+prompt Set compiler flags
+declare
+  v_db_version varchar2(10);
+begin
+  select replace(regexp_substr(version, '\d+\.\d+'), '.', null) as db_version
+    into v_db_version
+    from product_component_version
+   where product like 'Oracle Database%';
+  if to_number(v_db_version) >= 180 then
+    execute immediate q'[
+      select replace(regexp_substr(version_full, '\d+\.\d+'), '.', null) as db_version
+        from product_component_version
+       where product like 'Oracle Database%' ]'
+      into v_db_version;
+  end if;
+  -- Show unset compiler flags as errors (results for example in errors like "PLW-06003: unknown inquiry directive '$$DB_VERSION'")
+  execute immediate q'[alter session set plsql_warnings = 'ENABLE:6003']';
+  -- Finally set compiler flags
+  execute immediate replace(
+    q'[alter session set plsql_ccflags = 'db_version:#DB_VERSION#']',
+    '#DB_VERSION#',
+    v_db_version);
+end;
+/
 
 prompt Compile package om_tapigen (spec)
 @OM_TAPIGEN.pks
