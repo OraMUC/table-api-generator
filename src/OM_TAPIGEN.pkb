@@ -42,6 +42,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     generator_action       VARCHAR2(30 CHAR),
     column_prefix          all_tab_cols.column_name%TYPE,
     pk_is_multi_column     BOOLEAN,
+    identity_column        all_tab_cols.column_name%TYPE,
+    identity_type          VARCHAR2(30 CHAR),
     xmltype_column_present BOOLEAN,
     number_of_data_columns integer,
     number_of_pk_columns   integer,
@@ -97,7 +99,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
   TYPE t_rec_template_options IS RECORD(
     use_column_defaults   BOOLEAN,
-    hide_identity_columns BOOLEAN,
+    crud_mode             varchar2(10),
     padding               INTEGER);
 
   --
@@ -810,52 +812,60 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   return t_tab_package_state pipelined is
     v_row t_rec_package_state;
   begin
-    v_row.key   := 'generator_action';
-    v_row.value := g_status.generator_action;
+    v_row.package_status_key := 'generator_action';
+    v_row.value              := g_status.generator_action;
     pipe row(v_row);
     --
-    v_row.key   := 'api_name';
-    v_row.value := g_params.api_name;
+    v_row.package_status_key := 'api_name';
+    v_row.value              := g_params.api_name;
     pipe row(v_row);
     --
-    v_row.key   := 'column_prefix';
-    v_row.value := g_status.column_prefix;
+    v_row.package_status_key := 'column_prefix';
+    v_row.value              := g_status.column_prefix;
     pipe row(v_row);
     --
-    v_row.key   := 'pk_is_multi_column';
-    v_row.value := util_bool_to_string(g_status.pk_is_multi_column);
+    v_row.package_status_key := 'pk_is_multi_column';
+    v_row.value              := util_bool_to_string(g_status.pk_is_multi_column);
     pipe row(v_row);
     --
-    v_row.key   := 'xmltype_column_present';
-    v_row.value := util_bool_to_string(g_status.xmltype_column_present);
+    v_row.package_status_key := 'identity_column';
+    v_row.value              := g_status.identity_column;
     pipe row(v_row);
     --
-    v_row.key   := 'number_of_data_columns';
-    v_row.value := to_char(g_status.number_of_data_columns);
+    v_row.package_status_key := 'identity_type';
+    v_row.value              := g_status.identity_type;
     pipe row(v_row);
     --
-    v_row.key   := 'number_of_pk_columns';
-    v_row.value := to_char(g_status.number_of_pk_columns);
+    v_row.package_status_key := 'xmltype_column_present';
+    v_row.value              := util_bool_to_string(g_status.xmltype_column_present);
     pipe row(v_row);
     --
-    v_row.key   := 'number_of_uk_columns';
-    v_row.value := to_char(g_status.number_of_uk_columns);
+    v_row.package_status_key := 'number_of_data_columns';
+    v_row.value              := to_char(g_status.number_of_data_columns);
     pipe row(v_row);
     --
-    v_row.key   := 'number_of_fk_columns';
-    v_row.value := to_char(g_status.number_of_fk_columns);
+    v_row.package_status_key := 'number_of_pk_columns';
+    v_row.value              := to_char(g_status.number_of_pk_columns);
     pipe row(v_row);
     --
-    v_row.key   := 'rpad_columns';
-    v_row.value := to_char(g_status.rpad_columns);
+    v_row.package_status_key := 'number_of_uk_columns';
+    v_row.value              := to_char(g_status.number_of_uk_columns);
     pipe row(v_row);
     --
-    v_row.key   := 'rpad_pk_columns';
-    v_row.value := to_char(g_status.rpad_pk_columns);
+    v_row.package_status_key := 'number_of_fk_columns';
+    v_row.value              := to_char(g_status.number_of_fk_columns);
     pipe row(v_row);
     --
-    v_row.key   := 'rpad_uk_columns';
-    v_row.value := to_char(g_status.rpad_uk_columns);
+    v_row.package_status_key := 'rpad_columns';
+    v_row.value              := to_char(g_status.rpad_columns);
+    pipe row(v_row);
+    --
+    v_row.package_status_key := 'rpad_pk_columns';
+    v_row.value              := to_char(g_status.rpad_pk_columns);
+    pipe row(v_row);
+    --
+    v_row.package_status_key := 'rpad_uk_columns';
+    v_row.value              := to_char(g_status.rpad_uk_columns);
     pipe row(v_row);
   end util_view_package_state;
 
@@ -988,8 +998,62 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       return
         CASE WHEN g_columns(p_column_index).is_pk_yn = 'Y' THEN ' /*PK*/' END ||
         CASE WHEN g_columns(p_column_index).is_uk_yn = 'Y' THEN ' /*UK*/' END ||
-        CASE WHEN g_columns(p_column_index).is_fk_yn = 'Y' THEN ' /*FK*/' END;
+        CASE WHEN g_columns(p_column_index).is_fk_yn = 'Y' THEN ' /*FK*/' END ||
+        case when g_template_options.crud_mode = 'CREATE' and g_columns(p_column_index).identity_type is not null then
+          ' /*GENERATED ' || g_columns(p_column_index).identity_type ||
+          case when g_columns(p_column_index).default_on_null_yn = 'Y' then
+            ' ON NULL'
+          end ||
+          ' AS IDENTITY*/'
+        end;
     end get_column_comment;
+
+    -----------------------------------------------------------------------------
+
+    function check_identity_visibility (
+      p_column_index integer)
+    return boolean is
+    begin
+      return
+        CASE
+          WHEN g_columns(p_column_index).identity_type is null
+            or g_template_options.crud_mode is null
+            or g_template_options.crud_mode = 'CREATE' and g_columns(p_column_index).identity_type = 'BY DEFAULT'
+          THEN true
+          else false
+        end;
+    end check_identity_visibility;
+
+    -----------------------------------------------------------------------------
+
+    function check_audit_visibility_create (
+      p_column_index integer)
+    return boolean is
+    begin
+      return
+        CASE
+          WHEN g_columns(p_column_index).audit_type is null
+            or g_columns(p_column_index).audit_type like 'CREATED%'
+            or g_columns(p_column_index).audit_type like 'UPDATED%' and g_columns(p_column_index).is_nullable_yn = 'N'
+          THEN true
+          else false
+        end;
+    end check_audit_visibility_create;
+
+    -----------------------------------------------------------------------------
+
+    function check_audit_visibility_update (
+      p_column_index integer)
+    return boolean is
+    begin
+      return
+        CASE
+          WHEN g_columns(p_column_index).audit_type is null
+            or g_columns(p_column_index).audit_type like 'UPDATED%'
+          THEN true
+          else false
+        end;
+    end check_audit_visibility_update;
 
     -----------------------------------------------------------------------------
 
@@ -1013,15 +1077,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF
-          g_columns(i).is_excluded_yn = 'N'
-        AND (
-          g_columns(i).audit_type is null or
-          g_columns(i).audit_type like 'CREATED%' or
-          (g_columns(i).audit_type like 'UPDATED%' and g_columns(i).is_nullable_yn = 'N'))
-        AND NOT (
-          g_template_options.hide_identity_columns
-          AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
+        IF g_columns(i).is_excluded_yn = 'N'
+          and check_identity_visibility(i)
+          and check_audit_visibility_create(i)
         THEN
           v_result(v_result.count + 1) :=
             '      ' || '"' || g_columns(i).column_name || '"' ||
@@ -1045,15 +1103,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF
-          g_columns(i).is_excluded_yn = 'N'
-        AND (
-          g_columns(i).audit_type is null or
-          g_columns(i).audit_type like 'CREATED%' or
-          (g_columns(i).audit_type like 'UPDATED%' and g_columns(i).is_nullable_yn = 'N'))
-        AND NOT (
-          g_template_options.hide_identity_columns AND
-          nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
+        IF g_columns(i).is_excluded_yn = 'N'
+          and check_identity_visibility(i)
+          and check_audit_visibility_create(i)
         THEN
           v_result(v_result.count + 1) :=
             '      ' ||
@@ -1089,15 +1141,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF
-          g_columns(i).is_excluded_yn = 'N'
-        AND (
-          g_columns(i).audit_type is null or
-          g_columns(i).audit_type like 'CREATED%' or
-          (g_columns(i).audit_type like 'UPDATED%' and g_columns(i).is_nullable_yn = 'N'))
-        AND NOT (
-          g_template_options.hide_identity_columns AND
-          nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
+        IF g_columns(i).is_excluded_yn = 'N'
+          AND check_identity_visibility(i)
+          and check_audit_visibility_create(i)
         THEN
           v_result(v_result.count + 1) :=
             '      ' ||
@@ -1156,35 +1202,39 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
           AND g_columns(i).row_version_expression is null
-          AND NOT (
-            g_template_options.hide_identity_columns
-            AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
+          AND check_identity_visibility(i)
         THEN
-          v_result(v_result.count + 1) := CASE
-                                            WHEN g_template_options.padding IS NOT NULL THEN
-                                             rpad(' ', g_template_options.padding)
-                                            ELSE
-                                             '    '
-                                          END ||
-                                          util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
-                                          ' IN "' || g_params.table_name || '"."' || CASE
-                                            WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
-                                             rpad(g_columns(i).column_name || '"%TYPE', g_status.rpad_columns + 6)
-                                            ELSE
-                                             g_columns(i).column_name || '"%TYPE'
-                                          END || CASE
-                                            WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_columns(i).data_default IS NULL THEN
-                                             ' DEFAULT NULL'
-                                            WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
-                                             CASE
-                                               WHEN g_columns(i).data_default IS NOT NULL THEN
-                                                ' DEFAULT ' || g_columns(i).data_default
-                                               WHEN g_columns(i).is_nullable_yn = 'Y' THEN
-                                                ' DEFAULT NULL'
-                                               ELSE
-                                                ' '
-                                             END
-                                          END || get_column_comment(i) || c_list_delimiter;
+          v_result(v_result.count + 1) :=
+          CASE
+            WHEN g_template_options.padding IS NOT NULL THEN
+              rpad(' ', g_template_options.padding)
+            ELSE
+              '    '
+          END ||
+          util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
+          ' IN "' || g_params.table_name || '"."' ||
+          CASE
+            WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
+              rpad(g_columns(i).column_name || '"%TYPE', g_status.rpad_columns + 6)
+            ELSE
+              g_columns(i).column_name || '"%TYPE'
+          END ||
+          CASE
+            WHEN g_columns(i).is_pk_yn = 'Y'
+            AND NOT g_status.pk_is_multi_column
+            AND (g_columns(i).data_default IS NULL OR g_columns(i).identity_type is not null) THEN
+              ' DEFAULT NULL'
+            WHEN g_params.enable_column_defaults
+            AND g_template_options.use_column_defaults THEN
+              CASE
+                WHEN g_columns(i).data_default IS NOT NULL THEN
+                  ' DEFAULT ' || g_columns(i).data_default
+                WHEN g_columns(i).is_nullable_yn = 'Y' THEN
+                  ' DEFAULT NULL'
+                ELSE
+                  ' '
+              END
+          END || get_column_comment(i) || c_list_delimiter;
         END IF;
       END LOOP;
       trim_list(v_result);
@@ -1207,9 +1257,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
           AND g_columns(i).row_version_expression is null
-          AND NOT (
-            g_template_options.hide_identity_columns
-            AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
+          AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) := '    ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
@@ -1265,6 +1313,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
           AND g_columns(i).row_version_expression is null
+          and check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
             '      ' ||
@@ -1293,9 +1342,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
           AND g_columns(i).row_version_expression is null
-          AND NOT (
-            g_template_options.hide_identity_columns
-            AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
+          AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
             CASE WHEN g_template_options.padding IS NOT NULL
@@ -1327,9 +1374,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type is null
           AND g_columns(i).row_version_expression is null
-          AND NOT (
-            g_template_options.hide_identity_columns
-            AND nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT'))
+          AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
             '      '
@@ -1356,10 +1401,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
-        AND g_columns(i).is_pk_yn = 'N'
-        AND (
-          g_columns(i).audit_type is null or
-          g_columns(i).audit_type like 'UPDATED%')
+          AND g_columns(i).is_pk_yn = 'N'
+          and check_audit_visibility_update(i)
         THEN
           v_result(v_result.count + 1) :=
             '           ' ||
@@ -1393,10 +1436,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
-        AND g_columns(i).is_pk_yn = 'N'
-        AND (
-          g_columns(i).audit_type is null or
-          g_columns(i).audit_type like 'UPDATED%')
+          AND g_columns(i).is_pk_yn = 'N'
+          and check_audit_visibility_update(i)
         THEN
           v_result(v_result.count + 1) :=
             '             ' ||
@@ -2058,6 +2099,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(g_params.table_name);
         WHEN 'TABLE_NAME_MINUS_6' THEN
           code_append(substr(g_params.table_name, 1, c_ora_max_name_len - 6));
+        WHEN 'IDENTITY_TYPE' THEN
+          if g_status.identity_type is not null then
+            code_append(' with column '||g_status.identity_column||' generated '||g_status.identity_type||' as identity');
+          end if;
         WHEN 'COLUMN_PREFIX' THEN
           code_append(g_status.column_prefix);
         WHEN 'PK_COLUMN' THEN
@@ -2174,33 +2219,38 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
       v_match := upper(TRIM(substr(g_code_blocks.template, v_match_pos_dynamic + 2, v_match_len)));
 
-      g_template_options.use_column_defaults := nvl(util_string_to_bool(regexp_substr(srcstr        => v_match,
-                                                                                      pattern       => 'DEFAULTS=([A-Z0-9]+)',
-                                                                                      position      => 1,
-                                                                                      occurrence    => 1,
-                                                                                      modifier      => 'i',
-                                                                                      subexpression => 1)),
-                                                    FALSE);
-
-      g_template_options.hide_identity_columns := nvl(util_string_to_bool(regexp_substr(srcstr        => v_match,
-                                                                                        pattern       => 'HIDE_IDENTITY_COLUMNS=([A-Z0-9]+)',
-                                                                                        position      => 1,
-                                                                                        occurrence    => 1,
-                                                                                        modifier      => 'i',
-                                                                                        subexpression => 1)),
-                                                      FALSE);
-      g_template_options.padding               := to_number(regexp_substr(srcstr        => v_match,
-                                                                          pattern       => 'PADDING=([0-9]+)',
-                                                                          position      => 1,
-                                                                          occurrence    => 1,
-                                                                          modifier      => 'i',
-                                                                          subexpression => 1));
-      v_match                                  := regexp_substr(srcstr        => v_match,
-                                                                pattern       => '^ *([A-Z_0-9]+)',
-                                                                position      => 1,
-                                                                occurrence    => 1,
-                                                                modifier      => 'i',
-                                                                subexpression => 1);
+      g_template_options.use_column_defaults :=
+        nvl(
+          util_string_to_bool(regexp_substr(
+            srcstr        => v_match,
+            pattern       => 'USE_COLUMN_DEFAULTS=([A-Z]+)',
+            position      => 1,
+            occurrence    => 1,
+            modifier      => 'i',
+            subexpression => 1)),
+          FALSE);
+      g_template_options.crud_mode :=
+        regexp_substr(
+          srcstr        => v_match,
+          pattern       => 'CRUD_MODE=([A-Z]+)',
+          position      => 1,
+          occurrence    => 1,
+          modifier      => 'i',
+          subexpression => 1);
+      g_template_options.padding := to_number(regexp_substr(
+        srcstr        => v_match,
+        pattern       => 'PADDING=([0-9]+)',
+        position      => 1,
+        occurrence    => 1,
+        modifier      => 'i',
+        subexpression => 1));
+      v_match := regexp_substr(
+        srcstr        => v_match,
+        pattern       => '^ *([A-Z_0-9]+)',
+        position      => 1,
+        occurrence    => 1,
+        modifier      => 'i',
+        subexpression => 1);
 
       -- (1) process text before the match
       code_append(substr(g_code_blocks.template, v_current_pos, v_match_pos_dynamic - v_current_pos));
@@ -2572,6 +2622,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         IF g_columns(i).data_type = 'XMLTYPE' THEN
           g_status.xmltype_column_present := TRUE;
         END IF;
+        -- check, if we have an identity column present
+        IF g_columns(i).identity_type is not null THEN
+          g_status.identity_column := g_columns(i).column_name;
+          g_status.identity_type := g_columns(i).identity_type ||
+            case when g_columns(i).default_on_null_yn = 'Y' then ' ON NULL' end;
+        END IF;
         -- Calc column prefix by saving the found prefix as tab index and count afterwards
         -- the length of the tab: if it is greater then 1 we have NO distinct column prefix.
         v_column_prefix := substr(g_columns(i).column_name, 1,
@@ -2581,6 +2637,21 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             END);
         v_column_prefix_tab(v_column_prefix) := v_column_prefix;
       END LOOP;
+
+      IF g_params.enable_insertion_of_rows and g_status.identity_type = 'BY DEFAULT' THEN
+        raise_application_error(c_generator_error_number,
+          'Your table '||g_params.table_name||' has an identity type BY DEFAULT.' || c_lf ||
+          'We can not generate an API for this table. Please change your identity' || c_lf ||
+          'type either to ALWAYS or BY DEFAULT ON NULL. For the API create methods' || c_lf ||
+          'we need to decide if the parameter for your identity column should be' || c_lf ||
+          'shown or not. If it is shown we need to set the default for the parameter' || c_lf ||
+          'to NULL for you, so you will be able to omit the identity information' || c_lf ||
+          'and the table will care about to generate one for you. You will also' || c_lf ||
+          'be able to provide an own identity for e.g loading existing data.' || c_lf ||
+          'Please refer to this article by Tim Hall for more informations about' || c_lf ||
+          'identity columns: ' || c_lf ||
+          'https://oracle-base.com/articles/12c/identity-columns-in-oracle-12cr1');
+      END IF;
 
       if v_column_prefix_tab.count > 1 then
         g_status.column_prefix := null;
@@ -2919,7 +2990,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
   /*
-  This is the API for the table "{{ TABLE_NAME }}".
+  This is the API for the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
 
   GENERATION OPTIONS
   - Must be in the lines {{ SPEC_OPTIONS_MIN_LINE }}-{{ SPEC_OPTIONS_MAX_LINE }} to be reusable by the generator
@@ -2960,13 +3031,14 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
 
       g_code_blocks.template := '
 CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
-  /**
-   * generator="{{ GENERATOR }}"
-   * generator_version="{{ GENERATOR_VERSION }}"
-   * generator_action="{{ GENERATOR_ACTION }}"
-   * generated_at="{{ GENERATED_AT }}"
-   * generated_by="{{ GENERATED_BY }}"
-   */';
+  /*
+  This is the API for the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
+  generator="{{ GENERATOR }}"
+  generator_version="{{ GENERATOR_VERSION }}"
+  generator_action="{{ GENERATOR_ACTION }}"
+  generated_at="{{ GENERATED_AT }}"
+  generated_by="{{ GENERATED_BY }}"
+  */';
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
@@ -3194,13 +3266,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       g_code_blocks.template := '
   FUNCTION create_row (
-    {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
+    {% LIST_PARAMS_W_PK use_column_defaults=true crud_mode=create %} )
   RETURN {{ RETURN_TYPE }};';
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
   FUNCTION create_row (
-    {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
+    {% LIST_PARAMS_W_PK use_column_defaults=true crud_mode=create %} )
   RETURN {{ RETURN_TYPE }} IS
     v_return {{ RETURN_TYPE }}; ' || CASE WHEN g_status.xmltype_column_present
                                           AND g_params.return_row_instead_of_pk THEN '
@@ -3208,9 +3280,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     v_pk_rec t_pk_rec;' END || '
   BEGIN
     INSERT INTO "{{ TABLE_NAME }}" (
-      {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
+      {% LIST_INSERT_COLUMNS crud_mode=create %} )
     VALUES (
-      {% LIST_INSERT_PARAMS hide_identity_columns=true %} )
+      {% LIST_INSERT_PARAMS crud_mode=create %} )
     RETURN '  || CASE WHEN (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column)
                       AND NOT g_status.xmltype_column_present THEN '
       {% LIST_COLUMNS_W_PK_FULL %}
@@ -3236,6 +3308,83 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
     -----------------------------------------------------------------------------
 
+    PROCEDURE gen_create_row_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_row_prc');
+
+      g_code_blocks.template := '
+  PROCEDURE create_row (
+    {% LIST_PARAMS_W_PK use_column_defaults=true crud_mode=create %} );';
+      util_template_replace('API SPEC');
+
+      g_code_blocks.template := '
+  PROCEDURE create_row (
+    {% LIST_PARAMS_W_PK use_column_defaults=true crud_mode=create %} )
+  IS
+    v_return {{ RETURN_TYPE }};
+  BEGIN
+    v_return := create_row (
+      {% LIST_MAP_PAR_EQ_PARAM_W_PK crud_mode=create %} );
+  END create_row;';
+      util_template_replace('API BODY');
+
+      util_debug_stop_one_step;
+    END gen_create_row_prc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_create_rowtype_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_rowtype_fnc');
+
+      g_code_blocks.template := '
+  FUNCTION create_row (
+    {{ ROWTYPE_PARAM }} )
+  RETURN {{ RETURN_TYPE }};';
+      util_template_replace('API SPEC');
+
+      g_code_blocks.template := '
+  FUNCTION create_row (
+    {{ ROWTYPE_PARAM }} )
+  RETURN {{ RETURN_TYPE }} IS
+    v_return {{ RETURN_TYPE }};
+  BEGIN
+    v_return := create_row (
+      {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK crud_mode=create %} );
+    RETURN v_return;
+  END create_row;';
+      util_template_replace('API BODY');
+
+      util_debug_stop_one_step;
+    END gen_create_rowtype_fnc;
+
+    -----------------------------------------------------------------------------
+
+    PROCEDURE gen_create_rowtype_prc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_create_rowtype_prc');
+
+      g_code_blocks.template := '
+  PROCEDURE create_row (
+    {{ ROWTYPE_PARAM }} );';
+      util_template_replace('API SPEC');
+
+      g_code_blocks.template := '
+  PROCEDURE create_row (
+    {{ ROWTYPE_PARAM }} )
+  IS
+    v_return {{ RETURN_TYPE }};
+  BEGIN
+    v_return := create_row (
+      {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK crud_mode=create %} );
+  END create_row;';
+      util_template_replace('API BODY');
+
+      util_debug_stop_one_step;
+    END gen_create_rowtype_prc;
+
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_create_rows_bulk_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_rows_bulk_fnc');
@@ -3257,9 +3406,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   BEGIN
     FORALL i IN INDICES OF p_rows_tab
     INSERT INTO "{{ TABLE_NAME }}" (
-      {% LIST_INSERT_COLUMNS hide_identity_columns=true %} )
+      {% LIST_INSERT_COLUMNS crud_mode=create %} )
     VALUES (
-      {% LIST_INSERT_BULK_PARAMS hide_identity_columns=true %} )
+      {% LIST_INSERT_BULK_PARAMS crud_mode=create %} )
     RETURN ' || CASE WHEN NOT g_status.xmltype_column_present THEN '
       {% LIST_COLUMNS_W_PK_FULL %}
     BULK COLLECT INTO v_return;'
@@ -3311,83 +3460,6 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       util_debug_stop_one_step;
     END gen_create_rows_bulk_prc;
-
-    -----------------------------------------------------------------------------
-
-    PROCEDURE gen_create_row_prc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_create_row_prc');
-
-      g_code_blocks.template := '
-  PROCEDURE create_row (
-    {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} );';
-      util_template_replace('API SPEC');
-
-      g_code_blocks.template := '
-  PROCEDURE create_row (
-    {% LIST_PARAMS_W_PK defaults=true hide_identity_columns=true %} )
-  IS
-    v_return {{ RETURN_TYPE }};
-  BEGIN
-    v_return := create_row (
-      {% LIST_MAP_PAR_EQ_PARAM_W_PK hide_identity_columns=true %} );
-  END create_row;';
-      util_template_replace('API BODY');
-
-      util_debug_stop_one_step;
-    END gen_create_row_prc;
-
-    -----------------------------------------------------------------------------
-
-    PROCEDURE gen_create_rowtype_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_create_rowtype_fnc');
-
-      g_code_blocks.template := '
-  FUNCTION create_row (
-    {{ ROWTYPE_PARAM }} )
-  RETURN {{ RETURN_TYPE }};';
-      util_template_replace('API SPEC');
-
-      g_code_blocks.template := '
-  FUNCTION create_row (
-    {{ ROWTYPE_PARAM }} )
-  RETURN {{ RETURN_TYPE }} IS
-    v_return {{ RETURN_TYPE }};
-  BEGIN
-    v_return := create_row (
-      {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK hide_identity_columns=true %} );
-    RETURN v_return;
-  END create_row;';
-      util_template_replace('API BODY');
-
-      util_debug_stop_one_step;
-    END gen_create_rowtype_fnc;
-
-    -----------------------------------------------------------------------------
-
-    PROCEDURE gen_create_rowtype_prc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_create_rowtype_prc');
-
-      g_code_blocks.template := '
-  PROCEDURE create_row (
-    {{ ROWTYPE_PARAM }} );';
-      util_template_replace('API SPEC');
-
-      g_code_blocks.template := '
-  PROCEDURE create_row (
-    {{ ROWTYPE_PARAM }} )
-  IS
-    v_return {{ RETURN_TYPE }};
-  BEGIN
-    v_return := create_row (
-      {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK hide_identity_columns=true %} );
-  END create_row;';
-      util_template_replace('API BODY');
-
-      util_debug_stop_one_step;
-    END gen_create_rowtype_prc;
 
     -----------------------------------------------------------------------------
 
@@ -3627,7 +3699,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       v_return := read_row ( {% LIST_PK_MAP_PARAM_EQ_PARAM %} ){{ RETURN_TYPE_READ_ROW }};
     ELSE
       v_return := create_row (
-        {% LIST_MAP_PAR_EQ_PARAM_W_PK padding=8 hide_identity_columns=true %} );
+        {% LIST_MAP_PAR_EQ_PARAM_W_PK crud_mode=create padding=8 %} );
     END IF;
     RETURN v_return;
   END create_or_update_row;';
@@ -3870,7 +3942,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       g_code_blocks.template := '
   FUNCTION create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} )
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS crud_mode=create %} )
   RETURN {{ RETURN_TYPE }};
   /**
    * Helper mainly for testing and dummy data generation purposes.
@@ -3880,12 +3952,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       g_code_blocks.template := '
   FUNCTION create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} )
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS crud_mode=create %} )
   RETURN {{ RETURN_TYPE }} IS
     v_return {{ RETURN_TYPE }};
   BEGIN
     v_return := create_row (
-      {% LIST_MAP_PAR_EQ_PARAM_W_PK hide_identity_columns=true %} );
+      {% LIST_MAP_PAR_EQ_PARAM_W_PK crud_mode=create %} );
     RETURN v_return;
   END create_a_row;';
       util_template_replace('API BODY');
@@ -3901,7 +3973,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       g_code_blocks.template := '
   PROCEDURE create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} );
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS crud_mode=create %} );
   /**
    * Helper mainly for testing and dummy data generation purposes.
    * Create a new row without (hopefully) providing any parameters.
@@ -3910,12 +3982,12 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
 
       g_code_blocks.template := '
   PROCEDURE create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS hide_identity_columns=true %} )
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
   IS
     v_return {{ RETURN_TYPE }};
   BEGIN
     v_return := create_row (
-      {% LIST_MAP_PAR_EQ_PARAM_W_PK hide_identity_columns=true %} );
+      {% LIST_MAP_PAR_EQ_PARAM_W_PK crud_mode=create %} );
   END create_a_row;';
       util_template_replace('API BODY');
 
@@ -3985,14 +4057,15 @@ END "{{ API_NAME }}";';
 CREATE OR REPLACE VIEW "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_DML_V" AS
 SELECT {% LIST_COLUMNS_W_PK_FULL %}
   FROM {{ TABLE_NAME }}
-  /**
-   * generator="{{ GENERATOR }}"
-   * generator_version="{{ GENERATOR_VERSION }}"
-   * generator_action="{{ GENERATOR_ACTION }}"
-   * generated_at="{{ GENERATED_AT }}"
-   * generated_by="{{ GENERATED_BY }}"
-   */
-    ';
+  /*
+  This is the DML view for the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
+  generator="{{ GENERATOR }}"
+  generator_version="{{ GENERATOR_VERSION }}"
+  generator_action="{{ GENERATOR_ACTION }}"
+  generated_at="{{ GENERATED_AT }}"
+  generated_by="{{ GENERATED_BY }}"
+  */
+  ';
       util_template_replace('VIEW');
 
       util_debug_stop_one_step;
@@ -4009,17 +4082,18 @@ CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON "{{ TABLE_NAME_MINUS_6 }}_DML_V"
   FOR EACH ROW
-  /**
-   * generator="{{ GENERATOR }}"
-   * generator_version="{{ GENERATOR_VERSION }}"
-   * generator_action="{{ GENERATOR_ACTION }}"
-   * generated_at="{{ GENERATED_AT }}"
-   * generated_by="{{ GENERATED_BY }}"
-   */
+  /*
+  This is the instead of trigger for the DML view of the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
+  generator="{{ GENERATOR }}"
+  generator_version="{{ GENERATOR_VERSION }}"
+  generator_action="{{ GENERATOR_ACTION }}"
+  generated_at="{{ GENERATED_AT }}"
+  generated_by="{{ GENERATED_BY }}"
+  */
 BEGIN
   IF INSERTING THEN' || CASE WHEN g_params.enable_insertion_of_rows THEN '
     "{{ API_NAME }}".create_row (
-      {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %} );'
+      {% LIST_MAP_PAR_EQ_NEWCOL_W_PK crud_mode=create %} );'
                         ELSE '
     raise_application_error ({{ GENERATOR_ERROR_NUMBER }}, ''Insertion of a row is not allowed.'');'
                         END || '

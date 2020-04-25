@@ -197,7 +197,7 @@ we need this additional table type. */
 --
 
 TYPE t_rec_package_state IS RECORD(
-  key                   varchar2(30),
+  package_status_key    varchar2(30),
   value                 varchar2(128));
 
 TYPE t_tab_package_state IS TABLE OF t_rec_package_state;
