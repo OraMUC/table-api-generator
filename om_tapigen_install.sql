@@ -3423,54 +3423,58 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       -- generate standard custom defaults for the users convenience...
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).data_custom_default IS NULL -- do not override users defaults from the processing step above
-         THEN
+          and g_columns(i).is_excluded_yn = 'N'
+          AND g_columns(i).audit_type is null
+          and g_columns(i).identity_type is null
+          AND g_columns(i).row_version_expression is null
+        THEN
           IF g_columns(i).data_default IS NOT NULL THEN
             g_columns(i).data_custom_default := g_columns(i).data_default;
             g_columns(i).custom_default_source := 'TABLE';
           ELSE
-            g_columns(i).data_custom_default := CASE
-                                                  WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND
-                                                        g_params.sequence_name IS NOT NULL THEN
-                                                   '"' || g_params.sequence_name || '"' || '.nextval'
-                                                  WHEN g_columns(i).is_fk_yn = 'Y' THEN
-                                                   util_get_fk_value(p_table_name  => g_columns(i).r_table_name,
-                                                                     p_column_name => g_columns(i).r_column_name,
-                                                                     p_owner       => g_columns(i).r_owner)
-                                                  WHEN g_columns(i).data_type IN ('NUMBER', 'INTEGER', 'FLOAT') THEN
+            g_columns(i).data_custom_default :=
+              CASE
+                WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND
+                      g_params.sequence_name IS NOT NULL THEN
+                  '"' || g_params.sequence_name || '"' || '.nextval'
+                WHEN g_columns(i).is_fk_yn = 'Y' THEN
+                  util_get_fk_value(p_table_name  => g_columns(i).r_table_name,
+                                    p_column_name => g_columns(i).r_column_name,
+                                    p_owner       => g_columns(i).r_owner)
+                WHEN g_columns(i).data_type IN ('NUMBER', 'INTEGER', 'FLOAT') THEN
 
-                                                   'round(dbms_random.value(0,' ||
-                                                   rpad('9',
-                                                        nvl(g_columns(i).data_precision, 9) - nvl(g_columns(i).data_scale, 0),
-                                                        '9') || CASE
-                                                     WHEN nvl(g_columns(i).data_scale, 0) > 0 THEN
-                                                      '.' || rpad('9', nvl(g_columns(i).data_scale, 0), '9')
-                                                     ELSE
-                                                      NULL
-                                                   END || '),' || to_char(nvl(g_columns(i).data_scale, 0)) || ')'
-                                                  WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
-                                                   CASE
-                                                     WHEN lower(g_columns(i).column_name) LIKE '%mail%' THEN
-                                                      'substr(sys_guid(),1,' || to_char(g_columns(i).char_length - 10) ||
-                                                      ') || ''@dummy.com'''
-                                                     WHEN lower(g_columns(i).column_name) LIKE '%phone%' THEN
-                                                      'substr(''+1.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,''0''),1,' ||
-                                                      to_char(g_columns(i).char_length) || ')'
-                                                     ELSE
-                                                      'substr(sys_guid(),1,' || to_char(g_columns(i).char_length) || ')'
-                                                   END
-                                                  WHEN g_columns(i).data_type = 'DATE' THEN
-                                                   'to_date(trunc(dbms_random.value(to_char(date''1900-01-01'',''j''),to_char(date''2099-12-31'',''j''))),''j'')'
-                                                  WHEN g_columns(i).data_type LIKE 'TIMESTAMP%' THEN
-                                                   'systimestamp'
-                                                  WHEN g_columns(i).data_type = 'CLOB' THEN
-                                                   'to_clob(''Dummy clob for API method get_a_row: '' || sys_guid())'
-                                                  WHEN g_columns(i).data_type = 'BLOB' THEN
-                                                   'to_blob(utl_raw.cast_to_raw(''Dummy clob for API method get_a_row: '' || sys_guid()))'
-                                                  WHEN g_columns(i).data_type = 'XMLTYPE' THEN
-                                                   'xmltype(''<dummy>Dummy XML for API method get_a_row: '' || sys_guid() || ''</dummy>'')'
-                                                  ELSE
-                                                   'NULL'
-                                                END;
+                  'round(dbms_random.value(0,' ||
+                  rpad('9',
+                      least(nvl(g_columns(i).data_precision, 9), 36) - nvl(g_columns(i).data_scale, 0),
+                      '9') || CASE
+                    WHEN nvl(g_columns(i).data_scale, 0) > 0 THEN
+                    '.' || rpad('9', nvl(g_columns(i).data_scale, 0), '9')
+                    ELSE
+                    NULL
+                  END || '),' || to_char(nvl(g_columns(i).data_scale, 0)) || ')'
+                WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
+                  CASE
+                    WHEN lower(g_columns(i).column_name) LIKE '%mail%' THEN
+                    'dbms_random.string(''a'',' || to_char(g_columns(i).char_length - 12) || ') || ''@dummy.world'''
+                    WHEN lower(g_columns(i).column_name) LIKE '%phone%' THEN
+                    'substr(''+1.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,''0''),1,' ||
+                    to_char(g_columns(i).char_length) || ')'
+                    ELSE
+                    'dbms_random.string(''a'',' || to_char(g_columns(i).char_length) || ')'
+                  END
+                WHEN g_columns(i).data_type = 'DATE' THEN
+                  'to_date(trunc(dbms_random.value(to_char(date''1900-01-01'',''j''),to_char(date''2099-12-31'',''j''))),''j'')'
+                WHEN g_columns(i).data_type LIKE 'TIMESTAMP%' THEN
+                  'systimestamp'
+                WHEN g_columns(i).data_type = 'CLOB' THEN
+                  'to_clob(''Dummy clob for API method get_a_row: '' || dbms_random.string(''a'', 30))'
+                WHEN g_columns(i).data_type = 'BLOB' THEN
+                  'to_blob(utl_raw.cast_to_raw(''Dummy clob for API method get_a_row: '' || dbms_random.string(''a'', 30)))'
+                WHEN g_columns(i).data_type = 'XMLTYPE' THEN
+                  'xmltype(''<dummy>Dummy XML for API method get_a_row: '' || dbms_random.string(''a'', 30) || ''</dummy>'')'
+                ELSE
+                  'NULL'
+              END;
             g_columns(i).custom_default_source := 'TAPIGEN';
           END IF;
         END IF;
@@ -3569,11 +3573,11 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
 CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   /*
   This is the API for the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
-  generator="{{ GENERATOR }}"
-  generator_version="{{ GENERATOR_VERSION }}"
-  generator_action="{{ GENERATOR_ACTION }}"
-  generated_at="{{ GENERATED_AT }}"
-  generated_by="{{ GENERATED_BY }}"
+  - generator: {{ GENERATOR }}
+  - generator_version: {{ GENERATOR_VERSION }}
+  - generator_action: {{ GENERATOR_ACTION }}
+  - generated_at: {{ GENERATED_AT }}
+  - generated_by: {{ GENERATED_BY }}
   */';
       util_template_replace('API BODY');
 
@@ -4480,10 +4484,10 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   FUNCTION create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS crud_mode=create %} )
   RETURN {{ RETURN_TYPE }};
-  /**
-   * Helper mainly for testing and dummy data generation purposes.
-   * Create a new row without (hopefully) providing any parameters.
-   */';
+  /*
+  Helper mainly for testing and dummy data generation purposes.
+  Create a new row without (hopefully) providing any parameters.
+  */';
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
@@ -4510,15 +4514,15 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
   PROCEDURE create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS crud_mode=create %} );
-  /**
-   * Helper mainly for testing and dummy data generation purposes.
-   * Create a new row without (hopefully) providing any parameters.
-   */';
+  /*
+  Helper mainly for testing and dummy data generation purposes.
+  Create a new row without (hopefully) providing any parameters.
+  */';
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
   PROCEDURE create_a_row (
-    {% LIST_PARAMS_W_PK_CUST_DEFAULTS %} )
+    {% LIST_PARAMS_W_PK_CUST_DEFAULTS crud_mode=create %} )
   IS
     v_return {{ RETURN_TYPE }};
   BEGIN
@@ -4595,11 +4599,11 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
   FROM {{ TABLE_NAME }}
   /*
   This is the DML view for the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
-  generator="{{ GENERATOR }}"
-  generator_version="{{ GENERATOR_VERSION }}"
-  generator_action="{{ GENERATOR_ACTION }}"
-  generated_at="{{ GENERATED_AT }}"
-  generated_by="{{ GENERATED_BY }}"
+  - generator: {{ GENERATOR }}
+  - generator_version: {{ GENERATOR_VERSION }}
+  - generator_action: {{ GENERATOR_ACTION }}
+  - generated_at: {{ GENERATED_AT }}
+  - generated_by: {{ GENERATED_BY }}
   */
   ';
       util_template_replace('VIEW');
@@ -4620,11 +4624,11 @@ CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
   FOR EACH ROW
   /*
   This is the instead of trigger for the DML view of the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
-  generator="{{ GENERATOR }}"
-  generator_version="{{ GENERATOR_VERSION }}"
-  generator_action="{{ GENERATOR_ACTION }}"
-  generated_at="{{ GENERATED_AT }}"
-  generated_by="{{ GENERATED_BY }}"
+  - generator: {{ GENERATOR }}
+  - generator_version: {{ GENERATOR_VERSION }}
+  - generator_action: {{ GENERATOR_ACTION }}
+  - generated_at: {{ GENERATED_AT }}
+  - generated_by: {{ GENERATED_BY }}
   */
 BEGIN
   IF INSERTING THEN' || CASE WHEN g_params.enable_insertion_of_rows THEN '

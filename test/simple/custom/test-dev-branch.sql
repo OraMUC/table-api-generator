@@ -42,7 +42,8 @@ begin
     p_return_row_instead_of_pk   => false,
     p_enable_dml_view            => true,
     p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY',
-    p_row_version_column_mapping => '#PREFIX#_VERSION_ID=global_version_sequence.nextval');
+    p_row_version_column_mapping => '#PREFIX#_VERSION_ID=global_version_sequence.nextval',
+    p_enable_custom_defaults     => true);
 end;
 /
 prompt --parameter based create and update
@@ -80,6 +81,14 @@ begin
   v_row := app_users_api.read_row(p_au_email => 'test@test.com');
   v_row.au_last_name := 'dummy';
   app_users_api.update_row(v_row);
+end;
+/
+
+prompt --create 10 rows without any parameter
+begin
+  for i in 1..10 loop
+    app_users_api.create_a_row;
+  end loop;
 end;
 /
 
