@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.14';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.16';
 /**
 Oracle PL/SQL Table API Generator
 =================================
