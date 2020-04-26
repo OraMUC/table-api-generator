@@ -10,6 +10,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_enable_getter_and_setter    CONSTANT param_type := 'Enable getter/setter methods';
   c_col_prefix_in_method_names  CONSTANT param_type := 'Keep column prefix in getter/setter method names';
   c_return_row_instead_of_pk    CONSTANT param_type := 'Return row instead of pk (for create functions)';
+  c_default_bulk_limit          CONSTANT param_type := 'Default bulk size for set based methods';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
   c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #TABLE_NAME_26#_SEQ)';
@@ -58,6 +59,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_enable_getter_and_setter) := 'TRUE';
     v_params(c_col_prefix_in_method_names) := 'TRUE';
     v_params(c_return_row_instead_of_pk) := 'FALSE';
+    v_params(c_default_bulk_limit) := '1000';
     v_params(c_enable_dml_view) := 'FALSE';
     v_params(c_api_name) := NULL;
     v_params(c_sequence_name) := NULL;
@@ -72,25 +74,27 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
 
   FUNCTION get_ordered_params RETURN t_string IS
   BEGIN
-    RETURN NEW t_string(c_parameter_descriptions,
-                        c_enable_insertion_of_rows,
-                        c_enable_column_defaults,
-                        c_enable_update_of_rows,
-                        c_enable_deletion_of_rows,
-                        c_enable_parameter_prefixes,
-                        c_enable_proc_with_out_params,
-                        c_enable_getter_and_setter,
-                        c_col_prefix_in_method_names,
-                        c_return_row_instead_of_pk,
-                        c_enable_dml_view,
-                        c_api_name,
-                        c_sequence_name,
-                        c_exclude_column_list,
-                        c_audit_column_mappings,
-                        c_audit_user_expression,
-                        c_row_version_column_mapping,
-                        c_enable_custom_defaults,
-                        c_custom_default_values);
+    RETURN NEW t_string(
+      c_parameter_descriptions,
+      c_enable_insertion_of_rows,
+      c_enable_column_defaults,
+      c_enable_update_of_rows,
+      c_enable_deletion_of_rows,
+      c_enable_parameter_prefixes,
+      c_enable_proc_with_out_params,
+      c_enable_getter_and_setter,
+      c_col_prefix_in_method_names,
+      c_return_row_instead_of_pk,
+      c_default_bulk_limit,
+      c_enable_dml_view,
+      c_api_name,
+      c_sequence_name,
+      c_exclude_column_list,
+      c_audit_column_mappings,
+      c_audit_user_expression,
+      c_row_version_column_mapping,
+      c_enable_custom_defaults,
+      c_custom_default_values);
   END get_ordered_params;
 
   FUNCTION get_lov RETURN t_lov IS
@@ -117,30 +121,32 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     in_params      IN t_param
   ) RETURN CLOB IS
   BEGIN
-    RETURN om_tapigen.get_code(p_table_name                  => in_object_name,
-                               p_enable_insertion_of_rows    => util_string_to_bool(in_params(c_enable_insertion_of_rows)),
-                               p_enable_column_defaults      => util_string_to_bool(in_params(c_enable_column_defaults)),
-                               p_enable_update_of_rows       => util_string_to_bool(in_params(c_enable_update_of_rows)),
-                               p_enable_deletion_of_rows     => util_string_to_bool(in_params(c_enable_deletion_of_rows)),
-                               p_enable_parameter_prefixes   => util_string_to_bool(in_params(c_enable_parameter_prefixes)),
-                               p_enable_proc_with_out_params => util_string_to_bool(in_params(c_enable_proc_with_out_params)),
-                               p_enable_getter_and_setter    => util_string_to_bool(in_params(c_enable_getter_and_setter)),
-                               p_col_prefix_in_method_names  => util_string_to_bool(in_params(c_col_prefix_in_method_names)),
-                               p_return_row_instead_of_pk    => util_string_to_bool(in_params(c_return_row_instead_of_pk)),
-                               p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
-                               p_api_name                    => in_params(c_api_name),
-                               p_sequence_name               => in_params(c_sequence_name),
-                               p_exclude_column_list         => in_params(c_exclude_column_list),
-                               p_audit_column_mappings       => in_params(c_audit_column_mappings),
-                               p_audit_user_expression       => in_params(c_audit_user_expression),
-                               p_row_version_column_mapping  => in_params(c_row_version_column_mapping),
-                               p_enable_custom_defaults      => util_string_to_bool(in_params(c_enable_custom_defaults)),
-                               p_custom_default_values       => CASE
-                                                                  WHEN in_params(c_custom_default_values) IS NOT NULL THEN
-                                                                   xmltype(in_params(c_custom_default_values))
-                                                                  ELSE
-                                                                   NULL
-                                                                END);
+    RETURN om_tapigen.get_code(
+      p_table_name                  => in_object_name,
+      p_enable_insertion_of_rows    => util_string_to_bool(in_params(c_enable_insertion_of_rows)),
+      p_enable_column_defaults      => util_string_to_bool(in_params(c_enable_column_defaults)),
+      p_enable_update_of_rows       => util_string_to_bool(in_params(c_enable_update_of_rows)),
+      p_enable_deletion_of_rows     => util_string_to_bool(in_params(c_enable_deletion_of_rows)),
+      p_enable_parameter_prefixes   => util_string_to_bool(in_params(c_enable_parameter_prefixes)),
+      p_enable_proc_with_out_params => util_string_to_bool(in_params(c_enable_proc_with_out_params)),
+      p_enable_getter_and_setter    => util_string_to_bool(in_params(c_enable_getter_and_setter)),
+      p_col_prefix_in_method_names  => util_string_to_bool(in_params(c_col_prefix_in_method_names)),
+      p_return_row_instead_of_pk    => util_string_to_bool(in_params(c_return_row_instead_of_pk)),
+      p_default_bulk_limit          => to_number(in_params(c_default_bulk_limit)),
+      p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
+      p_api_name                    => in_params(c_api_name),
+      p_sequence_name               => in_params(c_sequence_name),
+      p_exclude_column_list         => in_params(c_exclude_column_list),
+      p_audit_column_mappings       => in_params(c_audit_column_mappings),
+      p_audit_user_expression       => in_params(c_audit_user_expression),
+      p_row_version_column_mapping  => in_params(c_row_version_column_mapping),
+      p_enable_custom_defaults      => util_string_to_bool(in_params(c_enable_custom_defaults)),
+      p_custom_default_values       => CASE
+                                        WHEN in_params(c_custom_default_values) IS NOT NULL THEN
+                                          xmltype(in_params(c_custom_default_values))
+                                        ELSE
+                                          NULL
+                                      END);
   END generate;
 
 END om_tapigen_oddgen_wrapper;

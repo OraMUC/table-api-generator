@@ -41,6 +41,7 @@ create table names(
   n_first_name  varchar2(15)            ,
   n_last_name   varchar2(15)            ,
   n_email       varchar2(30)  not null  ,
+  n_phone       varchar2(30)            ,
   n_street      varchar2(30)            ,
   n_city        varchar2(30)            ,
   n_country     varchar2(30)            ,

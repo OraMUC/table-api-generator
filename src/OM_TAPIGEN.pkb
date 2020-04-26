@@ -27,6 +27,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     enable_getter_and_setter    BOOLEAN,
     col_prefix_in_method_names  BOOLEAN,
     return_row_instead_of_pk    BOOLEAN,
+    default_bulk_limit          INTEGER,
     enable_dml_view             BOOLEAN,
     api_name                    all_objects.object_name%TYPE,
     sequence_name               all_sequences.sequence_name%TYPE,
@@ -2136,6 +2137,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(util_bool_to_string(g_params.enable_parameter_prefixes));
         WHEN 'RETURN_ROW_INSTEAD_OF_PK' THEN
           code_append(util_bool_to_string(g_params.return_row_instead_of_pk));
+        WHEN 'DEFAULT_BULK_LIMIT' THEN
+          code_append(to_char(g_params.default_bulk_limit));
         WHEN 'CUSTOM_DEFAULTS' THEN
           code_append(CASE
                         WHEN g_params.custom_default_values IS NOT NULL THEN
@@ -2318,6 +2321,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_enable_getter_and_setter    IN BOOLEAN,
     p_col_prefix_in_method_names  IN BOOLEAN,
     p_return_row_instead_of_pk    IN BOOLEAN,
+    p_default_bulk_limit          IN INTEGER,
     p_enable_dml_view             IN BOOLEAN,
     p_api_name                    IN VARCHAR2,
     p_sequence_name               IN VARCHAR2,
@@ -2364,6 +2368,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_params.enable_getter_and_setter    := p_enable_getter_and_setter;
       g_params.col_prefix_in_method_names  := p_col_prefix_in_method_names;
       g_params.return_row_instead_of_pk    := p_return_row_instead_of_pk;
+      g_params.default_bulk_limit          := p_default_bulk_limit;
       g_params.enable_dml_view             := p_enable_dml_view;
       g_params.api_name                    := util_get_substituted_name(nvl(p_api_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'));
       g_params.sequence_name               := CASE WHEN p_sequence_name IS NOT NULL THEN util_get_substituted_name(p_sequence_name) ELSE NULL END;
@@ -2938,11 +2943,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                       q'^to_char(round(dbms_random.value(100, 9999))), 1, ^' ||
                       to_char(g_columns(i).char_length) || ')'
                     WHEN lower(g_columns(i).column_name) LIKE '%name%'
-                      OR lower(g_columns(i).column_name) LIKE '%street%'
                       OR lower(g_columns(i).column_name) LIKE '%city%'
                       OR lower(g_columns(i).column_name) LIKE '%country%'
                     THEN
                       q'^initcap(dbms_random.string('L', round(dbms_random.value(3, ^' || to_char(g_columns(i).char_length) || '))))'
+                    WHEN lower(g_columns(i).column_name) LIKE '%street%' THEN
+                      q'^initcap(dbms_random.string('L', round(dbms_random.value(3, ^' || to_char(g_columns(i).char_length - 4) || '))))' ||
+                      q'^ || ' ' || ^' ||
+                      q'^to_char(round(dbms_random.value(1, 200)))^'
                     ELSE
                       q'^dbms_random.string('A', round(dbms_random.value(1, ^' || to_char(g_columns(i).char_length) || ')))'
                   END
@@ -3038,6 +3046,7 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
     p_enable_getter_and_setter="{{ ENABLE_GETTER_AND_SETTER }}"
     p_col_prefix_in_method_names="{{ COL_PREFIX_IN_METHOD_NAMES }}"
     p_return_row_instead_of_pk="{{ RETURN_ROW_INSTEAD_OF_PK }}"
+    p_default_bulk_limit="{{ DEFAULT_BULK_LIMIT }}"
     p_enable_dml_view="{{ ENABLE_DML_VIEW }}"
     p_api_name="{{ API_NAME }}"
     p_sequence_name="{{ SEQUENCE_NAME }}"
@@ -3083,7 +3092,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
-  g_bulk_limit     PLS_INTEGER := 10000;
+  g_bulk_limit     PLS_INTEGER := {{ DEFAULT_BULK_LIMIT }};
   g_bulk_completed BOOLEAN     := FALSE;';
       util_template_replace('API BODY');
 
@@ -4332,6 +4341,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_enable_getter_and_setter    IN BOOLEAN DEFAULT TRUE,
     p_col_prefix_in_method_names  IN BOOLEAN DEFAULT TRUE,
     p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
+    p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
@@ -4356,6 +4366,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_enable_getter_and_setter    => p_enable_getter_and_setter,
               p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
               p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
+              p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
@@ -4385,6 +4396,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_enable_getter_and_setter    IN BOOLEAN DEFAULT TRUE,
     p_col_prefix_in_method_names  IN BOOLEAN DEFAULT TRUE,
     p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
+    p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
@@ -4412,6 +4424,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_enable_getter_and_setter    => p_enable_getter_and_setter,
               p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
               p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
+              p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
@@ -4442,6 +4455,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_enable_getter_and_setter    IN BOOLEAN DEFAULT TRUE,
     p_col_prefix_in_method_names  IN BOOLEAN DEFAULT TRUE,
     p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
+    p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
@@ -4466,6 +4480,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_enable_getter_and_setter    => p_enable_getter_and_setter,
               p_col_prefix_in_method_names  => p_col_prefix_in_method_names,
               p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
+              p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
@@ -4493,7 +4508,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   BEGIN
     -- I was not able to compile without execute immediate - got a strange ORA-03113.
     -- Direct execution of the statement in SQL tool works :-(
-    EXECUTE IMMEDIATE '
+    EXECUTE IMMEDIATE q'^
 -- ATTENTION: query columns need to match the global row definition om_tapigen.g_row_existing_apis.
 -- Creating a cursor was not possible - database throws an error
 
@@ -4502,32 +4517,32 @@ WITH api_names AS (
                 NAME AS api_name
            FROM all_source
           WHERE     owner = :p_owner
-                AND TYPE = ''PACKAGE''
+                AND TYPE = 'PACKAGE'
                 AND line BETWEEN :spec_options_min_line
                              AND :spec_options_max_line
-                AND INSTR (text,''generator="OM_TAPIGEN"'') > 0
+                AND INSTR (text,'generator="OM_TAPIGEN"') > 0
      ) -- select * from api_names;
      , sources AS (
          SELECT owner,
                 package_name,
                 xmltype (
-                   NVL (REGEXP_SUBSTR (REPLACE (source_code, ''*'', NULL), -- replace needed for backward compatibility of old comment style
-                                       ''<options.*>'',
+                   NVL (REGEXP_SUBSTR (REPLACE (source_code, '*', NULL), -- replace needed for backward compatibility of old comment style
+                                       '<options.*>',
                                        1,
                                        1,
-                                       ''ni''),
-                        ''<no_data_found/>''))
+                                       'ni'),
+                        '<no_data_found/>'))
                    AS options
            FROM (SELECT owner,
                         NAME AS package_name,
-                        LISTAGG (text, '' '')
+                        LISTAGG (text, ' ')
                            WITHIN GROUP (ORDER BY NAME, line)
                            OVER (PARTITION BY NAME)
                            AS source_code
                    FROM all_source
                   WHERE     owner = :p_owner
                         AND name  IN (SELECT api_name FROM api_names)
-                        AND TYPE  = ''PACKAGE''
+                        AND TYPE  = 'PACKAGE'
                         AND line  BETWEEN :spec_options_min_line
                                       AND :spec_options_max_line)
           GROUP BY owner, package_name, source_code
@@ -4539,7 +4554,7 @@ WITH api_names AS (
                 x.generator,
                 x.generator_version,
                 x.generator_action,
-                TO_DATE (x.generated_at,''yyyy-mm-dd hh24:mi:ss'') AS generated_at,
+                TO_DATE (x.generated_at,'yyyy-mm-dd hh24:mi:ss') AS generated_at,
                 x.generated_by,
                 x.p_owner,
                 x.p_table_name,
@@ -4552,6 +4567,7 @@ WITH api_names AS (
                 x.p_enable_getter_and_setter,
                 x.p_col_prefix_in_method_names,
                 x.p_return_row_instead_of_pk,
+                x.p_default_bulk_limit,
                 x.p_enable_dml_view,
                 x.p_api_name,
                 x.p_sequence_name,
@@ -4564,33 +4580,34 @@ WITH api_names AS (
            FROM sources t
                 CROSS JOIN
                 XMLTABLE (
-                   ''/options''
+                   '/options'
                    PASSING options
-                   COLUMNS generator                     VARCHAR2 (30 CHAR)   PATH ''@generator'',
-                           generator_version             VARCHAR2 (10 CHAR)   PATH ''@generator_version'',
-                           generator_action              VARCHAR2 (30 CHAR)   PATH ''@generator_action'',
-                           generated_at                  VARCHAR2 (30 CHAR)   PATH ''@generated_at'',
-                           generated_by                  VARCHAR2 (128 CHAR)  PATH ''@generated_by'',
-                           p_owner                       VARCHAR2 (128 CHAR)  PATH ''@p_owner'',
-                           p_table_name                  VARCHAR2 (128 CHAR)  PATH ''@p_table_name'',
-                           p_enable_insertion_of_rows    VARCHAR2 (5 CHAR)    PATH ''@p_enable_insertion_of_rows'',
-                           p_enable_column_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_column_defaults'',
-                           p_enable_update_of_rows       VARCHAR2 (5 CHAR)    PATH ''@p_enable_update_of_rows'',
-                           p_enable_deletion_of_rows     VARCHAR2 (5 CHAR)    PATH ''@p_enable_deletion_of_rows'',
-                           p_enable_parameter_prefixes   VARCHAR2 (5 CHAR)    PATH ''@p_enable_parameter_prefixes'',
-                           p_enable_proc_with_out_params VARCHAR2 (5 CHAR)    PATH ''@p_enable_proc_with_out_params'',
-                           p_enable_getter_and_setter    VARCHAR2 (5 CHAR)    PATH ''@p_enable_getter_and_setter'',
-                           p_col_prefix_in_method_names  VARCHAR2 (5 CHAR)    PATH ''@p_col_prefix_in_method_names'',
-                           p_return_row_instead_of_pk    VARCHAR2 (5 CHAR)    PATH ''@p_return_row_instead_of_pk'',
-                           p_enable_dml_view             VARCHAR2 (5 CHAR)    PATH ''@p_enable_dml_view'',
-                           p_api_name                    VARCHAR2 (128 CHAR)  PATH ''@p_api_name'',
-                           p_sequence_name               VARCHAR2 (128 CHAR)  PATH ''@p_sequence_name'',
-                           p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH ''@p_exclude_column_list'',
-                           p_audit_column_mappings       VARCHAR2 (4000 CHAR) PATH ''@p_audit_column_mappings'',
-                           p_audit_user_expression       VARCHAR2 (4000 CHAR) PATH ''@p_audit_user_expression'',
-                           p_row_version_column_mapping  VARCHAR2 (4000 CHAR) PATH ''@p_row_version_column_mapping'',
-                           p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_custom_defaults'',
-                           p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'') x
+                   COLUMNS generator                     VARCHAR2 (30 CHAR)   PATH '@generator',
+                           generator_version             VARCHAR2 (10 CHAR)   PATH '@generator_version',
+                           generator_action              VARCHAR2 (30 CHAR)   PATH '@generator_action',
+                           generated_at                  VARCHAR2 (30 CHAR)   PATH '@generated_at',
+                           generated_by                  VARCHAR2 (128 CHAR)  PATH '@generated_by',
+                           p_owner                       VARCHAR2 (128 CHAR)  PATH '@p_owner',
+                           p_table_name                  VARCHAR2 (128 CHAR)  PATH '@p_table_name',
+                           p_enable_insertion_of_rows    VARCHAR2 (5 CHAR)    PATH '@p_enable_insertion_of_rows',
+                           p_enable_column_defaults      VARCHAR2 (5 CHAR)    PATH '@p_enable_column_defaults',
+                           p_enable_update_of_rows       VARCHAR2 (5 CHAR)    PATH '@p_enable_update_of_rows',
+                           p_enable_deletion_of_rows     VARCHAR2 (5 CHAR)    PATH '@p_enable_deletion_of_rows',
+                           p_enable_parameter_prefixes   VARCHAR2 (5 CHAR)    PATH '@p_enable_parameter_prefixes',
+                           p_enable_proc_with_out_params VARCHAR2 (5 CHAR)    PATH '@p_enable_proc_with_out_params',
+                           p_enable_getter_and_setter    VARCHAR2 (5 CHAR)    PATH '@p_enable_getter_and_setter',
+                           p_col_prefix_in_method_names  VARCHAR2 (5 CHAR)    PATH '@p_col_prefix_in_method_names',
+                           p_return_row_instead_of_pk    VARCHAR2 (5 CHAR)    PATH '@p_return_row_instead_of_pk',
+                           p_default_bulk_limit          INTEGER              PATH '@p_default_bulk_limit',
+                           p_enable_dml_view             VARCHAR2 (5 CHAR)    PATH '@p_enable_dml_view',
+                           p_api_name                    VARCHAR2 (128 CHAR)  PATH '@p_api_name',
+                           p_sequence_name               VARCHAR2 (128 CHAR)  PATH '@p_sequence_name',
+                           p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH '@p_exclude_column_list',
+                           p_audit_column_mappings       VARCHAR2 (4000 CHAR) PATH '@p_audit_column_mappings',
+                           p_audit_user_expression       VARCHAR2 (4000 CHAR) PATH '@p_audit_user_expression',
+                           p_row_version_column_mapping  VARCHAR2 (4000 CHAR) PATH '@p_row_version_column_mapping',
+                           p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH '@p_enable_custom_defaults',
+                           p_custom_default_values       VARCHAR2 (30 CHAR)   PATH '@p_custom_default_values') x
      ) -- select * from apis;
      , objects AS (
          SELECT specs.object_name   AS package_name,
@@ -4604,7 +4621,7 @@ WITH api_names AS (
                         last_ddl_time
                    FROM all_objects
                   WHERE     owner       = :p_owner
-                        AND object_type = ''PACKAGE''
+                        AND object_type = 'PACKAGE'
                         AND object_name IN (SELECT api_name FROM api_names))
                 specs
                 LEFT JOIN
@@ -4614,11 +4631,11 @@ WITH api_names AS (
                         last_ddl_time
                    FROM all_objects
                   WHERE     owner       = :p_owner
-                        AND object_type = ''PACKAGE BODY''
+                        AND object_type = 'PACKAGE BODY'
                         AND object_name IN (SELECT api_name FROM api_names))
                 bodys
                    ON     specs.object_name              = bodys.object_name
-                      AND specs.object_type || '' BODY'' = bodys.object_type
+                      AND specs.object_type || ' BODY' = bodys.object_type
      ) -- select * from objects;
 SELECT NULL AS errors,
        apis.owner,
@@ -4644,6 +4661,7 @@ SELECT NULL AS errors,
        apis.p_enable_getter_and_setter,
        apis.p_col_prefix_in_method_names,
        apis.p_return_row_instead_of_pk,
+       apis.p_default_bulk_limit,
        apis.p_enable_dml_view,
        apis.p_api_name,
        apis.p_sequence_name,
@@ -4655,7 +4673,8 @@ SELECT NULL AS errors,
        apis.p_custom_default_values
   FROM apis JOIN objects ON apis.package_name = objects.package_name
  WHERE table_name = NVL ( :p_table_name, table_name)
-            ' BULK COLLECT
+      ^'
+      BULK COLLECT
       INTO v_tab
       USING p_owner, c_spec_options_min_line, c_spec_options_max_line, p_owner, c_spec_options_min_line, c_spec_options_max_line, p_owner, p_owner, p_table_name;
     IF v_tab.count > 0 THEN

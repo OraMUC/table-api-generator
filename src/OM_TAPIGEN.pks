@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.17';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.18';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -127,6 +127,7 @@ TYPE t_rec_existing_apis IS RECORD(
   p_enable_getter_and_setter    VARCHAR2(5 CHAR),
   p_col_prefix_in_method_names  VARCHAR2(5 CHAR),
   p_return_row_instead_of_pk    VARCHAR2(5 CHAR),
+  p_default_bulk_limit          INTEGER,
   p_enable_dml_view             VARCHAR2(5 CHAR),
   p_api_name                    all_objects.object_name%TYPE,
   p_sequence_name               all_objects.object_name%TYPE,
@@ -223,25 +224,26 @@ TYPE t_tab_vc2_4k IS TABLE OF VARCHAR2(4000);
 PROCEDURE compile_api
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
   p_table_name                  IN VARCHAR2,
-  p_owner                       IN VARCHAR2 DEFAULT USER,
-  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,
+  p_owner                       IN VARCHAR2 DEFAULT USER,  -- The schema, in which the API should be generated.
+  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,  -- If true, create methods are generated.
   p_enable_column_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, the data dictionary defaults of the columns are used for the create methods.
-  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,
-  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE,
+  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,  -- If true, update methods are generated.
+  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE, -- If true, delete methods are generated.
   p_enable_parameter_prefixes   IN BOOLEAN  DEFAULT TRUE,  -- If true, the param names of methods will be prefixed with 'p_'.
-  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
-  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- prefixedIf true, for each column get and set methods are created.
-  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
-  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE,
-  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE,
-  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
-  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
-  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
-  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
-  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
-  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier)
-  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out parameters is generated - can be useful for low code frontends like APEX to manage session state.
+  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- If true, getter and setter methods are created for each column.
+  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names.
+  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
+  p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
+  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
+  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
+  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
+  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
+  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
+  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
+  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 );
 /**
 
@@ -258,25 +260,26 @@ END;
 FUNCTION compile_api_and_get_code
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
   p_table_name                  IN VARCHAR2,
-  p_owner                       IN VARCHAR2 DEFAULT USER,
-  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,
+  p_owner                       IN VARCHAR2 DEFAULT USER,  -- The schema, in which the API should be generated.
+  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,  -- If true, create methods are generated.
   p_enable_column_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, the data dictionary defaults of the columns are used for the create methods.
-  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,
-  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE,
+  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,  -- If true, update methods are generated.
+  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE, -- If true, delete methods are generated.
   p_enable_parameter_prefixes   IN BOOLEAN  DEFAULT TRUE,  -- If true, the param names of methods will be prefixed with 'p_'.
-  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
-  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- prefixedIf true, for each column get and set methods are created.
-  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
-  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE,
-  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE,
-  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
-  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
-  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
-  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
-  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
-  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier)
-  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out parameters is generated - can be useful for low code frontends like APEX to manage session state.
+  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- If true, getter and setter methods are created for each column.
+  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names.
+  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
+  p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
+  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
+  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
+  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
+  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
+  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
+  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
+  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 ) RETURN CLOB;
 /**
 
@@ -297,25 +300,26 @@ END;
 FUNCTION get_code
 ( --> For detailed parameter descriptions see https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md
   p_table_name                  IN VARCHAR2,
-  p_owner                       IN VARCHAR2 DEFAULT USER,
-  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,
+  p_owner                       IN VARCHAR2 DEFAULT USER,  -- The schema, in which the API should be generated.
+  p_enable_insertion_of_rows    IN BOOLEAN  DEFAULT TRUE,  -- If true, create methods are generated.
   p_enable_column_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, the data dictionary defaults of the columns are used for the create methods.
-  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,
-  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE,
+  p_enable_update_of_rows       IN BOOLEAN  DEFAULT TRUE,  -- If true, update methods are generated.
+  p_enable_deletion_of_rows     IN BOOLEAN  DEFAULT FALSE, -- If true, delete methods are generated.
   p_enable_parameter_prefixes   IN BOOLEAN  DEFAULT TRUE,  -- If true, the param names of methods will be prefixed with 'p_'.
-  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX).
-  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- prefixedIf true, for each column get and set methods are created.
-  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names
-  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE,
-  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE,
-  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20))
-  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible
-  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
-  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
-  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...)
-  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier)
-  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions)
-  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok
+  p_enable_proc_with_out_params IN BOOLEAN  DEFAULT TRUE,  -- If true, a helper method with out parameters is generated - can be useful for low code frontends like APEX to manage session state.
+  p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- If true, getter and setter methods are created for each column.
+  p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names.
+  p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
+  p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
+  p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
+  p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
+  p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
+  p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
+  p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
+  p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
+  p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
+  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 ) RETURN CLOB;
 /**
 
