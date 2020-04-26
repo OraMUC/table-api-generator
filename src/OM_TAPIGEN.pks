@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.16';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.17';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -11,7 +11,7 @@ additional wrapper package for the [SQL Developer extension oddgen](https://www.
 The effort of generated API's is to reduce your PL/SQL code by calling standard
 procedures and functions for usual DML operations on tables. So the generated
 table APIs work as a logical layer between your business logic and the data. And
-by the way this logical layer enables you to easily seperate the data schema and
+by the way this logical layer enables you to easily separate the data schema and
 the UI schema for your applications to improve security by granting only execute
 privs on table APIs to the application schema. In addition to that table APIs
 will speed up your development cycles because developers are able to set the

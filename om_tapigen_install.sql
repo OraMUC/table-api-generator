@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.16';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.17';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -44,7 +44,7 @@ additional wrapper package for the [SQL Developer extension oddgen](https://www.
 The effort of generated API's is to reduce your PL/SQL code by calling standard
 procedures and functions for usual DML operations on tables. So the generated
 table APIs work as a logical layer between your business logic and the data. And
-by the way this logical layer enables you to easily seperate the data schema and
+by the way this logical layer enables you to easily separate the data schema and
 the UI schema for your applications to improve security by granting only execute
 privs on table APIs to the application schema. In addition to that table APIs
 will speed up your development cycles because developers are able to set the
@@ -3401,6 +3401,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_index INTEGER;
     BEGIN
       util_debug_start_one_step(p_action => 'init_process_custom_defaults');
+
       -- process user provided custom defaults
       IF g_params.custom_default_values IS NOT NULL THEN
         FOR i IN (SELECT x.column_name AS column_name, x.data_default AS data_default
@@ -3420,12 +3421,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           END;
         END LOOP;
       END IF;
+
       -- generate standard custom defaults for the users convenience...
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).data_custom_default IS NULL -- do not override users defaults from the processing step above
           and g_columns(i).is_excluded_yn = 'N'
-          AND g_columns(i).audit_type is null
           and g_columns(i).identity_type is null
+          AND g_columns(i).audit_type is null
           AND g_columns(i).row_version_expression is null
         THEN
           IF g_columns(i).data_default IS NOT NULL THEN
@@ -3441,37 +3443,55 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                   util_get_fk_value(p_table_name  => g_columns(i).r_table_name,
                                     p_column_name => g_columns(i).r_column_name,
                                     p_owner       => g_columns(i).r_owner)
-                WHEN g_columns(i).data_type IN ('NUMBER', 'INTEGER', 'FLOAT') THEN
-
-                  'round(dbms_random.value(0,' ||
-                  rpad('9',
-                      least(nvl(g_columns(i).data_precision, 9), 36) - nvl(g_columns(i).data_scale, 0),
-                      '9') || CASE
+                WHEN g_columns(i).data_type IN ('NUMBER', 'FLOAT') THEN
+                  'round(dbms_random.value(0, ' ||
+                  rpad('9', least(nvl(g_columns(i).data_precision, 12), 24) - nvl(g_columns(i).data_scale, 0), '9') ||
+                  CASE
                     WHEN nvl(g_columns(i).data_scale, 0) > 0 THEN
-                    '.' || rpad('9', nvl(g_columns(i).data_scale, 0), '9')
+                      '.' || rpad('9', g_columns(i).data_scale, '9')
                     ELSE
-                    NULL
-                  END || '),' || to_char(nvl(g_columns(i).data_scale, 0)) || ')'
+                      NULL
+                  END || '), ' ||
+                  CASE
+                    WHEN g_columns(i).data_type = 'NUMBER' THEN
+                      to_char(nvl(g_columns(i).data_scale, 0))
+                    WHEN g_columns(i).data_type = 'FLOAT' THEN
+                      to_char(least(g_columns(i).data_precision / 2, 12))
+                  END || ')'
                 WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
                   CASE
                     WHEN lower(g_columns(i).column_name) LIKE '%mail%' THEN
-                    'dbms_random.string(''a'',' || to_char(g_columns(i).char_length - 12) || ') || ''@dummy.world'''
+                      q'^dbms_random.string('L', round(dbms_random.value(6, ^' || to_char(least(g_columns(i).char_length - 18, 24)) || ')))' ||
+                      q'^ || '@' || ^' ||
+                      q'^dbms_random.string('L', round(dbms_random.value(6, 12)))^' ||
+                      q'^ || '.' || ^' ||
+                      q'^dbms_random.string('L', round(dbms_random.value(2, 4)))^'
                     WHEN lower(g_columns(i).column_name) LIKE '%phone%' THEN
-                    'substr(''+1.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,999))),3,''0'') || ''.'' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,''0''),1,' ||
-                    to_char(g_columns(i).char_length) || ')'
+                      q'^substr('+' || ^' ||
+                      q'^to_char(round(dbms_random.value(1, 99))) || ' ' || ^' ||
+                      q'^to_char(round(dbms_random.value(10, 9999))) || ' ' || ^' ||
+                      q'^to_char(round(dbms_random.value(100, 999))) || ' ' || ^' ||
+                      q'^to_char(round(dbms_random.value(100, 9999))), 1, ^' ||
+                      to_char(g_columns(i).char_length) || ')'
+                    WHEN lower(g_columns(i).column_name) LIKE '%name%'
+                      OR lower(g_columns(i).column_name) LIKE '%street%'
+                      OR lower(g_columns(i).column_name) LIKE '%city%'
+                      OR lower(g_columns(i).column_name) LIKE '%country%'
+                    THEN
+                      q'^initcap(dbms_random.string('L', round(dbms_random.value(3, ^' || to_char(g_columns(i).char_length) || '))))'
                     ELSE
-                    'dbms_random.string(''a'',' || to_char(g_columns(i).char_length) || ')'
+                      q'^dbms_random.string('A', round(dbms_random.value(1, ^' || to_char(g_columns(i).char_length) || ')))'
                   END
                 WHEN g_columns(i).data_type = 'DATE' THEN
-                  'to_date(trunc(dbms_random.value(to_char(date''1900-01-01'',''j''),to_char(date''2099-12-31'',''j''))),''j'')'
+                  q'^to_date(round(dbms_random.value(to_char(date '1900-01-01', 'j'), to_char(date '2099-12-31', 'j'))), 'j')^'
                 WHEN g_columns(i).data_type LIKE 'TIMESTAMP%' THEN
                   'systimestamp'
                 WHEN g_columns(i).data_type = 'CLOB' THEN
-                  'to_clob(''Dummy clob for API method get_a_row: '' || dbms_random.string(''a'', 30))'
+                  q'^to_clob('Dummy clob for API method get_a_row: ' || dbms_random.string('A', round(dbms_random.value(30, 100))))^'
                 WHEN g_columns(i).data_type = 'BLOB' THEN
-                  'to_blob(utl_raw.cast_to_raw(''Dummy clob for API method get_a_row: '' || dbms_random.string(''a'', 30)))'
+                  q'^to_blob(utl_raw.cast_to_raw('Dummy clob for API method get_a_row: ' || dbms_random.string('A', round(dbms_random.value(30, 100)))))^'
                 WHEN g_columns(i).data_type = 'XMLTYPE' THEN
-                  'xmltype(''<dummy>Dummy XML for API method get_a_row: '' || dbms_random.string(''a'', 30) || ''</dummy>'')'
+                  q'^xmltype('<dummy>Dummy XML for API method get_a_row: ' || dbms_random.string('A', round(dbms_random.value(30, 100))) || '</dummy>')^'
                 ELSE
                   'NULL'
               END;
@@ -3479,6 +3499,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           END IF;
         END IF;
       END LOOP;
+
       util_debug_stop_one_step;
     END init_process_custom_defaults;
 
@@ -4455,10 +4476,10 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
   FUNCTION get_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;
-  /**
-   * Helper mainly for testing and dummy data generation purposes.
-   * Returns a row with (hopefully) complete default data.
-   */';
+  /*
+  Helper mainly for testing and dummy data generation purposes.
+  Returns a row with (hopefully) complete default data.
+  */';
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
@@ -4543,11 +4564,11 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
   FUNCTION read_a_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;
-  /**
-   * Helper mainly for testing and dummy data generation purposes.
-   * Fetch one row (the first the database delivers) without providing
-   * a primary key parameter.
-   */';
+  /*
+  Helper mainly for testing and dummy data generation purposes.
+  Fetch one row (the first the database delivers) without providing
+  a primary key parameter.
+  */';
       util_template_replace('API SPEC');
 
       g_code_blocks.template := '
