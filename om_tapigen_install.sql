@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.18';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.19';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -162,6 +162,7 @@ TYPE t_rec_existing_apis IS RECORD(
   p_return_row_instead_of_pk    VARCHAR2(5 CHAR),
   p_default_bulk_limit          INTEGER,
   p_enable_dml_view             VARCHAR2(5 CHAR),
+  p_enable_one_to_one_view      VARCHAR2(5 CHAR),
   p_api_name                    all_objects.object_name%TYPE,
   p_sequence_name               all_objects.object_name%TYPE,
   p_exclude_column_list         VARCHAR2(4000 CHAR),
@@ -269,6 +270,7 @@ PROCEDURE compile_api
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
@@ -305,6 +307,7 @@ FUNCTION compile_api_and_get_code
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
@@ -345,6 +348,7 @@ FUNCTION get_code
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
@@ -569,6 +573,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     return_row_instead_of_pk    BOOLEAN,
     default_bulk_limit          INTEGER,
     enable_dml_view             BOOLEAN,
+    enable_one_to_one_view      BOOLEAN,
     api_name                    all_objects.object_name%TYPE,
     sequence_name               all_sequences.sequence_name%TYPE,
     exclude_column_list         VARCHAR2(4000 CHAR),
@@ -634,7 +639,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     dml_view                       CLOB,
     dml_view_varchar_cache         VARCHAR2(32767 CHAR),
     dml_view_trigger               CLOB,
-    dml_view_trigger_varchar_cache VARCHAR2(32767 CHAR));
+    dml_view_trigger_varchar_cache VARCHAR2(32767 CHAR),
+    one_to_one_view                CLOB,
+    one_to_one_view_varchar_cache  VARCHAR2(32767 CHAR)
+    );
 
   --
 
@@ -2598,6 +2606,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         util_clob_append(g_code_blocks.dml_view, g_code_blocks.dml_view_varchar_cache, p_code_snippet);
       ELSIF p_scope = 'TRIGGER' THEN
         util_clob_append(g_code_blocks.dml_view_trigger, g_code_blocks.dml_view_trigger_varchar_cache, p_code_snippet);
+      ELSIF p_scope = '1:1 VIEW' THEN
+        util_clob_append(g_code_blocks.one_to_one_view, g_code_blocks.one_to_one_view_varchar_cache, p_code_snippet);
       END IF;
     END code_append;
 
@@ -2669,6 +2679,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(util_bool_to_string(g_params.enable_deletion_of_rows));
         WHEN 'ENABLE_DML_VIEW' THEN
           code_append(util_bool_to_string(g_params.enable_dml_view));
+        WHEN 'ENABLE_ONE_TO_ONE_VIEW' THEN
+          code_append(util_bool_to_string(g_params.enable_one_to_one_view));
         WHEN 'ENABLE_GETTER_AND_SETTER' THEN
           code_append(util_bool_to_string(g_params.enable_getter_and_setter));
         WHEN 'ENABLE_PROC_WITH_OUT_PARAMS' THEN
@@ -2863,6 +2875,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_return_row_instead_of_pk    IN BOOLEAN,
     p_default_bulk_limit          IN INTEGER,
     p_enable_dml_view             IN BOOLEAN,
+    p_enable_one_to_one_view      IN BOOLEAN,
     p_api_name                    IN VARCHAR2,
     p_sequence_name               IN VARCHAR2,
     p_exclude_column_list         IN VARCHAR2,
@@ -2910,6 +2923,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_params.return_row_instead_of_pk    := p_return_row_instead_of_pk;
       g_params.default_bulk_limit          := p_default_bulk_limit;
       g_params.enable_dml_view             := p_enable_dml_view;
+      g_params.enable_one_to_one_view      := p_enable_one_to_one_view;
       g_params.api_name                    := util_get_substituted_name(nvl(p_api_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'));
       g_params.sequence_name               := CASE WHEN p_sequence_name IS NOT NULL THEN util_get_substituted_name(p_sequence_name) ELSE NULL END;
       g_params.exclude_column_list         := p_exclude_column_list;
@@ -3005,10 +3019,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     PROCEDURE init_create_temporary_lobs IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_create_temporary_lobs');
-      dbms_lob.createtemporary(lob_loc => g_code_blocks.api_spec, cache => FALSE);
-      dbms_lob.createtemporary(lob_loc => g_code_blocks.api_body, cache => FALSE);
-      dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view, cache => FALSE);
-      dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view_trigger, cache => FALSE);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.api_spec,         cache => true);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.api_body,         cache => true);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view,         cache => true);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view_trigger, cache => true);
+      dbms_lob.createtemporary(lob_loc => g_code_blocks.one_to_one_view,  cache => true);
       util_debug_stop_one_step;
     END init_create_temporary_lobs;
 
@@ -3588,6 +3603,7 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
     p_return_row_instead_of_pk="{{ RETURN_ROW_INSTEAD_OF_PK }}"
     p_default_bulk_limit="{{ DEFAULT_BULK_LIMIT }}"
     p_enable_dml_view="{{ ENABLE_DML_VIEW }}"
+    p_enable_one_to_one_view="{{ ENABLE_ONE_TO_ONE_VIEW }}"
     p_api_name="{{ API_NAME }}"
     p_sequence_name="{{ SEQUENCE_NAME }}"
     p_exclude_column_list="{{ EXCLUDE_COLUMN_LIST }}"
@@ -4632,12 +4648,12 @@ CREATE OR REPLACE VIEW "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_DML_V" AS
 SELECT {% LIST_COLUMNS_W_PK_FULL %}
   FROM {{ TABLE_NAME }}
   /*
-  This is the DML view for the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
-  - generator: {{ GENERATOR }}
-  - generator_version: {{ GENERATOR_VERSION }}
-  - generator_action: {{ GENERATOR_ACTION }}
-  - generated_at: {{ GENERATED_AT }}
-  - generated_by: {{ GENERATED_BY }}
+  This is the DML view for the table "{{ TABLE_NAME }}".
+  - Generator:         {{ GENERATOR }}
+  - Generator version: {{ GENERATOR_VERSION }}
+  - Generator action:  {{ GENERATOR_ACTION }}
+  - Generated at:      {{ GENERATED_AT }}
+  - Generated by:      {{ GENERATED_BY }}
   */
   ';
       util_template_replace('VIEW');
@@ -4657,12 +4673,12 @@ CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
   ON "{{ TABLE_NAME_MINUS_6 }}_DML_V"
   FOR EACH ROW
   /*
-  This is the instead of trigger for the DML view of the table "{{ TABLE_NAME }}"{{ IDENTITY_TYPE }}.
-  - generator: {{ GENERATOR }}
-  - generator_version: {{ GENERATOR_VERSION }}
-  - generator_action: {{ GENERATOR_ACTION }}
-  - generated_at: {{ GENERATED_AT }}
-  - generated_by: {{ GENERATED_BY }}
+  This is the instead of trigger for the DML view of the table "{{ TABLE_NAME }}".
+  - Generator:         {{ GENERATOR }}
+  - Generator version: {{ GENERATOR_VERSION }}
+  - Generator action:  {{ GENERATOR_ACTION }}
+  - Generated at:      {{ GENERATED_AT }}
+  - Generated by:      {{ GENERATED_BY }}
   */
 BEGIN
   IF INSERTING THEN' || CASE WHEN g_params.enable_insertion_of_rows THEN '
@@ -4692,6 +4708,31 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
     -----------------------------------------------------------------------------
 
+    PROCEDURE gen_one_to_one_view IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_one_to_one_view');
+
+      g_code_blocks.template := '
+CREATE OR REPLACE VIEW "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_V" AS
+SELECT {% LIST_COLUMNS_W_PK_FULL %}
+  FROM {{ TABLE_NAME }}
+  WITH READ ONLY
+  /*
+  This is the 1:1 view for the table "{{ TABLE_NAME }}".
+  - Generator:         {{ GENERATOR }}
+  - Generator version: {{ GENERATOR_VERSION }}
+  - Generator action:  {{ GENERATOR_ACTION }}
+  - Generated at:      {{ GENERATED_AT }}
+  - Generated by:      {{ GENERATED_BY }}
+  */
+  ';
+      util_template_replace('1:1 VIEW');
+
+      util_debug_stop_one_step;
+    END gen_one_to_one_view;
+
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_finalize_clob_vc2_caching IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_finalize_clob_vc2_caching');
@@ -4713,6 +4754,12 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
         util_clob_append(p_clob               => g_code_blocks.dml_view_trigger,
                          p_clob_varchar_cache => g_code_blocks.dml_view_trigger_varchar_cache,
+                         p_varchar_to_append  => NULL,
+                         p_final_call         => TRUE);
+      END IF;
+      IF g_params.enable_one_to_one_view THEN
+        util_clob_append(p_clob               => g_code_blocks.one_to_one_view,
+                         p_clob_varchar_cache => g_code_blocks.one_to_one_view_varchar_cache,
                          p_varchar_to_append  => NULL,
                          p_final_call         => TRUE);
       END IF;
@@ -4805,6 +4852,11 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       gen_dml_view_trigger;
     END IF;
 
+    -- 1:1 View
+    IF g_params.enable_one_to_one_view THEN
+      gen_one_to_one_view;
+    END IF;
+
     gen_finalize_clob_vc2_caching;
 
   END main_generate_code;
@@ -4856,6 +4908,19 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       util_debug_stop_one_step;
 
     END IF;
+
+    IF g_params.enable_one_to_one_view THEN
+      -- compile DML view
+      util_debug_start_one_step(p_action => 'compile_one_to_one_view');
+      BEGIN
+        util_execute_sql(g_code_blocks.one_to_one_view);
+      EXCEPTION
+        WHEN OTHERS THEN
+          NULL;
+      END;
+      util_debug_stop_one_step;
+    END IF;
+
   END main_compile_code;
 
   -----------------------------------------------------------------------------
@@ -4863,7 +4928,16 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
   FUNCTION main_return_code RETURN CLOB IS
     terminator VARCHAR2(10 CHAR) := c_lf || '/' || c_lflf;
   BEGIN
-    RETURN g_code_blocks.api_spec || terminator || g_code_blocks.api_body || terminator || CASE WHEN g_params.enable_dml_view THEN g_code_blocks.dml_view || terminator || g_code_blocks.dml_view_trigger || terminator ELSE NULL END;
+    RETURN
+      g_code_blocks.api_spec || terminator ||
+      g_code_blocks.api_body || terminator ||
+      CASE WHEN g_params.enable_dml_view THEN
+        g_code_blocks.dml_view || terminator ||
+        g_code_blocks.dml_view_trigger || terminator
+      END ||
+      CASE WHEN g_params.enable_one_to_one_view THEN
+        g_code_blocks.one_to_one_view || terminator
+      END;
   END main_return_code;
 
   -----------------------------------------------------------------------------
@@ -4883,6 +4957,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
@@ -4908,6 +4983,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
+              p_enable_one_to_one_view      => p_enable_one_to_one_view,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
               p_exclude_column_list         => p_exclude_column_list,
@@ -4938,6 +5014,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
@@ -4966,6 +5043,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
+              p_enable_one_to_one_view      => p_enable_one_to_one_view,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
               p_exclude_column_list         => p_exclude_column_list,
@@ -4997,6 +5075,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     p_return_row_instead_of_pk    IN BOOLEAN DEFAULT FALSE,
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
@@ -5022,6 +5101,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
               p_return_row_instead_of_pk    => p_return_row_instead_of_pk,
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
+              p_enable_one_to_one_view      => p_enable_one_to_one_view,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
               p_exclude_column_list         => p_exclude_column_list,
@@ -5109,6 +5189,7 @@ WITH api_names AS (
                 x.p_return_row_instead_of_pk,
                 x.p_default_bulk_limit,
                 x.p_enable_dml_view,
+                x.p_enable_one_to_one_view,
                 x.p_api_name,
                 x.p_sequence_name,
                 x.p_exclude_column_list,
@@ -5140,6 +5221,7 @@ WITH api_names AS (
                            p_return_row_instead_of_pk    VARCHAR2 (5 CHAR)    PATH '@p_return_row_instead_of_pk',
                            p_default_bulk_limit          INTEGER              PATH '@p_default_bulk_limit',
                            p_enable_dml_view             VARCHAR2 (5 CHAR)    PATH '@p_enable_dml_view',
+                           p_enable_one_to_one_view      VARCHAR2 (5 CHAR)    PATH '@p_enable_one_to_one_view',
                            p_api_name                    VARCHAR2 (128 CHAR)  PATH '@p_api_name',
                            p_sequence_name               VARCHAR2 (128 CHAR)  PATH '@p_sequence_name',
                            p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH '@p_exclude_column_list',
@@ -5203,6 +5285,7 @@ SELECT NULL AS errors,
        apis.p_return_row_instead_of_pk,
        apis.p_default_bulk_limit,
        apis.p_enable_dml_view,
+       apis.p_enable_one_to_one_view,
        apis.p_api_name,
        apis.p_sequence_name,
        apis.p_exclude_column_list,
@@ -5309,6 +5392,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_return_row_instead_of_pk    CONSTANT param_type := 'Return row instead of pk (for create methods)';
   c_default_bulk_limit          CONSTANT param_type := 'Default bulk size for set based methods';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
+  c_enable_one_to_one_view      CONSTANT param_type := 'Enable 1:1 view with read only';
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
   c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #TABLE_NAME_26#_SEQ)';
   c_exclude_column_list         CONSTANT param_type := 'Exclude column list (comma separated)';
@@ -5346,26 +5430,27 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   FUNCTION get_params RETURN t_param IS
     v_params t_param;
   BEGIN
-    v_params(c_parameter_descriptions) := 'https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md';
-    v_params(c_enable_insertion_of_rows) := 'true';
-    v_params(c_enable_column_defaults) := 'false';
-    v_params(c_enable_update_of_rows) := 'true';
-    v_params(c_enable_deletion_of_rows) := 'false';
-    v_params(c_enable_parameter_prefixes) := 'true';
+    v_params(c_parameter_descriptions)      := 'https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md';
+    v_params(c_enable_insertion_of_rows)    := 'true';
+    v_params(c_enable_column_defaults)      := 'false';
+    v_params(c_enable_update_of_rows)       := 'true';
+    v_params(c_enable_deletion_of_rows)     := 'false';
+    v_params(c_enable_parameter_prefixes)   := 'true';
     v_params(c_enable_proc_with_out_params) := 'true';
-    v_params(c_enable_getter_and_setter) := 'true';
-    v_params(c_col_prefix_in_method_names) := 'true';
-    v_params(c_return_row_instead_of_pk) := 'false';
-    v_params(c_default_bulk_limit) := '1000';
-    v_params(c_enable_dml_view) := 'false';
-    v_params(c_api_name) := NULL;
-    v_params(c_sequence_name) := NULL;
-    v_params(c_exclude_column_list) := NULL;
-    v_params(c_audit_column_mappings) := NULL;
-    v_params(c_audit_user_expression) := om_tapigen.c_audit_user_expression;
-    v_params(c_row_version_column_mapping) := NULL;
-    v_params(c_enable_custom_defaults) := 'false';
-    v_params(c_custom_default_values) := NULL;
+    v_params(c_enable_getter_and_setter)    := 'true';
+    v_params(c_col_prefix_in_method_names)  := 'true';
+    v_params(c_return_row_instead_of_pk)    := 'false';
+    v_params(c_default_bulk_limit)          := '1000';
+    v_params(c_enable_dml_view)             := 'false';
+    v_params(c_enable_one_to_one_view)      := 'false';
+    v_params(c_api_name)                    := NULL;
+    v_params(c_sequence_name)               := NULL;
+    v_params(c_exclude_column_list)         := NULL;
+    v_params(c_audit_column_mappings)       := NULL;
+    v_params(c_audit_user_expression)       := om_tapigen.c_audit_user_expression;
+    v_params(c_row_version_column_mapping)  := NULL;
+    v_params(c_enable_custom_defaults)      := 'false';
+    v_params(c_custom_default_values)       := NULL;
     RETURN v_params;
   END get_params;
 
@@ -5384,6 +5469,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       c_return_row_instead_of_pk,
       c_default_bulk_limit,
       c_enable_dml_view,
+      c_enable_one_to_one_view,
       c_api_name,
       c_sequence_name,
       c_exclude_column_list,
@@ -5397,17 +5483,18 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   FUNCTION get_lov RETURN t_lov IS
     v_lov t_lov;
   BEGIN
-    v_lov(c_enable_insertion_of_rows) := NEW t_string('true', 'false');
-    v_lov(c_enable_column_defaults) := NEW t_string('true', 'false');
-    v_lov(c_enable_update_of_rows) := NEW t_string('true', 'false');
-    v_lov(c_enable_deletion_of_rows) := NEW t_string('true', 'false');
-    v_lov(c_enable_parameter_prefixes) := NEW t_string('true', 'false');
+    v_lov(c_enable_insertion_of_rows)    := NEW t_string('true', 'false');
+    v_lov(c_enable_column_defaults)      := NEW t_string('true', 'false');
+    v_lov(c_enable_update_of_rows)       := NEW t_string('true', 'false');
+    v_lov(c_enable_deletion_of_rows)     := NEW t_string('true', 'false');
+    v_lov(c_enable_parameter_prefixes)   := NEW t_string('true', 'false');
     v_lov(c_enable_proc_with_out_params) := NEW t_string('true', 'false');
-    v_lov(c_enable_getter_and_setter) := NEW t_string('true', 'false');
-    v_lov(c_col_prefix_in_method_names) := NEW t_string('true', 'false');
-    v_lov(c_return_row_instead_of_pk) := NEW t_string('true', 'false');
-    v_lov(c_enable_dml_view) := NEW t_string('true', 'false');
-    v_lov(c_enable_custom_defaults) := NEW t_string('true', 'false');
+    v_lov(c_enable_getter_and_setter)    := NEW t_string('true', 'false');
+    v_lov(c_col_prefix_in_method_names)  := NEW t_string('true', 'false');
+    v_lov(c_return_row_instead_of_pk)    := NEW t_string('true', 'false');
+    v_lov(c_enable_dml_view)             := NEW t_string('true', 'false');
+    v_lov(c_enable_one_to_one_view)      := NEW t_string('true', 'false');
+    v_lov(c_enable_custom_defaults)      := NEW t_string('true', 'false');
     RETURN v_lov;
   END get_lov;
 
@@ -5431,6 +5518,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       p_return_row_instead_of_pk    => util_string_to_bool(in_params(c_return_row_instead_of_pk)),
       p_default_bulk_limit          => to_number(in_params(c_default_bulk_limit)),
       p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
+      p_enable_one_to_one_view      => util_string_to_bool(in_params(c_enable_one_to_one_view)),
       p_api_name                    => in_params(c_api_name),
       p_sequence_name               => in_params(c_sequence_name),
       p_exclude_column_list         => in_params(c_exclude_column_list),

@@ -12,6 +12,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_return_row_instead_of_pk    CONSTANT param_type := 'Return row instead of pk (for create methods)';
   c_default_bulk_limit          CONSTANT param_type := 'Default bulk size for set based methods';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
+  c_enable_one_to_one_view      CONSTANT param_type := 'Enable 1:1 view with read only';
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
   c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #TABLE_NAME_26#_SEQ)';
   c_exclude_column_list         CONSTANT param_type := 'Exclude column list (comma separated)';
@@ -49,26 +50,27 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   FUNCTION get_params RETURN t_param IS
     v_params t_param;
   BEGIN
-    v_params(c_parameter_descriptions) := 'https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md';
-    v_params(c_enable_insertion_of_rows) := 'true';
-    v_params(c_enable_column_defaults) := 'false';
-    v_params(c_enable_update_of_rows) := 'true';
-    v_params(c_enable_deletion_of_rows) := 'false';
-    v_params(c_enable_parameter_prefixes) := 'true';
+    v_params(c_parameter_descriptions)      := 'https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md';
+    v_params(c_enable_insertion_of_rows)    := 'true';
+    v_params(c_enable_column_defaults)      := 'false';
+    v_params(c_enable_update_of_rows)       := 'true';
+    v_params(c_enable_deletion_of_rows)     := 'false';
+    v_params(c_enable_parameter_prefixes)   := 'true';
     v_params(c_enable_proc_with_out_params) := 'true';
-    v_params(c_enable_getter_and_setter) := 'true';
-    v_params(c_col_prefix_in_method_names) := 'true';
-    v_params(c_return_row_instead_of_pk) := 'false';
-    v_params(c_default_bulk_limit) := '1000';
-    v_params(c_enable_dml_view) := 'false';
-    v_params(c_api_name) := NULL;
-    v_params(c_sequence_name) := NULL;
-    v_params(c_exclude_column_list) := NULL;
-    v_params(c_audit_column_mappings) := NULL;
-    v_params(c_audit_user_expression) := om_tapigen.c_audit_user_expression;
-    v_params(c_row_version_column_mapping) := NULL;
-    v_params(c_enable_custom_defaults) := 'false';
-    v_params(c_custom_default_values) := NULL;
+    v_params(c_enable_getter_and_setter)    := 'true';
+    v_params(c_col_prefix_in_method_names)  := 'true';
+    v_params(c_return_row_instead_of_pk)    := 'false';
+    v_params(c_default_bulk_limit)          := '1000';
+    v_params(c_enable_dml_view)             := 'false';
+    v_params(c_enable_one_to_one_view)      := 'false';
+    v_params(c_api_name)                    := NULL;
+    v_params(c_sequence_name)               := NULL;
+    v_params(c_exclude_column_list)         := NULL;
+    v_params(c_audit_column_mappings)       := NULL;
+    v_params(c_audit_user_expression)       := om_tapigen.c_audit_user_expression;
+    v_params(c_row_version_column_mapping)  := NULL;
+    v_params(c_enable_custom_defaults)      := 'false';
+    v_params(c_custom_default_values)       := NULL;
     RETURN v_params;
   END get_params;
 
@@ -87,6 +89,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       c_return_row_instead_of_pk,
       c_default_bulk_limit,
       c_enable_dml_view,
+      c_enable_one_to_one_view,
       c_api_name,
       c_sequence_name,
       c_exclude_column_list,
@@ -100,17 +103,18 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   FUNCTION get_lov RETURN t_lov IS
     v_lov t_lov;
   BEGIN
-    v_lov(c_enable_insertion_of_rows) := NEW t_string('true', 'false');
-    v_lov(c_enable_column_defaults) := NEW t_string('true', 'false');
-    v_lov(c_enable_update_of_rows) := NEW t_string('true', 'false');
-    v_lov(c_enable_deletion_of_rows) := NEW t_string('true', 'false');
-    v_lov(c_enable_parameter_prefixes) := NEW t_string('true', 'false');
+    v_lov(c_enable_insertion_of_rows)    := NEW t_string('true', 'false');
+    v_lov(c_enable_column_defaults)      := NEW t_string('true', 'false');
+    v_lov(c_enable_update_of_rows)       := NEW t_string('true', 'false');
+    v_lov(c_enable_deletion_of_rows)     := NEW t_string('true', 'false');
+    v_lov(c_enable_parameter_prefixes)   := NEW t_string('true', 'false');
     v_lov(c_enable_proc_with_out_params) := NEW t_string('true', 'false');
-    v_lov(c_enable_getter_and_setter) := NEW t_string('true', 'false');
-    v_lov(c_col_prefix_in_method_names) := NEW t_string('true', 'false');
-    v_lov(c_return_row_instead_of_pk) := NEW t_string('true', 'false');
-    v_lov(c_enable_dml_view) := NEW t_string('true', 'false');
-    v_lov(c_enable_custom_defaults) := NEW t_string('true', 'false');
+    v_lov(c_enable_getter_and_setter)    := NEW t_string('true', 'false');
+    v_lov(c_col_prefix_in_method_names)  := NEW t_string('true', 'false');
+    v_lov(c_return_row_instead_of_pk)    := NEW t_string('true', 'false');
+    v_lov(c_enable_dml_view)             := NEW t_string('true', 'false');
+    v_lov(c_enable_one_to_one_view)      := NEW t_string('true', 'false');
+    v_lov(c_enable_custom_defaults)      := NEW t_string('true', 'false');
     RETURN v_lov;
   END get_lov;
 
@@ -134,6 +138,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       p_return_row_instead_of_pk    => util_string_to_bool(in_params(c_return_row_instead_of_pk)),
       p_default_bulk_limit          => to_number(in_params(c_default_bulk_limit)),
       p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
+      p_enable_one_to_one_view      => util_string_to_bool(in_params(c_enable_one_to_one_view)),
       p_api_name                    => in_params(c_api_name),
       p_sequence_name               => in_params(c_sequence_name),
       p_exclude_column_list         => in_params(c_exclude_column_list),

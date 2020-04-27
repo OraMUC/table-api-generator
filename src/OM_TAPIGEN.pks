@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.18';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.19';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -129,6 +129,7 @@ TYPE t_rec_existing_apis IS RECORD(
   p_return_row_instead_of_pk    VARCHAR2(5 CHAR),
   p_default_bulk_limit          INTEGER,
   p_enable_dml_view             VARCHAR2(5 CHAR),
+  p_enable_one_to_one_view      VARCHAR2(5 CHAR),
   p_api_name                    all_objects.object_name%TYPE,
   p_sequence_name               all_objects.object_name%TYPE,
   p_exclude_column_list         VARCHAR2(4000 CHAR),
@@ -236,6 +237,7 @@ PROCEDURE compile_api
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
@@ -272,6 +274,7 @@ FUNCTION compile_api_and_get_code
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
@@ -312,6 +315,7 @@ FUNCTION get_code
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
+  p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitution like #TABLE_NAME_4_20# (treated as substr(4,20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).

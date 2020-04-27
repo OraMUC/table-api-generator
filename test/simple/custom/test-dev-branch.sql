@@ -60,6 +60,7 @@ begin
     p_enable_deletion_of_rows    => true,
     p_return_row_instead_of_pk   => false,
     p_enable_dml_view            => true,
+    p_enable_one_to_one_view     => true,
     p_enable_custom_defaults     => true);
 end;
 /
@@ -72,6 +73,7 @@ begin
     p_enable_deletion_of_rows    => true,
     p_return_row_instead_of_pk   => false,
     p_enable_dml_view            => true,
+    p_enable_one_to_one_view     => true,
     p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY',
     p_row_version_column_mapping => '#PREFIX#_VERSION_ID=global_version_sequence.nextval',
     p_enable_custom_defaults     => true);
