@@ -9,7 +9,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   c_list_delimiter              CONSTANT VARCHAR2(3 CHAR) := ',' || c_lf;
   c_custom_defaults_present_msg CONSTANT VARCHAR2(30) := 'SEE_END_OF_API_PACKAGE_SPEC';
   c_spec_options_min_line       CONSTANT NUMBER := 5;
-  c_spec_options_max_line       CONSTANT NUMBER := 38;
+  c_spec_options_max_line       CONSTANT NUMBER := 40;
   c_debug_max_runs              CONSTANT NUMBER := 1000;
 
   -----------------------------------------------------------------------------

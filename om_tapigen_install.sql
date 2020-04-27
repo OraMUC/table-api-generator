@@ -549,7 +549,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   c_list_delimiter              CONSTANT VARCHAR2(3 CHAR) := ',' || c_lf;
   c_custom_defaults_present_msg CONSTANT VARCHAR2(30) := 'SEE_END_OF_API_PACKAGE_SPEC';
   c_spec_options_min_line       CONSTANT NUMBER := 5;
-  c_spec_options_max_line       CONSTANT NUMBER := 38;
+  c_spec_options_max_line       CONSTANT NUMBER := 40;
   c_debug_max_runs              CONSTANT NUMBER := 1000;
 
   -----------------------------------------------------------------------------
@@ -5299,14 +5299,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
 
   c_parameter_descriptions      CONSTANT param_type := 'Detailed parameter descriptions can be found here';
   c_enable_insertion_of_rows    CONSTANT param_type := 'Enable insertion of rows';
-  c_enable_column_defaults      CONSTANT param_type := 'Enable column defaults (for inserts)';
+  c_enable_column_defaults      CONSTANT param_type := 'Enable column defaults (for create methods)';
   c_enable_update_of_rows       CONSTANT param_type := 'Enable update of rows';
   c_enable_deletion_of_rows     CONSTANT param_type := 'Enable deletion of rows';
   c_enable_parameter_prefixes   CONSTANT param_type := 'Enable parameter prefixes (p_ + colname)';
   c_enable_proc_with_out_params CONSTANT param_type := 'Enable procedure with out parameters';
   c_enable_getter_and_setter    CONSTANT param_type := 'Enable getter/setter methods';
   c_col_prefix_in_method_names  CONSTANT param_type := 'Keep column prefix in getter/setter method names';
-  c_return_row_instead_of_pk    CONSTANT param_type := 'Return row instead of pk (for create functions)';
+  c_return_row_instead_of_pk    CONSTANT param_type := 'Return row instead of pk (for create methods)';
   c_default_bulk_limit          CONSTANT param_type := 'Default bulk size for set based methods';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
@@ -5347,24 +5347,24 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params t_param;
   BEGIN
     v_params(c_parameter_descriptions) := 'https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md';
-    v_params(c_enable_insertion_of_rows) := 'TRUE';
-    v_params(c_enable_column_defaults) := 'FALSE';
-    v_params(c_enable_update_of_rows) := 'TRUE';
-    v_params(c_enable_deletion_of_rows) := 'FALSE';
-    v_params(c_enable_parameter_prefixes) := 'TRUE';
-    v_params(c_enable_proc_with_out_params) := 'TRUE';
-    v_params(c_enable_getter_and_setter) := 'TRUE';
-    v_params(c_col_prefix_in_method_names) := 'TRUE';
-    v_params(c_return_row_instead_of_pk) := 'FALSE';
+    v_params(c_enable_insertion_of_rows) := 'true';
+    v_params(c_enable_column_defaults) := 'false';
+    v_params(c_enable_update_of_rows) := 'true';
+    v_params(c_enable_deletion_of_rows) := 'false';
+    v_params(c_enable_parameter_prefixes) := 'true';
+    v_params(c_enable_proc_with_out_params) := 'true';
+    v_params(c_enable_getter_and_setter) := 'true';
+    v_params(c_col_prefix_in_method_names) := 'true';
+    v_params(c_return_row_instead_of_pk) := 'false';
     v_params(c_default_bulk_limit) := '1000';
-    v_params(c_enable_dml_view) := 'FALSE';
+    v_params(c_enable_dml_view) := 'false';
     v_params(c_api_name) := NULL;
     v_params(c_sequence_name) := NULL;
     v_params(c_exclude_column_list) := NULL;
     v_params(c_audit_column_mappings) := NULL;
     v_params(c_audit_user_expression) := om_tapigen.c_audit_user_expression;
     v_params(c_row_version_column_mapping) := NULL;
-    v_params(c_enable_custom_defaults) := 'FALSE';
+    v_params(c_enable_custom_defaults) := 'false';
     v_params(c_custom_default_values) := NULL;
     RETURN v_params;
   END get_params;
