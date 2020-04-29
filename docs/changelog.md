@@ -22,13 +22,16 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 ## 0.6.0 (2020-xx-xx)
 
-- added: support for bulk processing
-- added: support for audit columns
-- added: support for a row version column (https://stackoverflow.com/questions/20487657/sql-server-rowversion-equivalent-in-oracle)
-- removed: parameter p_enable_generic_change_log (makes no sense anymore with bulk processing and multi column primary keys)
+- added: support for bulk processing (generated per default as core functionality)
+- added: support for audit columns (parameters p_audit_column_mappings and p_audit_user_expression)
+- added: support for a row version column (parameter p_row_version_column_mapping) (https://stackoverflow.com/questions/20487657/sql-server-rowversion-equivalent-in-oracle)
+- added: support for a 1:1 view with read only (parameter p_enable_one_to_one_view)
+- added: double quoting of names can now be configured (parameter p_double_quote_names, default true)
+- removed: support for a generic change log (parameter p_enable_generic_change_log - makes no sense anymore with bulk processing and multi column primary keys)
 - removed: parameter p_reuse_existing_api_params (usage was was not logic, simply provide always your needed parameters and create scripts or a wrapper)
 - removed: prevent updates if columns do not differ (needed to support all possible column types and for performance reasons)
-- removed: procedure recreate_existing_apis (this was a parmeterless option which reused the existing API parameters, you can still do this with the help of the pipelined function view_existing_apis)
+- removed: procedure recreate_existing_apis (this was a parameterless option which reused the existing API parameters, you can still do this with the help of the pipelined function view_existing_apis)
+- fixed: identity columns are always hidden on create methods (is now handled correct and in the sense of an API)
 
 ## 0.5.1 (2020-04-19)
 

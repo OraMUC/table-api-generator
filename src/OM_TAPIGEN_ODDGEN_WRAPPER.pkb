@@ -10,6 +10,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_enable_getter_and_setter    CONSTANT param_type := 'Enable getter/setter methods';
   c_col_prefix_in_method_names  CONSTANT param_type := 'Keep column prefix in getter/setter method names';
   c_return_row_instead_of_pk    CONSTANT param_type := 'Return row instead of pk (for create methods)';
+  c_double_quote_names          CONSTANT param_type := 'Place column and table names in double quotes';
   c_default_bulk_limit          CONSTANT param_type := 'Default bulk size for set based methods';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
   c_enable_one_to_one_view      CONSTANT param_type := 'Enable 1:1 view with read only';
@@ -60,6 +61,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_enable_getter_and_setter)    := 'true';
     v_params(c_col_prefix_in_method_names)  := 'true';
     v_params(c_return_row_instead_of_pk)    := 'false';
+    v_params(c_double_quote_names)          := 'true';
     v_params(c_default_bulk_limit)          := '1000';
     v_params(c_enable_dml_view)             := 'false';
     v_params(c_enable_one_to_one_view)      := 'false';
@@ -87,6 +89,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       c_enable_getter_and_setter,
       c_col_prefix_in_method_names,
       c_return_row_instead_of_pk,
+      c_double_quote_names,
       c_default_bulk_limit,
       c_enable_dml_view,
       c_enable_one_to_one_view,
@@ -112,6 +115,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_lov(c_enable_getter_and_setter)    := NEW t_string('true', 'false');
     v_lov(c_col_prefix_in_method_names)  := NEW t_string('true', 'false');
     v_lov(c_return_row_instead_of_pk)    := NEW t_string('true', 'false');
+    v_lov(c_double_quote_names)          := NEW t_string('true', 'false');
     v_lov(c_enable_dml_view)             := NEW t_string('true', 'false');
     v_lov(c_enable_one_to_one_view)      := NEW t_string('true', 'false');
     v_lov(c_enable_custom_defaults)      := NEW t_string('true', 'false');
@@ -136,6 +140,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       p_enable_getter_and_setter    => util_string_to_bool(in_params(c_enable_getter_and_setter)),
       p_col_prefix_in_method_names  => util_string_to_bool(in_params(c_col_prefix_in_method_names)),
       p_return_row_instead_of_pk    => util_string_to_bool(in_params(c_return_row_instead_of_pk)),
+      p_double_quote_names          => util_string_to_bool(in_params(c_double_quote_names)),
       p_default_bulk_limit          => to_number(in_params(c_default_bulk_limit)),
       p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
       p_enable_one_to_one_view      => util_string_to_bool(in_params(c_enable_one_to_one_view)),

@@ -74,6 +74,7 @@ begin
     p_return_row_instead_of_pk   => false,
     p_enable_dml_view            => true,
     p_enable_one_to_one_view     => true,
+    p_double_quote_names         => false,
     p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY',
     p_row_version_column_mapping => '#PREFIX#_VERSION_ID=global_version_sequence.nextval',
     p_enable_custom_defaults     => true);
@@ -154,11 +155,11 @@ select * from names;
 
 select app_users_api.get_au_xmltype(1) as au_xmltype_id_1 from dual;
 
+select * from table(om_tapigen.util_view_package_state);
+
 SELECT LISTAGG(OBJECT_NAME, ', ') WITHIN GROUP(ORDER BY OBJECT_NAME) as invalid_objects
   FROM USER_OBJECTS
  WHERE STATUS = 'INVALID';
-
-select * from table(om_tapigen.util_view_package_state);
 
 /*
 select * from table(om_tapigen.util_view_columns_array);

@@ -117,6 +117,7 @@ PROCEDURE compile_api
   p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- If true, getter and setter methods are created for each column.
   p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names.
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
+  p_double_quote_names          IN BOOLEAN  DEFAULT TRUE,  -- If true, column names and table names are placed in double quotes.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
   p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
@@ -163,6 +164,7 @@ FUNCTION compile_api_and_get_code
   p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- If true, getter and setter methods are created for each column.
   p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names.
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
+  p_double_quote_names          IN BOOLEAN  DEFAULT TRUE,  -- If true, column names and table names are placed in double quotes.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
   p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
@@ -211,6 +213,7 @@ FUNCTION get_code
   p_enable_getter_and_setter    IN BOOLEAN  DEFAULT TRUE,  -- If true, getter and setter methods are created for each column.
   p_col_prefix_in_method_names  IN BOOLEAN  DEFAULT TRUE,  -- If true, a found unique column prefix is kept otherwise omitted in the getter and setter method names.
   p_return_row_instead_of_pk    IN BOOLEAN  DEFAULT FALSE, -- If true, the whole row instead of the pk columns is returned on create methods.
+  p_double_quote_names          IN BOOLEAN  DEFAULT TRUE,  -- If true, column names and table names are placed in double quotes.
   p_default_bulk_limit          IN INTEGER  DEFAULT 1000,  -- The bulk size for the set based methods (create_rows, read_rows, update_rows)
   p_enable_dml_view             IN BOOLEAN  DEFAULT FALSE, -- If true, a view with an instead of trigger is generated, which simply calls the API methods - can be useful for low code frontends like APEX.
   p_enable_one_to_one_view      IN BOOLEAN  DEFAULT FALSE, -- If true, a 1:1 view with read only is generated - usefull when you want to separate the tables into an own schema without direct user access.
