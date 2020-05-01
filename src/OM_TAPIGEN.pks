@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.20';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.21';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -23,25 +23,19 @@ boilerplate code for your tables.
 FEATURES
 
 - Generates small wrappers around your tables
-- You only need to specify generation options once per table - parameters are
-  saved in the package spec source and can be reused for regeneration
 - Highly configurable
+- You can enable or disable separately insert, update and delete functionality
 - Standard CRUD methods (column and row type based) and an additional create
   or update method
-- Insert / Update / Delete of rows can be enabled or disabled
-- Optional bulk methods for Reading Rows / Insert / Update / Delete for high
-  performant DML processing
+- Set based methods for high performance DML processing
+- For each unique constraint a read method and a getter to fetch the primary key
 - Functions to check if a row exists (primary key based, returning boolean or
   varchar2)
-- For each unique constraint a getter function to fetch the primary key
+- Support for audit columns
+- Support for a row version column
 - Optional getter and setter for each column
-- Optional generic logging (one log entry for each changed column over all API
-  enabled tables in one generic log table - very handy to create a record
-  history in the user interface)
-- Checks for real changes during UPDATE operation and updates only if required
-- Supports APEX automatic row processing by generation of an optional updatable
-  view with an instead of trigger (which calls simply the API and, if enabled,
-  the generic logging)
+- Optional 1:1 view to support the separation of concerns (also known as ThickDB/SmartDB/PinkDB paradigm)
+- Optional DML view with an instead of trigger to support low code tools like APEX
 
 LICENSE
 
@@ -76,22 +70,8 @@ LINKS
 --------------------------------------------------------------------------------
 -- Public global constants c_*
 --------------------------------------------------------------------------------
-c_ora_max_name_len CONSTANT INTEGER :=
-  $IF dbms_db_version.ver_le_11_1 $THEN
-    30
-  $ELSE
-    $IF dbms_db_version.ver_le_11_2 $THEN
-      30
-    $ELSE
-      $IF dbms_db_version.ver_le_12_1 $THEN
-        30
-      $ELSE
-        ora_max_name_len
-      $END
-    $END
-  $END;
-
-c_audit_user_expression        CONSTANT VARCHAR2(128 CHAR) := q'[coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'))]';
+c_ora_max_name_len      CONSTANT INTEGER            := $IF $$db_version < 121 $THEN 30 $ELSE ora_max_name_len $END;
+c_audit_user_expression CONSTANT VARCHAR2(128 CHAR) := q'[coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'))]';
 
 --------------------------------------------------------------------------------
 -- Subtypes (st_*)
@@ -194,14 +174,14 @@ TYPE t_rec_columns IS RECORD(
 
 TYPE t_tab_debug_columns IS TABLE OF t_rec_columns;
 /* We use t_tab_debug_columns as a private array/collection inside the package body
-indexed by binary_intager. For the pipelined function util_view_columns_array
+indexed by binary_integer. For the pipelined function util_view_columns_array
 we need this additional table type. */
 
 --
 
 TYPE t_rec_package_state IS RECORD(
-  package_status_key    varchar2(30),
-  value                 varchar2(128));
+  package_status_key    VARCHAR2(30),
+  value                 VARCHAR2(128));
 
 TYPE t_tab_package_state IS TABLE OF t_rec_package_state;
 /* For debugging we can view some global package state
@@ -247,7 +227,7 @@ PROCEDURE compile_api
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
   p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
-  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
+  p_custom_default_values       IN XMLTYPE  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 );
 /**
 
@@ -259,6 +239,7 @@ BEGIN
   om_tapigen.compile_api (p_table_name => 'EMP');
 END;
 ```
+
 **/
 
 FUNCTION compile_api_and_get_code
@@ -285,7 +266,7 @@ FUNCTION compile_api_and_get_code
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
   p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
-  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
+  p_custom_default_values       IN XMLTYPE  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 ) RETURN CLOB;
 /**
 
@@ -300,6 +281,7 @@ BEGIN
   --> do something with the API code
 END;
 ```
+
 **/
 
 
@@ -327,7 +309,7 @@ FUNCTION get_code
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
   p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
-  p_custom_default_values       IN xmltype  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
+  p_custom_default_values       IN XMLTYPE  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 ) RETURN CLOB;
 /**
 
@@ -344,6 +326,7 @@ BEGIN
   --> do something with the API code
 END;
 ```
+
 **/
 
 
@@ -362,6 +345,7 @@ Helper function (pipelined) to list all APIs generated by om_tapigen.
 ```sql
 SELECT * FROM TABLE (om_tapigen.view_existing_apis);
 ```
+
 **/
 
 
@@ -378,6 +362,7 @@ Also see the [naming conventions](https://github.com/OraMUC/table-api-generator/
 SELECT * FROM TABLE (om_tapigen.view_naming_conflicts);
 -- No rows expected. After you generated some APIs there will be results ;-)
 ```
+
 **/
 
 
@@ -455,6 +440,7 @@ BEGIN
   om_tapigen.util_set_debug_off;
 END;
 ```
+
 */
 
 
@@ -468,6 +454,7 @@ reasons. You can reset the debugging by calling `om_tapigen.util_set_debug_on`.
 ```sql
 SELECT * FROM TABLE(om_tapigen.util_view_debug_log);
 ```
+
 */
 
 
@@ -482,6 +469,7 @@ generation.
 ```sql
 SELECT * FROM TABLE(om_tapigen.util_view_columns_array);
 ```
+
 */
 
 
@@ -494,6 +482,7 @@ View some informations from the internal package state for debug purposes.
 ```sql
 SELECT * FROM TABLE(om_tapigen.util_view_package_state);
 ```
+
 */
 
 FUNCTION util_get_ddl(
