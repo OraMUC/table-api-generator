@@ -213,8 +213,8 @@ we need this additional table type. */
 --
 
 TYPE t_rec_package_state IS RECORD(
-  package_status_key    VARCHAR2(30),
-  value                 VARCHAR2(128));
+  package_status_key    VARCHAR2(30 CHAR),
+  value                 VARCHAR2(128 CHAR));
 
 TYPE t_tab_package_state IS TABLE OF t_rec_package_state;
 /* For debugging we can view some global package state
@@ -223,13 +223,13 @@ variables with the pipelined function util_view_package_state. */
 --
 
 TYPE t_rec_clob_line_by_line IS RECORD(
-  text VARCHAR2(4000));
+  text VARCHAR2(4000 CHAR));
 
 TYPE t_tab_clob_line_by_line IS TABLE OF t_rec_clob_line_by_line;
 
 --
 
-TYPE t_tab_vc2_4k IS TABLE OF VARCHAR2(4000);
+TYPE t_tab_vc2_4k IS TABLE OF VARCHAR2(4000 CHAR);
 
 
 --------------------------------------------------------------------------------
