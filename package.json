@@ -7,11 +7,12 @@
     "url": "https://github.com/OraMUC/table-api-generator.git"
   },
   "scripts": {
-    "test": "cd test/simple/custom && echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @test-dev-branch.sql && cd ../..",
     "prebuild": "npx ploc --in src/OM_TAPIGEN.pks --out README.md && npx markdown-toc -i --maxdepth 2 docs/parameters.md && npx markdown-toc -i --maxdepth 2 docs/getting-started.md && npx markdown-toc -i --maxdepth 2 docs/changelog.md",
     "build": "node src/build.js",
     "postbuild": "echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @om_tapigen_install.sql",
-    "watch": "chokidar src/* --initial -c \"npm run build && npm run test\""
+    "watch-src": "chokidar src/* --initial -c \"npm run build\"",
+    "test": "cd test && echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @compile_and_run.sql && cd ..",
+    "watch-test": "chokidar test/* --initial -c \"npm run test\""
   },
   "devDependencies": {
     "chokidar-cli": "^2.1.0",
