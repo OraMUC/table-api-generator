@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.21';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.22';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -68,22 +68,36 @@ LINKS
 **/
 
 --------------------------------------------------------------------------------
+-- Public constants (c_*) and subtypes (t_*)
+--------------------------------------------------------------------------------
+c_ora_max_name_len CONSTANT INTEGER := $IF $$db_version < 121 $THEN 30 $ELSE ora_max_name_len $END;
+
+SUBTYPE t_ora_max_name_len IS VARCHAR2(c_ora_max_name_len CHAR); -- 30 or 128 depending on the system
+SUBTYPE t_vc2_1            IS VARCHAR2(1 CHAR);
+SUBTYPE t_vc2_2            IS VARCHAR2(2 CHAR);
+SUBTYPE t_vc2_5            IS VARCHAR2(5 CHAR);
+SUBTYPE t_vc2_10           IS VARCHAR2(10 CHAR);
+SUBTYPE t_vc2_20           IS VARCHAR2(20 CHAR);
+SUBTYPE t_vc2_30           IS VARCHAR2(30 CHAR);
+SUBTYPE t_vc2_64           IS VARCHAR2(64 CHAR);
+SUBTYPE t_vc2_100          IS VARCHAR2(100 CHAR);
+SUBTYPE t_vc2_200          IS VARCHAR2(200 CHAR);
+SUBTYPE t_vc2_500          IS VARCHAR2(500 CHAR);
+SUBTYPE t_vc2_4k           IS VARCHAR2(4000 CHAR);
+SUBTYPE t_vc2_5k           IS VARCHAR2(5000 CHAR);
+SUBTYPE t_vc2_16K          IS VARCHAR2(16000 CHAR);
+SUBTYPE t_vc2_32K          IS VARCHAR2(32767 CHAR);
+
+c_audit_user_expression CONSTANT t_vc2_200 := q'[coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'))]';
+--------------------------------------------------------------------------------
 -- Public global constants c_*
 --------------------------------------------------------------------------------
-c_ora_max_name_len      CONSTANT INTEGER            := $IF $$db_version < 121 $THEN 30 $ELSE ora_max_name_len $END;
-c_audit_user_expression CONSTANT VARCHAR2(128 CHAR) := q'[coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'))]';
-
---------------------------------------------------------------------------------
--- Subtypes (st_*)
---------------------------------------------------------------------------------
-SUBTYPE st_session_module IS VARCHAR2(64 CHAR);
-SUBTYPE st_session_action IS VARCHAR2(64 CHAR);
 
 --------------------------------------------------------------------------------
 -- Public record (t_rec_*) and collection (t_tab_*) types
 --------------------------------------------------------------------------------
 TYPE t_rec_existing_apis IS RECORD(
-  errors                        VARCHAR2(4000 CHAR),
+  errors                        t_vc2_4k,
   owner                         all_users.username%TYPE,
   table_name                    all_objects.object_name%TYPE,
   package_name                  all_objects.object_name%TYPE,
@@ -91,34 +105,34 @@ TYPE t_rec_existing_apis IS RECORD(
   spec_last_ddl_time            all_objects.last_ddl_time%TYPE,
   body_status                   all_objects.status%TYPE,
   body_last_ddl_time            all_objects.last_ddl_time%TYPE,
-  generator                     VARCHAR2(10 CHAR),
-  generator_version             VARCHAR2(10 CHAR),
-  generator_action              VARCHAR2(24 CHAR),
+  generator                     t_vc2_10,
+  generator_version             t_vc2_10,
+  generator_action              t_vc2_30,
   generated_at                  DATE,
   generated_by                  all_users.username%TYPE,
   p_owner                       all_users.username%TYPE,
   p_table_name                  all_objects.object_name%TYPE,
-  p_enable_insertion_of_rows    VARCHAR2(5 CHAR),
-  p_enable_column_defaults      VARCHAR2(5 CHAR),
-  p_enable_update_of_rows       VARCHAR2(5 CHAR),
-  p_enable_deletion_of_rows     VARCHAR2(5 CHAR),
-  p_enable_parameter_prefixes   VARCHAR2(5 CHAR),
-  p_enable_proc_with_out_params VARCHAR2(5 CHAR),
-  p_enable_getter_and_setter    VARCHAR2(5 CHAR),
-  p_col_prefix_in_method_names  VARCHAR2(5 CHAR),
-  p_return_row_instead_of_pk    VARCHAR2(5 CHAR),
-  p_double_quote_names          VARCHAR2(5 CHAR),
+  p_enable_insertion_of_rows    t_vc2_5,
+  p_enable_column_defaults      t_vc2_5,
+  p_enable_update_of_rows       t_vc2_5,
+  p_enable_deletion_of_rows     t_vc2_5,
+  p_enable_parameter_prefixes   t_vc2_5,
+  p_enable_proc_with_out_params t_vc2_5,
+  p_enable_getter_and_setter    t_vc2_5,
+  p_col_prefix_in_method_names  t_vc2_5,
+  p_return_row_instead_of_pk    t_vc2_5,
+  p_double_quote_names          t_vc2_5,
   p_default_bulk_limit          INTEGER,
-  p_enable_dml_view             VARCHAR2(5 CHAR),
-  p_enable_one_to_one_view      VARCHAR2(5 CHAR),
+  p_enable_dml_view             t_vc2_5,
+  p_enable_one_to_one_view      t_vc2_5,
   p_api_name                    all_objects.object_name%TYPE,
   p_sequence_name               all_objects.object_name%TYPE,
-  p_exclude_column_list         VARCHAR2(4000 CHAR),
-  p_audit_column_mappings       VARCHAR2(4000 CHAR),
-  p_audit_user_expression       VARCHAR2(4000 CHAR),
-  p_row_version_column_mapping  VARCHAR2(4000 CHAR),
-  p_enable_custom_defaults      VARCHAR2(5 CHAR),
-  p_custom_default_values       VARCHAR2(30 CHAR));
+  p_exclude_column_list         t_vc2_4k,
+  p_audit_column_mappings       t_vc2_4k,
+  p_audit_user_expression       t_vc2_4k,
+  p_row_version_column_mapping  t_vc2_4k,
+  p_enable_custom_defaults      t_vc2_5,
+  p_custom_default_values       t_vc2_30);
 
 TYPE t_tab_existing_apis IS TABLE OF t_rec_existing_apis;
 
@@ -142,7 +156,7 @@ TYPE t_rec_debug_data IS RECORD(
   step       INTEGER,
   elapsed    NUMBER,
   execution  NUMBER,
-  action     st_session_action,
+  action     t_vc2_64,
   start_time TIMESTAMP(6));
 
 TYPE t_tab_debug_data IS TABLE OF t_rec_debug_data;
@@ -156,18 +170,18 @@ TYPE t_rec_columns IS RECORD(
   data_length            all_tab_cols.data_length%TYPE,
   data_precision         all_tab_cols.data_precision%TYPE,
   data_scale             all_tab_cols.data_scale%TYPE,
-  data_default           VARCHAR2(4000 CHAR),
-  data_custom_default    VARCHAR2(4000 CHAR),
-  custom_default_source  VARCHAR2(15 CHAR),
-  identity_type          VARCHAR2(15 CHAR),
-  default_on_null_yn     VARCHAR2(1 CHAR),
-  is_pk_yn               VARCHAR2(1 CHAR),
-  is_uk_yn               VARCHAR2(1 CHAR),
-  is_fk_yn               VARCHAR2(1 CHAR),
-  is_nullable_yn         VARCHAR2(1 CHAR),
-  is_excluded_yn         VARCHAR2(1 CHAR),
-  audit_type             VARCHAR2(15 CHAR),
-  row_version_expression VARCHAR2(4000 CHAR),
+  data_default           t_vc2_4k,
+  data_custom_default    t_vc2_4k,
+  custom_default_source  t_vc2_20,
+  identity_type          t_vc2_20,
+  default_on_null_yn     t_vc2_1,
+  is_pk_yn               t_vc2_1,
+  is_uk_yn               t_vc2_1,
+  is_fk_yn               t_vc2_1,
+  is_nullable_yn         t_vc2_1,
+  is_excluded_yn         t_vc2_1,
+  audit_type             t_vc2_20,
+  row_version_expression t_vc2_4k,
   r_owner                all_users.username%TYPE,
   r_table_name           all_objects.object_name%TYPE,
   r_column_name          all_tab_cols.column_name%TYPE);
@@ -180,8 +194,8 @@ we need this additional table type. */
 --
 
 TYPE t_rec_package_state IS RECORD(
-  package_status_key    VARCHAR2(30 CHAR),
-  value                 VARCHAR2(128 CHAR));
+  package_status_key    t_vc2_30,
+  value                 t_vc2_200);
 
 TYPE t_tab_package_state IS TABLE OF t_rec_package_state;
 /* For debugging we can view some global package state
@@ -190,13 +204,13 @@ variables with the pipelined function util_view_package_state. */
 --
 
 TYPE t_rec_clob_line_by_line IS RECORD(
-  text VARCHAR2(4000 CHAR));
+  text t_vc2_4k);
 
 TYPE t_tab_clob_line_by_line IS TABLE OF t_rec_clob_line_by_line;
 
 --
 
-TYPE t_tab_vc2_4k IS TABLE OF VARCHAR2(4000 CHAR);
+TYPE t_tab_vc2_4k IS TABLE OF t_vc2_4k;
 
 
 --------------------------------------------------------------------------------
@@ -482,17 +496,6 @@ View some informations from the internal package state for debug purposes.
 ```sql
 SELECT * FROM TABLE(om_tapigen.util_view_package_state);
 ```
-
-*/
-
-FUNCTION util_get_ddl(
-  p_object_type VARCHAR2,
-  p_object_name VARCHAR2,
-  p_owner       VARCHAR2 DEFAULT USER)
-RETURN CLOB;
-/*
-
-Helper for testing to get the DDL of generated objects.
 
 */
 
