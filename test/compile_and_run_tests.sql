@@ -5,6 +5,9 @@ prompt
 prompt Test github.com/OraMUC/table-api-generator
 prompt ============================================================
 
+prompt Create log table
+@create_log_table.sql
+
 prompt Compile package test_om_tapigen (spec)
 @TEST_OM_TAPIGEN.pks
 show errors
