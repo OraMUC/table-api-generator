@@ -3418,7 +3418,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
                   AND g_status.xmltype_column_present THEN '
       {% LIST_PK_NAMES %}
     INTO
-      {% LIST_PK_RETURN_COLUMNS %}
+      {% LIST_PK_RETURN_COLUMNS %};
     /* return clause does not support XMLTYPE column, so we have to do here an extra fetch */
     v_return := read_row (
       {% LIST_PK_MAP_PARAM_EQ_RETURN %} ); '

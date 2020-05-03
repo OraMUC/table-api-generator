@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.22';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.23';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -3958,7 +3958,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
                   AND g_status.xmltype_column_present THEN '
       {% LIST_PK_NAMES %}
     INTO
-      {% LIST_PK_RETURN_COLUMNS %}
+      {% LIST_PK_RETURN_COLUMNS %};
     /* return clause does not support XMLTYPE column, so we have to do here an extra fetch */
     v_return := read_row (
       {% LIST_PK_MAP_PARAM_EQ_RETURN %} ); '
