@@ -1,4 +1,4 @@
-set define off feedback off serveroutput on
+set define on feedback off serveroutput on
 whenever sqlerror exit sql.sqlcode rollback
 
 prompt

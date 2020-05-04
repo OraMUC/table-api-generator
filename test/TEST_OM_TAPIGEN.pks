@@ -8,61 +8,73 @@ CREATE OR REPLACE PACKAGE test_om_tapigen IS
 --%rollback(manual)
 
 --%beforeall
-procedure drop_and_create_test_table_objects;
+procedure util_drop_and_create_test_table_objects;
 
 --%beforeeach
-procedure drop_generated_objects;
+procedure util_drop_generated_objects;
 
 --%test
-procedure all_tables_with_defaults;
+procedure test_all_tables_with_defaults;
 
 --%test
-procedure all_tables_return_row_instead_of_pk;
+procedure test_all_tables_return_row_instead_of_pk_true;
 
 --%test
-procedure all_tables_no_double_quote_of_names;
+procedure test_all_tables_double_quote_names_false;
 
 --%test
-procedure all_tables_set_audit_column_mappings;
+procedure test_all_tables_audit_column_mappings_configured;
+
+--%test
+procedure test_table_users_create_methods_only;
+
+--%test
+procedure test_table_users_update_methods_only;
+
+--%test
+procedure test_table_users_delete_methods_only;
+
+--%test
+procedure test_table_users_create_and_update_methods;
 
 --------------------------------------------------------------------------------
 
-procedure create_test_table_objects;
-procedure drop_test_table_objects;
-function  get_list_of_invalid_generated_objects return varchar2;
-function  get_package_method_name return varchar2;
+subtype t_name is varchar2(128);
 
 --------------------------------------------------------------------------------
 
-cursor all_test_tables is
-  select
-    table_name
-  from
-    user_tables
-  where
-    table_name like 'TAG\_%' escape '\';
+cursor cur_all_test_tables is
+  select table_name
+    from user_tables
+   where table_name like 'TAG\_%' escape '\';
+
+cursor cur_all_test_table_objects is
+  select *
+    from user_objects
+   where object_type in ('TABLE', 'SEQUENCE')
+     and object_name like 'TAG\_%' escape '\';
+
+cursor cur_all_generated_objects is
+  select *
+    from user_objects
+   where object_type in ('VIEW', 'PACKAGE')
+     and object_name like 'TAG\_%' escape '\';
 
 --------------------------------------------------------------------------------
 
-cursor all_test_table_objects is
-  select
-    *
-  from
-    user_objects
-  where
-    object_type in ('TABLE', 'SEQUENCE')
-    and object_name like 'TAG\_%' escape '\';
+procedure util_create_test_table_objects;
 
---------------------------------------------------------------------------------
+procedure util_drop_test_table_objects;
 
-cursor all_generated_objects is
-  select
-    *
-  from
-    user_objects
-  where
-    object_type in ('VIEW', 'PACKAGE')
-    and object_name like 'TAG\_%' escape '\';
+function util_count_generated_objects return integer;
+
+function util_get_list_of_invalid_generated_objects return varchar2;
+
+function util_get_test_name return varchar2;
+function util_get_spec_regex_count (
+  p_code    clob,
+  p_regex   varchar2
+) return integer;
 
 --------------------------------------------------------------------------------
 

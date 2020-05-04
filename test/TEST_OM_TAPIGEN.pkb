@@ -2,37 +2,39 @@ create or replace package body test_om_tapigen is
 
 --------------------------------------------------------------------------------
 
-procedure all_tables_with_defaults is
+procedure test_all_tables_with_defaults is
   ----------
-  function compile_apis return varchar2 is
+  function compile_apis_return_invalid_object_names return varchar2 is
   begin
-    for i in all_test_tables loop
+    for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
         p_table_name     => i.table_name,
-        p_test_name      => get_package_method_name,
+        p_test_name      => util_get_test_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name => i.table_name
         )
       );
     end loop;
     commit;
-    return get_list_of_invalid_generated_objects;
-  end;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_apis_return_invalid_object_names;
   ----------
 begin
-  ut.expect(compile_apis).to_be_null;
-end all_tables_with_defaults;
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_apis_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(3);
+end test_all_tables_with_defaults;
 
 --------------------------------------------------------------------------------
 
-procedure all_tables_return_row_instead_of_pk is
+procedure test_all_tables_return_row_instead_of_pk_true is
   ----------
-  function compile_apis return varchar2 is
+  function compile_apis_return_invalid_object_names return varchar2 is
   begin
-    for i in all_test_tables loop
+    for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
         p_table_name     => i.table_name,
-        p_test_name      => get_package_method_name,
+        p_test_name      => util_get_test_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name               => i.table_name,
           p_return_row_instead_of_pk => true
@@ -40,23 +42,25 @@ procedure all_tables_return_row_instead_of_pk is
       );
     end loop;
     commit;
-    return get_list_of_invalid_generated_objects;
-  end;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_apis_return_invalid_object_names;
   ----------
 begin
-  ut.expect(compile_apis).to_be_null;
-end all_tables_return_row_instead_of_pk;
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_apis_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(3);
+end test_all_tables_return_row_instead_of_pk_true;
 
 --------------------------------------------------------------------------------
 
-procedure all_tables_no_double_quote_of_names is
+procedure test_all_tables_double_quote_names_false is
   ----------
-  function compile_apis return varchar2 is
+  function compile_apis_return_invalid_object_names return varchar2 is
   begin
-    for i in all_test_tables loop
+    for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
         p_table_name     => i.table_name,
-        p_test_name      => get_package_method_name,
+        p_test_name      => util_get_test_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name         => i.table_name,
           p_double_quote_names => false
@@ -64,50 +68,209 @@ procedure all_tables_no_double_quote_of_names is
       );
     end loop;
     commit;
-    return get_list_of_invalid_generated_objects;
-  end;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_apis_return_invalid_object_names;
   ----------
 begin
-  ut.expect(compile_apis).to_be_null;
-end all_tables_no_double_quote_of_names;
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_apis_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(3);
+end test_all_tables_double_quote_names_false;
 
 --------------------------------------------------------------------------------
 
-procedure all_tables_set_audit_column_mappings is
+procedure test_all_tables_audit_column_mappings_configured is
   ----------
-  function compile_apis return varchar2 is
+  function compile_apis_return_invalid_object_names return varchar2 is
   begin
-    for i in all_test_tables loop
+    for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
         p_table_name     => i.table_name,
-        p_test_name      => get_package_method_name,
+        p_test_name      => util_get_test_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name                 => i.table_name,
           p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
-          p_audit_column_mappings      =>
-            'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+          p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
         )
       );
     end loop;
     commit;
-    return get_list_of_invalid_generated_objects;
-  end;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_apis_return_invalid_object_names;
   ----------
 begin
-  ut.expect(compile_apis).to_be_null;
-end all_tables_set_audit_column_mappings;
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_apis_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(3);
+end test_all_tables_audit_column_mappings_configured;
 
 --------------------------------------------------------------------------------
 
-procedure drop_and_create_test_table_objects is
+procedure test_table_users_create_methods_only is
+  l_table_name t_name := 'TAG_USERS';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name                 => l_table_name,
+      p_enable_insertion_of_rows   => true,
+      p_enable_update_of_rows      => false,
+      p_enable_deletion_of_rows    => false,
+      p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+    );
+    test_om_tapigen_log_api.create_row (
+      p_table_name     => l_table_name,
+      p_test_name      => util_get_test_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
 begin
-  drop_test_table_objects;
-  create_test_table_objects;
-end;
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' get_pk_by_unique_cols')).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' create_row')).to_equal(6);
+  ut.expect(util_get_spec_regex_count(l_code,' read_row')).to_equal(4);
+  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
+  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(0);
+end test_table_users_create_methods_only;
 
 --------------------------------------------------------------------------------
 
-procedure create_test_table_objects is
+procedure test_table_users_update_methods_only is
+  l_table_name t_name := 'TAG_USERS';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name                 => l_table_name,
+      p_enable_insertion_of_rows   => false,
+      p_enable_update_of_rows      => true,
+      p_enable_deletion_of_rows    => false,
+      p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+    );
+    test_om_tapigen_log_api.create_row (
+      p_table_name     => l_table_name,
+      p_test_name      => util_get_test_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' get_pk_by_unique_cols')).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' create_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' read_row')).to_equal(4);
+  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(3);
+  ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
+  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(3);
+end test_table_users_update_methods_only;
+
+--------------------------------------------------------------------------------
+
+procedure test_table_users_delete_methods_only is
+  l_table_name t_name := 'TAG_USERS';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name                 => l_table_name,
+      p_enable_insertion_of_rows   => false,
+      p_enable_update_of_rows      => false,
+      p_enable_deletion_of_rows    => true,
+      p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+    );
+    test_om_tapigen_log_api.create_row (
+      p_table_name     => l_table_name,
+      p_test_name      => util_get_test_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' get_pk_by_unique_cols')).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' create_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' read_row')).to_equal(4);
+  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(2);
+  ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
+  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(0);
+end test_table_users_delete_methods_only;
+
+--------------------------------------------------------------------------------
+
+procedure test_table_users_create_and_update_methods is
+  l_table_name t_name := 'TAG_USERS';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name                 => l_table_name,
+      p_enable_insertion_of_rows   => true,
+      p_enable_update_of_rows      => true,
+      p_enable_deletion_of_rows    => false,
+      p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+    );
+    test_om_tapigen_log_api.create_row (
+      p_table_name     => l_table_name,
+      p_test_name      => util_get_test_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' get_pk_by_unique_cols')).to_equal(1);
+  ut.expect(util_get_spec_regex_count(l_code,' create_row')).to_equal(6);
+  ut.expect(util_get_spec_regex_count(l_code,' read_row')).to_equal(4);
+  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(3);
+  ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
+  ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(4);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
+  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(3);
+end test_table_users_create_and_update_methods;
+
+--------------------------------------------------------------------------------
+
+procedure util_drop_and_create_test_table_objects is
+begin
+  util_drop_test_table_objects;
+  util_create_test_table_objects;
+end util_drop_and_create_test_table_objects;
+
+--------------------------------------------------------------------------------
+
+procedure util_create_test_table_objects is
   ----------
   procedure tag_global_version_sequence is
   begin
@@ -123,10 +286,10 @@ procedure create_test_table_objects is
         u_last_name      varchar2(15 char)            ,
         u_email          varchar2(30 char)  not null  ,
         u_version_id     integer            not null  ,
-        u_created        date               not null  , -- This is only for demonstration
-        u_created_by     char(15 char)      not null  , -- purposes. In reality we expect
-        u_updated        timestamp          not null  , -- more unified names and types
-        u_updated_by     varchar2(15 char)  not null  , -- for audit columns.
+        u_created        date               not null  , -- This is only for test
+        u_created_by     char(15 char)      not null  , -- purposes. In reality
+        u_updated        timestamp          not null  , -- we expect more unified
+        u_updated_by     varchar2(15 char)  not null  , -- types for audit columns.
         --
         primary key (u_id),
         unique (u_email)
@@ -184,11 +347,11 @@ begin
   tag_users;
   tag_all_data_types_single_pk;
   tag_all_data_types_multi_pk;
-end create_test_table_objects;
+end util_create_test_table_objects;
 
 --------------------------------------------------------------------------------
 
-procedure drop_test_table_objects is
+procedure util_drop_test_table_objects is
   ----------
   procedure drop_fk_constraints is
   begin
@@ -208,7 +371,7 @@ procedure drop_test_table_objects is
   ----------
   procedure drop_tables_and_sequences is
   begin
-    for i in all_test_table_objects loop
+    for i in cur_all_test_table_objects loop
       execute immediate 'drop ' || i.object_type || ' ' || i.object_name;
     end loop;
   end drop_tables_and_sequences;
@@ -217,43 +380,72 @@ begin
   drop_fk_constraints;
   drop_tables_and_sequences;
   execute immediate 'purge recyclebin';
-end drop_test_table_objects;
+end util_drop_test_table_objects;
 
 --------------------------------------------------------------------------------
 
-procedure drop_generated_objects is
+procedure util_drop_generated_objects is
 begin
-  for i in all_generated_objects loop
+  for i in cur_all_generated_objects loop
     execute immediate 'drop ' || i.object_type || ' ' || i.object_name;
   end loop;
   execute immediate 'purge recyclebin';
-end drop_generated_objects;
+end util_drop_generated_objects;
 
 --------------------------------------------------------------------------------
 
-function get_list_of_invalid_generated_objects return varchar2 is
-  v_return varchar2(4000);
+function  util_count_generated_objects return integer is
+  l_return integer;
+begin
+  select
+    count(*)
+  into
+    l_return
+  from
+    user_objects
+  where
+    object_type in ('PACKAGE', 'VIEW', 'TRIGGER')
+    and object_name like 'TAG\_%' escape '\';
+  return l_return;
+end util_count_generated_objects;
+
+--------------------------------------------------------------------------------
+
+function util_get_list_of_invalid_generated_objects return varchar2 is
+  l_return varchar2(4000);
 begin
   select
     listagg(object_name || to_char(LAST_DDL_TIME,' yyyy-mm-dd hh24:mi:ss'), ', ')
       within group(order by object_name) as invalid_objects
   into
-    v_return
+    l_return
   from
     user_objects
   where
     object_name like 'TAG\_%' escape '\'
     and status = 'INVALID';
-  return v_return;
-end get_list_of_invalid_generated_objects;
+  return l_return;
+end util_get_list_of_invalid_generated_objects;
 
 --------------------------------------------------------------------------------
 
-function get_package_method_name return varchar2 is
+function util_get_test_name return varchar2 is
 begin
   -- https://stackoverflow.com/questions/50536323/currently-executing-procedure-name-within-the-package-in-oracle
   return utl_call_stack.subprogram(2)(2);
-end get_package_method_name;
+end util_get_test_name;
+
+--------------------------------------------------------------------------------
+
+function  util_get_spec_regex_count (
+  p_code    clob,
+  p_regex   varchar2
+) return integer is
+  l_spec clob;
+begin
+  l_spec := regexp_substr(p_code, '(CREATE OR REPLACE PACKAGE.*)CREATE OR REPLACE PACKAGE BODY', 1, 1, 'in', 1);
+  return regexp_count(l_spec, p_regex);
+end;
 
 --------------------------------------------------------------------------------
 
