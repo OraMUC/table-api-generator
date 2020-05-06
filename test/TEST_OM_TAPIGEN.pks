@@ -41,8 +41,6 @@ procedure test_table_users_create_and_update_methods;
 
 subtype t_name is varchar2(128);
 
---------------------------------------------------------------------------------
-
 cursor cur_all_test_tables is
   select table_name
     from user_tables
@@ -72,8 +70,14 @@ function util_get_list_of_invalid_generated_objects return varchar2;
 
 function util_get_test_name return varchar2;
 function util_get_spec_regex_count (
-  p_code    clob,
-  p_regex   varchar2
+  p_code        clob,
+  p_regex_count varchar2
+) return integer;
+
+function util_get_regex_substr_count (
+  p_code         clob,
+  p_regex_substr varchar2,
+  p_regex_count  varchar2
 ) return integer;
 
 --------------------------------------------------------------------------------

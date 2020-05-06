@@ -258,6 +258,8 @@ begin
   ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(4);
   ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
   ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(3);
+  ut.expect(util_get_regex_substr_count(l_code,'create_row \(.*?\)', 'p_u_')).to_equal(3);
+  ut.expect(util_get_regex_substr_count(l_code,'update_row \(.*?\)', 'p_u_')).to_equal(4);
 end test_table_users_create_and_update_methods;
 
 --------------------------------------------------------------------------------
@@ -438,14 +440,28 @@ end util_get_test_name;
 --------------------------------------------------------------------------------
 
 function  util_get_spec_regex_count (
-  p_code    clob,
-  p_regex   varchar2
+  p_code        clob,
+  p_regex_count varchar2
 ) return integer is
   l_spec clob;
 begin
   l_spec := regexp_substr(p_code, '(CREATE OR REPLACE PACKAGE.*)CREATE OR REPLACE PACKAGE BODY', 1, 1, 'in', 1);
-  return regexp_count(l_spec, p_regex);
-end;
+  return regexp_count(l_spec, p_regex_count);
+end util_get_spec_regex_count;
+
+--------------------------------------------------------------------------------
+
+function util_get_regex_substr_count (
+  p_code         clob,
+  p_regex_substr varchar2,
+  p_regex_count  varchar2
+) return integer is
+  l_substr clob;
+begin
+  l_substr := regexp_substr(p_code, p_regex_substr, 1, 1, 'in');
+  --logger.log('l_substr: '|| l_substr);
+  return regexp_count(l_substr, p_regex_count);
+end util_get_regex_substr_count;
 
 --------------------------------------------------------------------------------
 

@@ -134,7 +134,7 @@
 ## p_api_name
 
 - String (all_objects.object_name%TYPE), default: null
-- If not null, the given name is used for the API 
+- If not null, the given name is used for the API
 - You can use substitutions - examples:
   - `#TABLE_NAME_20#` is treated as `substr(table_name,1,20)`
   - `#TABLE_NAME_5_20#` is treated as `substr(table_name,5,20)`
@@ -188,7 +188,7 @@ om_tapigen.compile_api(
 );
 ```
 
-The custom defaults are saved as a comment at the end of the package spec to be reusable by the generator in case of a parameterless recreation with the help of the package procedure `recreate_existing_apis` - here an example from the `EMPLOYEES_API` above:
+The custom defaults are saved as a comment at the end of the package spec to be reusable by the generator - here an example from the `EMPLOYEES_API` above:
 
 ```sql
   -- end of package spec --

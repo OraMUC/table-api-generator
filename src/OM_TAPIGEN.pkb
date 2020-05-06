@@ -115,11 +115,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   --
 
   TYPE t_rec_iterator IS RECORD(
+    column_name_compare   all_tab_cols.column_name%TYPE,
     column_name           all_tab_cols.column_name%TYPE,
     method_name           all_tab_cols.column_name%TYPE,
     parameter_name        all_tab_cols.column_name%TYPE,
-    old_value             t_vc2_500,
-    new_value             t_vc2_500,
     current_uk_constraint all_objects.object_name%TYPE);
 
   --
@@ -1465,6 +1464,43 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     END list_set_col_eq_param_wo_pk;
 
     -----------------------------------------------------------------------------
+    -- Setter methods: update a single column, but take audit and
+    -- row version into account
+    -- {% LIST_I_SET_COL_EQ_PARAM %}
+    -- Example:
+    --   test_number     = p_test_number,
+    --   test_updated_by = <username_expression>,
+    --   ...
+    -----------------------------------------------------------------------------
+    FUNCTION list_i_set_col_eq_param RETURN t_tab_vc2_2k IS
+      v_result t_tab_vc2_2k;
+    BEGIN
+      FOR i IN 1 .. g_columns.count LOOP
+        IF g_columns(i).column_name = g_iterator.column_name_compare
+          OR g_columns(i).audit_type LIKE 'UPDATED%'
+          OR g_columns(i).row_version_expression IS NOT NULL
+        THEN
+          v_result(v_result.count + 1) :=
+            '           ' ||
+            rpad(util_double_quote(g_columns(i).column_name), g_status.rpad_columns + 2) ||
+            ' = ' ||
+            CASE
+              WHEN g_columns(i).audit_type IS NOT NULL THEN
+                get_audit_value(i)
+              WHEN g_columns(i).row_version_expression IS NOT NULL THEN
+                g_columns(i).row_version_expression
+              ELSE
+                util_get_parameter_name(g_columns(i).column_name, NULL)
+            END ||
+            get_column_comment(i) || c_list_delimiter;
+        END IF;
+      END LOOP;
+      trim_list(v_result);
+      RETURN v_result;
+    END list_i_set_col_eq_param;
+
+
+    -----------------------------------------------------------------------------
     -- A column list for updating a row without PK in bulk mode:
     -- {% LIST_SET_COL_EQ_PAR_BULK_WO_PK %}
     -- Example:
@@ -2001,6 +2037,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_insert_bulk_params;
       WHEN 'LIST_SET_COL_EQ_PARAM_WO_PK' THEN
         RETURN list_set_col_eq_param_wo_pk;
+      WHEN 'LIST_I_SET_COL_EQ_PARAM' THEN
+        RETURN list_i_set_col_eq_param;
       WHEN 'LIST_SET_COL_EQ_PAR_BULK_WO_PK' THEN
         RETURN list_set_col_eq_par_bulk_wo_pk;
       WHEN 'LIST_SET_PAR_EQ_ROWTYCOL_WO_PK' THEN
@@ -2282,10 +2320,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(g_iterator.method_name);
         WHEN 'I_PARAMETER_NAME' THEN
           code_append(g_iterator.parameter_name);
-        WHEN 'I_OLD_VALUE' THEN
-          code_append(g_iterator.old_value);
-        WHEN 'I_NEW_VALUE' THEN
-          code_append(g_iterator.new_value);
         WHEN 'COLUMN_DEFAULTS_SERIALIZED' THEN
           code_append(g_params.custom_defaults_serialized);
         ELSE
@@ -3993,8 +4027,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   RETURN {{ TABLE_NAME }}.{{ I_COLUMN_NAME }}%TYPE IS
   BEGIN
     RETURN read_row (
-      {% LIST_PK_MAP_PARAM_EQ_PARAM %}
-    ).{{ I_COLUMN_NAME }};
+      {% LIST_PK_MAP_PARAM_EQ_PARAM %} ).{{ I_COLUMN_NAME }};
   END get_{{ I_METHOD_NAME }};';
           util_template_replace('API BODY');
 
@@ -4013,13 +4046,10 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
         AND g_columns(i).is_pk_yn = 'N'
         AND g_columns(i).audit_type IS NULL
         AND g_columns(i).row_version_expression IS NULL THEN
-          g_iterator.column_name    := util_double_quote(g_columns(i).column_name);
-          g_iterator.method_name    := util_get_method_name(g_columns(i).column_name);
-          g_iterator.parameter_name := util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns);
-          g_iterator.old_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
-                                                              p_attribute_name => 'v_row.' || util_double_quote(g_columns(i).column_name));
-          g_iterator.new_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
-                                                              p_attribute_name => g_iterator.parameter_name);
+          g_iterator.column_name         := util_double_quote(g_columns(i).column_name);
+          g_iterator.column_name_compare := g_columns(i).column_name;
+          g_iterator.method_name         := util_get_method_name(g_columns(i).column_name);
+          g_iterator.parameter_name      := util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns);
 
           g_code_blocks.template := '
   PROCEDURE set_{{ I_METHOD_NAME }} (
@@ -4035,7 +4065,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
     v_row {{ TABLE_NAME }}%ROWTYPE;
   BEGIN
     UPDATE {{ TABLE_NAME }}
-       SET {{ I_COLUMN_NAME }} = {{ I_PARAMETER_NAME }}
+       SET {% LIST_I_SET_COL_EQ_PARAM %}
      WHERE {% LIST_PK_COLUMNS_WHERE_CLAUSE %};' || '
   END set_{{ I_METHOD_NAME }};';
           util_template_replace('API BODY');

@@ -1,3 +1,4 @@
+--https://stackoverflow.com/questions/27543873/sqlplus-conditional-execution-with-variable-from-query
 set define on feedback off serveroutput on
 whenever sqlerror exit sql.sqlcode rollback
 
