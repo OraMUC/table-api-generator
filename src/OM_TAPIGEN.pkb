@@ -3617,9 +3617,12 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   PROCEDURE create_rows (
     {{ TABTYPE_PARAM }} )
   IS
-    v_return t_rows_tab;
   BEGIN
-    v_return := create_rows(p_rows_tab => p_rows_tab);
+    FORALL i IN INDICES OF p_rows_tab
+    INSERT INTO {{ TABLE_NAME }} (
+      {% LIST_INSERT_COLUMNS crud_mode=create %} )
+    VALUES (
+      {% LIST_INSERT_BULK_PARAMS crud_mode=create %} );
   END create_rows;';
       util_template_replace('API BODY');
 
