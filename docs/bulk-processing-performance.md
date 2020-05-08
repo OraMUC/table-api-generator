@@ -1,20 +1,22 @@
-# Bulk Processing
+# Bulk Processing Performance
 
 ## Create the table
 
 ```sql
 create table app_users (
-  au_id             integer            generated always as identity,
-  au_first_name     varchar2(15 char)            ,
-  au_last_name      varchar2(15 char)            ,
-  au_email          varchar2(30 char)  not null  ,
-  au_created_on     date               not null  , -- This is only for demo purposes.
-  au_created_by     char(15 char)      not null  , -- In reality we expect more
-  au_updated_at     timestamp          not null  , -- unified names and types
-  au_updated_by     varchar2(15 char)  not null  , -- for audit columns.
+  au_id          integer            generated always as identity,
+  au_first_name  varchar2(15 char)                         ,
+  au_last_name   varchar2(15 char)                         ,
+  au_email       varchar2(30 char)               not null  ,
+  au_active_yn   varchar2(1 char)   default 'Y'  not null  ,
+  au_created_on  date                            not null  , -- This is only for demo purposes.
+  au_created_by  char(15 char)                   not null  , -- In reality we expect more
+  au_updated_at  timestamp                       not null  , -- unified names and types
+  au_updated_by  varchar2(15 char)               not null  , -- for audit columns.
   --
   primary key (au_id),
-  unique (au_email)
+  unique (au_email),
+  check (au_active_yn in ('Y', 'N'))
 );
 ```
 
@@ -31,9 +33,81 @@ end;
 /
 ```
 
-## Create 10,000 rows
+## Example row by row (slow by slow) processing
+
+### Create 100,000 rows without API (and without a trigger, so we have here a problem with the audit columns, anyway...)
 
 ```sql
+set timing on
+truncate table app_users;
+
+begin
+  for i in 1 .. 100000 loop
+    insert into app_users (
+      au_first_name,
+      au_last_name,
+      au_email /*UK*/,
+      au_active_yn,
+      au_created_on,
+      au_created_by,
+      au_updated_at,
+      au_updated_by )
+    values (
+      initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, 15)))),
+      initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, 15)))),
+      sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12))) || '@' || sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12))) || '.' || sys.dbms_random.string('L', round(sys.dbms_random.value(2, 4))) /*UK*/,
+      'Y',
+      sysdate,
+      coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user')),
+      systimestamp,
+      coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user')) );
+  end loop;
+  commit;
+end;
+/
+```
+
+### Update 100,000 rows without API (and without triggers, again the problem with the audit columns...)
+
+```sql
+set timing on
+update app_users set
+  au_email      = upper(au_email),
+  au_updated_at = systimestamp,
+  au_updated_by = coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'));
+commit;
+```
+
+### Create an audit trigger and try again the two statements above to get our runtime with trigger
+
+```sql
+--drop trigger app_users_audit_trg
+create or replace trigger app_users_audit_trg
+before insert or update on app_users
+for each row
+begin
+  if inserting then
+    :new.au_created_on := sysdate;
+    :new.au_created_by := coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'));
+    :new.au_updated_at := systimestamp;
+    :new.au_updated_by := coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'));
+  end if;
+  if updating then
+    :new.au_created_on := :old.au_created_on;
+    :new.au_created_by := :old.au_created_by;
+    :new.au_updated_at := systimestamp;
+    :new.au_updated_by := coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'));
+  end if;
+end;
+/
+```
+
+### Create 100,000 rows with API
+
+```sql
+set timing on
+truncate table app_users;
+
 begin
   for i in 1 .. 100000 loop
     app_users_api.create_a_row; -- this method exists because of p_enable_custom_defaults => true, also see the docs
@@ -43,23 +117,48 @@ end;
 /
 ```
 
-## Example row by row (slow by slow) processing
+### Update 100,000 Rows with API
 
 ```sql
+set timing on
+
 begin
-  <<slow_by_slow>>
   for i in (select * from app_users) loop
     app_users_api.set_au_email(
       p_au_id    => i.au_id,
       p_au_email => upper(i.au_email)
     );
-  end loop slow_by_slow;
+  end loop;
   commit;
 end;
 /
 ```
 
 ## Example set based processing
+
+### Create 100,000 Rows
+
+```sql
+set timing on
+truncate table app_users;
+
+declare
+  l_rows_tab  app_users_api.t_rows_tab;
+begin
+  l_rows_tab := app_users_api.t_rows_tab();
+  l_rows_tab.extend(1000);
+  for z in 1 .. 100 loop
+    for i in 1 .. 1000 loop
+      l_rows_tab(i) := app_users_api.get_a_row;
+    end loop;
+    app_users_api.create_rows(l_rows_tab);
+    commit;
+  end loop;
+end;
+/
+```
+
+### Update 100,000 Rows
 
 ```sql
 set timing on
@@ -81,7 +180,7 @@ begin
     for i in 1 .. l_rows_tab.count
     loop
       --do your business logic here
-      l_rows_tab(i).au_email := upper(l_rows_tab(i).au_email);
+      l_rows_tab(i).au_email := lower(l_rows_tab(i).au_email);
     end loop inner_data;
 
     app_users_api.update_rows(l_rows_tab);
