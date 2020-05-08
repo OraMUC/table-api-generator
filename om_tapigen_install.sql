@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.26';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.27';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -46,7 +46,7 @@ procedures and functions for usual DML operations on tables. So the generated
 table APIs work as a logical layer between your business logic and the data. And
 by the way this logical layer enables you to easily separate the data schema and
 the UI schema for your applications to improve security by granting only execute
-privs on table APIs to the application schema. In addition to that table APIs
+rights on table APIs to the application schema. In addition to that table APIs
 will speed up your development cycles because developers are able to set the
 focal point to the business logic instead of wasting time by manual creating
 boilerplate code for your tables.
@@ -80,7 +80,7 @@ if you loose any code or data by using this API generator. By using it you
 accept the MIT license. As a best practice test the generator first in your
 development environment and decide after your tests, if you want to use it in
 production. If you miss any feature or find a bug, we are happy to hear from you
-via the GitHub [Issues](https://github.com/OraMUC/table-api-generator/issues)
+via the GitHub [issues](https://github.com/OraMUC/table-api-generator/issues)
 functionality.
 
 DOCS
@@ -4157,9 +4157,12 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   PROCEDURE create_rows (
     {{ TABTYPE_PARAM }} )
   IS
-    v_return t_rows_tab;
   BEGIN
-    v_return := create_rows(p_rows_tab => p_rows_tab);
+    FORALL i IN INDICES OF p_rows_tab
+    INSERT INTO {{ TABLE_NAME }} (
+      {% LIST_INSERT_COLUMNS crud_mode=create %} )
+    VALUES (
+      {% LIST_INSERT_BULK_PARAMS crud_mode=create %} );
   END create_rows;';
       util_template_replace('API BODY');
 
