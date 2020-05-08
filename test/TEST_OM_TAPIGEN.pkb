@@ -118,7 +118,7 @@ procedure test_table_users_create_methods_only is
       p_enable_update_of_rows      => false,
       p_enable_deletion_of_rows    => false,
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
-      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
       p_table_name     => l_table_name,
@@ -139,7 +139,7 @@ begin
   ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(0);
-  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(9);
   ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(0);
 end test_table_users_create_methods_only;
 
@@ -157,7 +157,7 @@ procedure test_table_users_update_methods_only is
       p_enable_update_of_rows      => true,
       p_enable_deletion_of_rows    => false,
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
-      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
       p_table_name     => l_table_name,
@@ -178,8 +178,8 @@ begin
   ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(3);
   ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(0);
-  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
-  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(3);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(9);
+  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(4);
 end test_table_users_update_methods_only;
 
 --------------------------------------------------------------------------------
@@ -196,7 +196,7 @@ procedure test_table_users_delete_methods_only is
       p_enable_update_of_rows      => false,
       p_enable_deletion_of_rows    => true,
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
-      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
       p_table_name     => l_table_name,
@@ -217,7 +217,7 @@ begin
   ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(2);
   ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(0);
-  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(9);
   ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(0);
 end test_table_users_delete_methods_only;
 
@@ -235,7 +235,7 @@ procedure test_table_users_create_and_update_methods is
       p_enable_update_of_rows      => true,
       p_enable_deletion_of_rows    => false,
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
-      p_audit_column_mappings      => 'created=#PREFIX#_CREATED, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED, updated_by=#PREFIX#_UPDATED_BY'
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
       p_table_name     => l_table_name,
@@ -256,10 +256,10 @@ begin
   ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(3);
   ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(4);
-  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(8);
-  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(3);
-  ut.expect(util_get_regex_substr_count(l_code,'create_row \(.*?\)', 'p_u_')).to_equal(3);
-  ut.expect(util_get_regex_substr_count(l_code,'update_row \(.*?\)', 'p_u_')).to_equal(4);
+  ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(9);
+  ut.expect(util_get_spec_regex_count(l_code,' set_u_')).to_equal(4);
+  ut.expect(util_get_regex_substr_count(l_code,'create_row \(.*?\)', 'p_u_')).to_equal(4);
+  ut.expect(util_get_regex_substr_count(l_code,'update_row \(.*?\)', 'p_u_')).to_equal(5);
 end test_table_users_create_and_update_methods;
 
 --------------------------------------------------------------------------------
@@ -281,22 +281,24 @@ procedure util_create_test_table_objects is
   ----------
   procedure tag_users is
   begin
-    execute immediate '
+    execute immediate q'[
       create table tag_users (
-        u_id             integer            generated always as identity,
-        u_first_name     varchar2(15 char)            ,
-        u_last_name      varchar2(15 char)            ,
-        u_email          varchar2(30 char)  not null  ,
-        u_version_id     integer            not null  ,
-        u_created        date               not null  , -- This is only for test
-        u_created_by     char(15 char)      not null  , -- purposes. In reality
-        u_updated        timestamp          not null  , -- we expect more unified
-        u_updated_by     varchar2(15 char)  not null  , -- types for audit columns.
+        u_id          integer            generated always as identity,
+        u_first_name  varchar2(15 char)                         ,
+        u_last_name   varchar2(15 char)                         ,
+        u_email       varchar2(30 char)               not null  ,
+        u_active_yn   varchar2(1 char)   default 'Y'  not null  ,
+        u_version_id  integer                         not null  ,
+        u_created_on  date                            not null  , -- This is only for demo purposes.
+        u_created_by  char(15 char)                   not null  , -- In reality we expect more
+        u_updated_at  timestamp                       not null  , -- unified names and types
+        u_updated_by  varchar2(15 char)               not null  , -- for audit columns.
         --
         primary key (u_id),
-        unique (u_email)
+        unique (u_email),
+        check (u_active_yn in ('Y', 'N'))
       )
-    ';
+    ]';
   end tag_users;
   ----------
   procedure tag_all_data_types_single_pk is
