@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS 
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2';
 /**
 
 Oracle PL/SQL Table API Generator
@@ -188,6 +188,7 @@ TYPE t_rec_columns IS RECORD(
   data_custom_default   VARCHAR2(4000 CHAR),
   custom_default_source VARCHAR2(15 CHAR),
   identity_type         VARCHAR2(15 CHAR),
+  default_on_null_yn    VARCHAR2(1 CHAR),
   is_pk_yn              VARCHAR2(1 CHAR),
   is_uk_yn              VARCHAR2(1 CHAR),
   is_fk_yn              VARCHAR2(1 CHAR),

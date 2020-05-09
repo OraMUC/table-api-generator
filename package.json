@@ -1,10 +1,20 @@
 {
   "name": "om_tapigen",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OraMUC/table-api-generator.git"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npx ploc -i OM_TAPIGEN.pks -o README.md && npx markdown-toc -i --maxdepth 2 docs/parameters.md && npx markdown-toc -i --maxdepth 2 docs/getting-started.md && npx markdown-toc -i --maxdepth 2 docs/changelog.md"
+    "build": "npx ploc --in OM_TAPIGEN.pks --out README.md && npx markdown-toc -i --maxdepth 2 docs/parameters.md && npx markdown-toc -i --maxdepth 2 docs/getting-started.md && npx markdown-toc -i --maxdepth 2 docs/changelog.md",
+    "postbuild": "echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @install.sql && echo tapigen was compiled > test/tapigen_compiled_trigger",
+    "watch-src": "chokidar *.pks *.pkb *.sql --initial -c \"npm run build\"",
+    "test": "cd test && echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @compile_and_run_tests.sql && cd ..",
+    "watch-test": "chokidar test/* --initial -c \"npm run test\""
   },
   "devDependencies": {
+    "chokidar-cli": "^2.1.0",
     "markdown-toc": "^1.2.0",
     "ploc": "^0.6.1"
   }

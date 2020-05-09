@@ -227,6 +227,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                       data_scale,
                       char_length,
                       identity_type,
+                      $IF dbms_db_version.ver_le_11_1 $THEN
+                      'N' AS default_on_null_yn,
+                      $ELSE $IF dbms_db_version.ver_le_11_2 $THEN
+                      'N' AS default_on_null_yn,
+                      $ELSE
+                      CASE WHEN default_on_null = 'YES' THEN 'Y' ELSE 'N' END AS default_on_null_yn,
+                      $END $END
                       CASE
                         WHEN data_default IS NOT NULL THEN
                          (SELECT om_tapigen.util_get_column_data_default(p_owner       => g_params.owner,
@@ -268,6 +275,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
            NULL AS data_custom_default,
            NULL AS custom_default_source,
            identity_type,
+           default_on_null_yn,
            'N' AS is_pk_yn,
            'N' AS is_uk_yn,
            'N' AS is_fk_yn,
@@ -797,6 +805,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_return.data_custom_default   := g_columns(i).data_custom_default;
       v_return.custom_default_source := g_columns(i).custom_default_source;
       v_return.identity_type         := g_columns(i).identity_type;
+      v_return.default_on_null_yn    := g_columns(i).default_on_null_yn;
       v_return.is_pk_yn              := g_columns(i).is_pk_yn;
       v_return.is_uk_yn              := g_columns(i).is_uk_yn;
       v_return.is_fk_yn              := g_columns(i).is_fk_yn;
@@ -905,7 +914,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   -----------------------------------------------------------------------------
 
   FUNCTION util_generate_list(p_list_name VARCHAR2) RETURN t_tab_vc2_5k IS
-  
+
+
     -----------------------------------------------------------------------------
     -- Columns as flat list for insert - without p_column_exclude_list:
     -- {% LIST_INSERT_COLUMNS %}
@@ -920,9 +930,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND
-            NOT (g_template_options.hide_identity_columns AND
-                 nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT')) THEN
+        IF g_columns(i).is_excluded_yn = 'N' 
+        AND NOT (
+          g_template_options.hide_identity_columns 
+          AND (
+            nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
+            OR 
+            nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
+          )            
+        ) 
+        THEN
           v_result(v_result.count + 1) := '      ' || '"' || g_columns(i).column_name || '"' || CASE
                                             WHEN g_columns(i).is_pk_yn = 'Y' THEN
                                              ' /*PK*/'
@@ -955,9 +972,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND
-            NOT (g_template_options.hide_identity_columns AND
-                 nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT')) THEN
+        IF g_columns(i).is_excluded_yn = 'N'
+        AND NOT (
+          g_template_options.hide_identity_columns 
+          AND (
+            nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
+            OR 
+            nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
+          )            
+        ) 
+        THEN
           v_result(v_result.count + 1) := '      ' || CASE
                                             WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_params.sequence_name IS NOT NULL THEN
                                              'COALESCE( ' || util_get_parameter_name(g_columns(i).column_name, NULL) || ', "' || g_params.sequence_name ||
@@ -1095,9 +1119,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND
-            NOT (g_template_options.hide_identity_columns AND
-                 nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT')) THEN
+        IF g_columns(i).is_excluded_yn = 'N'
+        AND NOT (
+          g_template_options.hide_identity_columns 
+          AND (
+            nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
+            OR 
+            nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
+          )            
+        ) 
+        THEN
           v_result(v_result.count + 1) := CASE
                                             WHEN g_template_options.padding IS NOT NULL THEN
                                              rpad(' ', g_template_options.padding)
@@ -1154,9 +1185,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND
-            NOT (g_template_options.hide_identity_columns AND
-                 nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT')) THEN
+        IF g_columns(i).is_excluded_yn = 'N'
+        AND NOT (
+          g_template_options.hide_identity_columns 
+          AND (
+            nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
+            OR 
+            nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
+          )            
+        ) 
+        THEN
           v_result(v_result.count + 1) := '    ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
                                           ' IN "' || g_params.table_name || '".' ||
@@ -1231,7 +1269,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' THEN
+        IF g_columns(i).is_excluded_yn = 'N'
+        AND NOT (
+          g_template_options.hide_identity_columns 
+          AND (
+            nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
+            OR 
+            nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
+          )            
+        ) 
+        THEN
           v_result(v_result.count + 1) := '      ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
                                           ' => :new."' || g_columns(i).column_name || '"' || CASE
@@ -1266,9 +1313,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND
-            NOT (g_template_options.hide_identity_columns AND
-                 nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT')) THEN
+        IF g_columns(i).is_excluded_yn = 'N'
+        AND NOT (
+          g_template_options.hide_identity_columns 
+          AND (
+            nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
+            OR 
+            nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
+          )            
+        ) 
+        THEN
           v_result(v_result.count + 1) := CASE
                                             WHEN g_template_options.padding IS NOT NULL THEN
                                              rpad(' ', g_template_options.padding)
@@ -1308,9 +1362,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N' AND
-            NOT (g_template_options.hide_identity_columns AND
-                 nvl(g_columns(i).identity_type, 'NULL') IN ('ALWAYS', 'BY DEFAULT')) THEN
+        IF g_columns(i).is_excluded_yn = 'N'
+        AND NOT (
+          g_template_options.hide_identity_columns 
+          AND (
+            nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
+            OR 
+            nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
+          )            
+        ) 
+        THEN
           v_result(v_result.count + 1) := '      ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
                                           ' => p_row."' || g_columns(i).column_name || '"' || CASE
@@ -3724,7 +3785,7 @@ BEGIN
                                   WHEN g_params.enable_insertion_of_rows THEN
                                    '
     "{{ API_NAME }}".create_row (
-      {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %} );'
+      {% LIST_MAP_PAR_EQ_NEWCOL_W_PK hide_identity_columns=true %} );'
                                   ELSE
                                    '
     raise_application_error (' || c_generator_error_number ||

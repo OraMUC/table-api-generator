@@ -9,6 +9,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
+- [0.5.2 (2020-05-09)](#052-2020-05-09)
 - [0.5.1 (2020-04-19)](#051-2020-04-19)
 - [0.5.0 (2018-12-23)](#050-2018-12-23)
 - [0.4.1 (2017-05-27)](#041-2017-05-27)
@@ -19,10 +20,13 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- tocstop -->
 
+## 0.5.2 (2020-05-09)
+
+Fixes #30: Primary key missing from create_row when identity column is used as PK - thanks to PaoloM (github.com/softinn72) to report this issue.
+
 ## 0.5.1 (2020-04-19)
 
 Fixes #29: Primary key not returned on create_row when XMLTYPE column is present - thanks to PaoloM (github.com/softinn72) to report this issue.
-
 
 ## 0.5.0 (2018-12-23)
 
@@ -32,21 +36,21 @@ ATTENTION: When installed in a central tools schema you need from version 0.5 on
 
 New support for multi column primary keys:
 
-  - NOT generated: get_pk_by_unique_cols functions - use instead read_row functions, which are also overloaded with unique constraint params and returning the whole row
-  - NOT supported: use of generic change log (p_enable_generic_change_log)
+- NOT generated: get_pk_by_unique_cols functions - use instead read_row functions, which are also overloaded with unique constraint params and returning the whole row
+- NOT supported: use of generic change log (p_enable_generic_change_log)
 
 New parameters:
 
-  - `p_owner ALL_USERS.USERNAME%TYPE DEFAULT USER`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_owner)
-  - `p_enable_column_defaults BOOLEAN DEFAULT FALSE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_column_defaults)
-  - `p_enable_parameter_prefixes BOOLEAN DEFAULT TRUE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_parameter_prefixes)
-  - `p_enable_proc_with_out_params BOOLEAN DEFAULT TRUE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_proc_with_out_params)
-  - `p_enable_getter_and_setter BOOLEAN DEFAULT TRUE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_getter_and_setter)
-  - `p_return_row_instead_of_pk BOOLEAN DEFAULT FALSE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_return_row_instead_of_pk)
-  - `p_api_name VARCHAR2 DEFAULT NULL`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_api_name)
-  - `p_exclude_column_list VARCHAR2 DEFAULT NULL`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_exclude_column_list)
-  - `p_enable_custom_defaults BOOLEAN DEFAULT FALSE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_custom_defaults)
-  - `p_custom_default_values XMLTYPE DEFAULT NULL`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_custom_default_values)
+- `p_owner ALL_USERS.USERNAME%TYPE DEFAULT USER`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_owner)
+- `p_enable_column_defaults BOOLEAN DEFAULT FALSE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_column_defaults)
+- `p_enable_parameter_prefixes BOOLEAN DEFAULT TRUE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_parameter_prefixes)
+- `p_enable_proc_with_out_params BOOLEAN DEFAULT TRUE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_proc_with_out_params)
+- `p_enable_getter_and_setter BOOLEAN DEFAULT TRUE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_getter_and_setter)
+- `p_return_row_instead_of_pk BOOLEAN DEFAULT FALSE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_return_row_instead_of_pk)
+- `p_api_name VARCHAR2 DEFAULT NULL`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_api_name)
+- `p_exclude_column_list VARCHAR2 DEFAULT NULL`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_exclude_column_list)
+- `p_enable_custom_defaults BOOLEAN DEFAULT FALSE`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_enable_custom_defaults)
+- `p_custom_default_values XMLTYPE DEFAULT NULL`: [docs](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md#p_custom_default_values)
 
 Other things, mostly internals, the visible one is better formatted API code:
 
@@ -67,11 +71,9 @@ Other things, mostly internals, the visible one is better formatted API code:
   - In the second step we want to use also utPLSQL for tests
 - Many rework in the background, mainly for the multi column primary keys - Thank you Peter ;-)
 
-
 ## 0.4.1 (2017-05-27)
 
 - Fixes #5: Parameter with PK is not used to insert - thanks to Jacek Gębal to report this issue
-
 
 ## 0.4.0 (2017-03-30)
 
@@ -95,19 +97,16 @@ Other stuff:
 - renaming internal variables more consistently
 - supporting special column names, by using quotes around column names and validating / converting parameter names
 
-
 ## 0.3.0 (2016-07-03)
 
 - First public release
 - André: Complete redesign with global package collections and initialisation phase to avoid many dictionary queries
 - Ottmar: Integration of all dependencies as package utilities, template engine to avoid many replace statements, integration in SQL-Developer, save parameters in source code for easy recreation
 
-
 ## 0.2.0 (not published)
 
 - André: Read row procedure for APEX with out parameters for the page items, rowtype based methods
 - Ottmar: Generic change log, get pk by unique columns function, idea for rowtype based methods
-
 
 ## 0.1.0 (not published)
 
