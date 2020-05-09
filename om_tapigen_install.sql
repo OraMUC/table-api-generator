@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.1.27';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.27';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -3782,7 +3782,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
 
       g_code_blocks.template := '
   FUNCTION bulk_is_complete
-  RETURN BOOLEAN IS
+  RETURN BOOLEAN
+  IS
   BEGIN
     RETURN g_bulk_completed;
   END bulk_is_complete;';
@@ -3804,7 +3805,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
 
       g_code_blocks.template := '
   FUNCTION get_bulk_limit
-  RETURN PLS_INTEGER IS
+  RETURN PLS_INTEGER
+  IS
   BEGIN
     RETURN g_bulk_limit;
   END get_bulk_limit;';
@@ -3846,7 +3848,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   FUNCTION util_xml_compare (
     p_doc1 XMLTYPE,
     p_doc2 XMLTYPE )
-  RETURN NUMBER IS
+  RETURN NUMBER
+  IS
     v_return NUMBER;
   BEGIN
     SELECT CASE
@@ -3950,7 +3953,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
           g_code_blocks.template := '
   FUNCTION get_pk_by_unique_cols (
     {% LIST_UK_PARAMS %} )
-  RETURN {{ RETURN_TYPE }} IS
+  RETURN {{ RETURN_TYPE }}
+  IS
     v_return {{ RETURN_TYPE }};
   BEGIN
     v_return := read_row ( {% LIST_UK_MAP_PARAM_EQ_PARAM %} ){{ RETURN_TYPE_READ_ROW }};
@@ -3978,7 +3982,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       g_code_blocks.template := '
   FUNCTION create_row (
     {% LIST_PARAMS_W_PK use_column_defaults=true crud_mode=create %} )
-  RETURN {{ RETURN_TYPE }} IS
+  RETURN {{ RETURN_TYPE }}
+  IS
     v_return {{ RETURN_TYPE }}; ' || CASE WHEN g_status.xmltype_column_present
                                           AND g_params.return_row_instead_of_pk THEN '
     /*this is required to handle column of datatype XMLTYPE for single row processing*/
@@ -4026,10 +4031,11 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   PROCEDURE create_row (
     {% LIST_PARAMS_W_PK use_column_defaults=true crud_mode=create %} )
   IS
-    v_return {{ RETURN_TYPE }};
   BEGIN
-    v_return := create_row (
-      {% LIST_MAP_PAR_EQ_PARAM_W_PK crud_mode=create %} );
+    INSERT INTO {{ TABLE_NAME }} (
+      {% LIST_INSERT_COLUMNS crud_mode=create %} )
+    VALUES (
+      {% LIST_INSERT_PARAMS crud_mode=create %} );
   END create_row;';
       util_template_replace('API BODY');
 
@@ -4051,12 +4057,11 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       g_code_blocks.template := '
   FUNCTION create_row (
     {{ ROWTYPE_PARAM }} )
-  RETURN {{ RETURN_TYPE }} IS
-    v_return {{ RETURN_TYPE }};
+  RETURN {{ RETURN_TYPE }}
+  IS
   BEGIN
-    v_return := create_row (
+    RETURN create_row (
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK crud_mode=create %} );
-    RETURN v_return;
   END create_row;';
       util_template_replace('API BODY');
 
@@ -4078,9 +4083,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   PROCEDURE create_row (
     {{ ROWTYPE_PARAM }} )
   IS
-    v_return {{ RETURN_TYPE }};
   BEGIN
-    v_return := create_row (
+    create_row (
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK crud_mode=create %} );
   END create_row;';
       util_template_replace('API BODY');
@@ -4102,7 +4106,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       g_code_blocks.template := '
   FUNCTION create_rows (
     {{ TABTYPE_PARAM }} )
-  RETURN t_rows_tab IS
+  RETURN t_rows_tab
+  IS
     v_return t_rows_tab;' || CASE WHEN g_status.xmltype_column_present THEN '
 
     /*This is required to handle column of datatype XMLTYPE for bulk processing*/
@@ -4184,7 +4189,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       g_code_blocks.template := '
   FUNCTION read_row (
     {% LIST_PK_PARAMS %} )
-  RETURN {{ TABLE_NAME }}%ROWTYPE IS
+  RETURN {{ TABLE_NAME }}%ROWTYPE
+  IS
     v_row {{ TABLE_NAME }}%ROWTYPE;
     CURSOR cur_row IS
       SELECT *
@@ -4236,9 +4242,9 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
 
     -----------------------------------------------------------------------------
 
-    PROCEDURE gen_read_row_prc IS
+    PROCEDURE gen_read_row_prc_w_out_params IS
     BEGIN
-      util_debug_start_one_step(p_action => 'gen_read_row_prc');
+      util_debug_start_one_step(p_action => 'gen_read_row_prc_w_out_params');
 
       g_code_blocks.template := '
   PROCEDURE read_row (
@@ -4258,7 +4264,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       util_template_replace('API BODY');
 
       util_debug_stop_one_step;
-    END gen_read_row_prc;
+    END gen_read_row_prc_w_out_params;
 
     -----------------------------------------------------------------------------
 
@@ -4278,7 +4284,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
           g_code_blocks.template := '
   FUNCTION read_row (
     {% LIST_UK_PARAMS %} )
-  RETURN {{ TABLE_NAME }}%ROWTYPE IS
+  RETURN {{ TABLE_NAME }}%ROWTYPE
+  IS
     v_row {{ TABLE_NAME }}%ROWTYPE;
     CURSOR cur_row IS
       SELECT *
@@ -4399,7 +4406,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       g_code_blocks.template := '
   FUNCTION create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
-  RETURN {{ RETURN_TYPE }} IS
+  RETURN {{ RETURN_TYPE }}
+  IS
     v_return {{ RETURN_TYPE }};
   BEGIN
     IF row_exists(
@@ -4437,10 +4445,17 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   PROCEDURE create_or_update_row (
     {% LIST_PARAMS_W_PK %} )
   IS
-    v_return {{ RETURN_TYPE }};
   BEGIN
-    v_return := create_or_update_row(
-      {% LIST_MAP_PAR_EQ_PARAM_W_PK %} );
+    IF row_exists(
+      {% LIST_PK_MAP_PARAM_EQ_PARAM %}
+    )
+    THEN
+      update_row(
+        {% LIST_MAP_PAR_EQ_PARAM_W_PK padding=8 %} );
+    ELSE
+      create_row (
+        {% LIST_MAP_PAR_EQ_PARAM_W_PK crud_mode=create padding=8 %} );
+    END IF;
   END create_or_update_row;';
       util_template_replace('API BODY');
 
@@ -4462,12 +4477,11 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       g_code_blocks.template := '
   FUNCTION create_or_update_row (
     {{ ROWTYPE_PARAM }} )
-  RETURN {{ RETURN_TYPE }} IS
-    v_return {{ RETURN_TYPE }};
+  RETURN {{ RETURN_TYPE }}
+  IS
   BEGIN
-    v_return := create_or_update_row(
+    RETURN create_or_update_row(
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
-    RETURN v_return;
   END create_or_update_row;';
       util_template_replace('API BODY');
 
@@ -4491,7 +4505,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   IS
     v_return {{ RETURN_TYPE }};
   BEGIN
-    v_return := create_or_update_row(
+    create_or_update_row(
       {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %} );
   END create_or_update_row;';
       util_template_replace('API BODY');
@@ -4567,7 +4581,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
           g_code_blocks.template := '
   FUNCTION get_{{ I_METHOD_NAME }}(
     {% LIST_PK_PARAMS %} )
-  RETURN {{ TABLE_NAME }}.{{ I_COLUMN_NAME }}%TYPE IS
+  RETURN {{ TABLE_NAME }}.{{ I_COLUMN_NAME }}%TYPE
+  IS
   BEGIN
     RETURN read_row (
       {% LIST_PK_MAP_PARAM_EQ_PARAM %} ).{{ I_COLUMN_NAME }};
@@ -4635,7 +4650,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
 
       g_code_blocks.template := '
   FUNCTION get_a_row
-  RETURN {{ TABLE_NAME }}%ROWTYPE IS
+  RETURN {{ TABLE_NAME }}%ROWTYPE
+  IS
     v_row {{ TABLE_NAME }}%ROWTYPE;
   BEGIN
     {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
@@ -4665,7 +4681,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       g_code_blocks.template := '
   FUNCTION create_a_row (
     {% LIST_PARAMS_W_PK_CUST_DEFAULTS crud_mode=create %} )
-  RETURN {{ RETURN_TYPE }} IS
+  RETURN {{ RETURN_TYPE }}
+  IS
     v_return {{ RETURN_TYPE }};
   BEGIN
     v_return := create_row (
@@ -4724,7 +4741,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
 
       g_code_blocks.template := '
   FUNCTION read_a_row
-  RETURN {{ TABLE_NAME }}%ROWTYPE IS
+  RETURN {{ TABLE_NAME }}%ROWTYPE
+  IS
     v_row  {{ TABLE_NAME }}%ROWTYPE;
     CURSOR cur_row IS SELECT * FROM {{ TABLE_NAME }};
   BEGIN
@@ -4923,7 +4941,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     gen_read_row_fnc;
     gen_read_row_by_uk_fnc;
     IF g_params.enable_proc_with_out_params THEN
-      gen_read_row_prc;
+      gen_read_row_prc_w_out_params;
     END IF;
     gen_read_rows_bulk_fnc;
 

@@ -17,6 +17,9 @@ procedure util_drop_generated_objects;
 procedure test_all_tables_with_defaults;
 
 --%test
+procedure test_all_tables_enable_dml_and_1_to_1_view;
+
+--%test
 procedure test_all_tables_return_row_instead_of_pk_true;
 
 --%test

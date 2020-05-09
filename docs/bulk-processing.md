@@ -25,8 +25,8 @@ create table app_users (
 ```sql
 begin
   om_tapigen.compile_api(
-    p_table_name             => 'APP_USERS',
-    p_audit_column_mappings  => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
+    p_table_name            => 'APP_USERS',
+    p_audit_column_mappings => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
   );
 end;
 /
@@ -37,24 +37,23 @@ end;
 ```sql
 declare
   l_rows_tab     app_users_api.t_rows_tab;
-  -- we insert here 100 times 1000 rows = 100,000 rows
   l_number_bulks integer := 100;
   l_bulk_size    integer := 1000;
 begin
   l_rows_tab := app_users_api.t_rows_tab();
-  l_rows_tab.extend(1000);
+  l_rows_tab.extend(l_bulk_size);
 
   <<number_bulks>>
   for z in 1 .. l_number_bulks loop
 
     <<bulk_size>>
     for i in 1 .. l_bulk_size loop
-      l_rows_tab(i).au_active_yn  := 'Y';
       l_rows_tab(i).au_first_name := initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, 15))));
       l_rows_tab(i).au_last_name  := initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, 15))));
-      l_rows_tab(i).au_email      := sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12))) ||
-        '@' || sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12))) ||
-        '.' || sys.dbms_random.string('L', round(sys.dbms_random.value(2, 4))) /*UK*/;
+      l_rows_tab(i).au_email      := sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12)))
+        || '@' || sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12)))
+        || '.' || sys.dbms_random.string('L', round(sys.dbms_random.value(2, 4)));
+      l_rows_tab(i).au_active_yn  := 'Y';
     end loop bulk_size;
 
     app_users_api.create_rows(l_rows_tab);
@@ -72,10 +71,9 @@ declare
   l_rows_tab   app_users_api.t_rows_tab;
   l_ref_cursor app_users_api.t_strong_ref_cursor;
 begin
-  open l_ref_cursor for select * from app_users;
-
   -- optionally set bulk limit, default is 1000
   -- app_users_api.set_bulk_limit(500);
+  open l_ref_cursor for select * from app_users;
 
   <<outer_bulk>>
   loop
@@ -87,6 +85,7 @@ begin
       --do your business logic here
       l_rows_tab(i).au_email := upper(l_rows_tab(i).au_email);
     end loop inner_data;
+
     app_users_api.update_rows(l_rows_tab);
     commit;
 

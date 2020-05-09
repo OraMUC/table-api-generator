@@ -10,6 +10,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 <!-- toc -->
 
 - [0.6.0 (2020-xx-xx)](#060-2020-xx-xx)
+- [0.5.2 (2020-05-09)](#052-2020-05-09)
 - [0.5.1 (2020-04-19)](#051-2020-04-19)
 - [0.5.0 (2018-12-23)](#050-2018-12-23)
 - [0.4.1 (2017-05-27)](#041-2017-05-27)
@@ -33,6 +34,10 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - removed: prevent updates if columns do not differ (needed to support all possible column types and for performance reasons)
 - removed: procedure recreate_existing_apis (this was a parameterless option which reused the existing API parameters, you can still do this with the help of the pipelined function view_existing_apis)
 - fixed: identity columns are always hidden on create methods (is now handled correct and in the sense of an API)
+
+## 0.5.2 (2020-05-09)
+
+Fixes #30: Primary key missing from create_row when identity column is used as PK - thanks to PaoloM (github.com/softinn72) to report this issue.
 
 ## 0.5.1 (2020-04-19)
 

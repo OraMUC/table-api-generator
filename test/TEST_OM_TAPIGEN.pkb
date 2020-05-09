@@ -27,6 +27,34 @@ end test_all_tables_with_defaults;
 
 --------------------------------------------------------------------------------
 
+procedure test_all_tables_enable_dml_and_1_to_1_view is
+  ----------
+  function compile_apis_return_invalid_object_names return varchar2 is
+  begin
+    for i in cur_all_test_tables loop
+      test_om_tapigen_log_api.create_row (
+        p_table_name     => i.table_name,
+        p_test_name      => util_get_test_name,
+        p_generated_code => om_tapigen.compile_api_and_get_code(
+          p_table_name               => i.table_name,
+          p_return_row_instead_of_pk => true,
+          p_enable_dml_view          => true,
+          p_enable_one_to_one_view   => true
+        )
+      );
+    end loop;
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_apis_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_apis_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(12);
+end test_all_tables_enable_dml_and_1_to_1_view;
+
+--------------------------------------------------------------------------------
+
 procedure test_all_tables_return_row_instead_of_pk_true is
   ----------
   function compile_apis_return_invalid_object_names return varchar2 is
@@ -234,6 +262,8 @@ procedure test_table_users_create_and_update_methods is
       p_enable_insertion_of_rows   => true,
       p_enable_update_of_rows      => true,
       p_enable_deletion_of_rows    => false,
+      p_enable_dml_view          => true,
+      p_enable_one_to_one_view   => true,
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -249,7 +279,7 @@ procedure test_table_users_create_and_update_methods is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_api_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(1);
+  ut.expect(util_count_generated_objects).to_equal(4);
   ut.expect(util_get_spec_regex_count(l_code,' get_pk_by_unique_cols')).to_equal(1);
   ut.expect(util_get_spec_regex_count(l_code,' create_row')).to_equal(6);
   ut.expect(util_get_spec_regex_count(l_code,' read_row')).to_equal(4);
