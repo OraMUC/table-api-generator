@@ -8,8 +8,8 @@ procedure test_all_tables_with_defaults is
   begin
     for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
-        p_table_name     => i.table_name,
         p_test_name      => util_get_test_name,
+        p_table_name     => i.table_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name => i.table_name
         )
@@ -22,7 +22,7 @@ procedure test_all_tables_with_defaults is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(3);
+  ut.expect(util_count_generated_objects).to_equal(7);
 end test_all_tables_with_defaults;
 
 --------------------------------------------------------------------------------
@@ -33,8 +33,8 @@ procedure test_all_tables_enable_dml_and_1_to_1_view is
   begin
     for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
-        p_table_name     => i.table_name,
         p_test_name      => util_get_test_name,
+        p_table_name     => i.table_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name               => i.table_name,
           p_return_row_instead_of_pk => true,
@@ -50,7 +50,7 @@ procedure test_all_tables_enable_dml_and_1_to_1_view is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(12);
+  ut.expect(util_count_generated_objects).to_equal(28);
 end test_all_tables_enable_dml_and_1_to_1_view;
 
 --------------------------------------------------------------------------------
@@ -61,8 +61,8 @@ procedure test_all_tables_return_row_instead_of_pk_true is
   begin
     for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
-        p_table_name     => i.table_name,
         p_test_name      => util_get_test_name,
+        p_table_name     => i.table_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name               => i.table_name,
           p_return_row_instead_of_pk => true
@@ -76,7 +76,7 @@ procedure test_all_tables_return_row_instead_of_pk_true is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(3);
+  ut.expect(util_count_generated_objects).to_equal(7);
 end test_all_tables_return_row_instead_of_pk_true;
 
 --------------------------------------------------------------------------------
@@ -87,8 +87,8 @@ procedure test_all_tables_double_quote_names_false is
   begin
     for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
-        p_table_name     => i.table_name,
         p_test_name      => util_get_test_name,
+        p_table_name     => i.table_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name         => i.table_name,
           p_double_quote_names => false
@@ -102,7 +102,7 @@ procedure test_all_tables_double_quote_names_false is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(3);
+  ut.expect(util_count_generated_objects).to_equal(7);
 end test_all_tables_double_quote_names_false;
 
 --------------------------------------------------------------------------------
@@ -113,8 +113,8 @@ procedure test_all_tables_audit_column_mappings_configured is
   begin
     for i in cur_all_test_tables loop
       test_om_tapigen_log_api.create_row (
-        p_table_name     => i.table_name,
         p_test_name      => util_get_test_name,
+        p_table_name     => i.table_name,
         p_generated_code => om_tapigen.compile_api_and_get_code(
           p_table_name                 => i.table_name,
           p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
@@ -129,7 +129,7 @@ procedure test_all_tables_audit_column_mappings_configured is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(3);
+  ut.expect(util_count_generated_objects).to_equal(7);
 end test_all_tables_audit_column_mappings_configured;
 
 --------------------------------------------------------------------------------
@@ -149,8 +149,8 @@ procedure test_table_users_create_methods_only is
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
-      p_table_name     => l_table_name,
       p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
       p_generated_code => l_code
     );
     commit;
@@ -188,8 +188,8 @@ procedure test_table_users_update_methods_only is
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
-      p_table_name     => l_table_name,
       p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
       p_generated_code => l_code
     );
     commit;
@@ -203,7 +203,7 @@ begin
   ut.expect(util_get_spec_regex_count(l_code,' get_pk_by_unique_cols')).to_equal(1);
   ut.expect(util_get_spec_regex_count(l_code,' create_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' read_row')).to_equal(4);
-  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(3);
+  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(5);
   ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(9);
@@ -227,8 +227,8 @@ procedure test_table_users_delete_methods_only is
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
-      p_table_name     => l_table_name,
       p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
       p_generated_code => l_code
     );
     commit;
@@ -262,14 +262,16 @@ procedure test_table_users_create_and_update_methods is
       p_enable_insertion_of_rows   => true,
       p_enable_update_of_rows      => true,
       p_enable_deletion_of_rows    => false,
-      p_enable_dml_view          => true,
-      p_enable_one_to_one_view   => true,
+      p_enable_dml_view            => true,
+      p_enable_one_to_one_view     => true,
+      p_enable_custom_defaults     => true,
+      p_double_quote_names         => false,
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
     test_om_tapigen_log_api.create_row (
-      p_table_name     => l_table_name,
       p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
       p_generated_code => l_code
     );
     commit;
@@ -283,7 +285,7 @@ begin
   ut.expect(util_get_spec_regex_count(l_code,' get_pk_by_unique_cols')).to_equal(1);
   ut.expect(util_get_spec_regex_count(l_code,' create_row')).to_equal(6);
   ut.expect(util_get_spec_regex_count(l_code,' read_row')).to_equal(4);
-  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(3);
+  ut.expect(util_get_spec_regex_count(l_code,' update_row')).to_equal(5);
   ut.expect(util_get_spec_regex_count(l_code,' delete_row')).to_equal(0);
   ut.expect(util_get_spec_regex_count(l_code,' create_or_update_row')).to_equal(4);
   ut.expect(util_get_spec_regex_count(l_code,' get_u_')).to_equal(9);
@@ -330,6 +332,82 @@ procedure util_create_test_table_objects is
       )
     ]';
   end tag_users;
+  ----------
+  procedure tag_roles is
+  begin
+    execute immediate q'[
+      create table tag_roles (
+        ro_id          integer            generated by default on null as identity,
+        ro_name        varchar2(15 char)               not null  ,
+        ro_description varchar2(30 char)               not null  ,
+        ro_active_yn   varchar2(1 char)   default 'Y'  not null  ,
+        ro_version_id  integer                         not null  ,
+        ro_created_on  date                            not null  , -- This is only for demo purposes.
+        ro_created_by  char(15 char)                   not null  , -- In reality we expect more
+        ro_updated_at  timestamp                       not null  , -- unified names and types
+        ro_updated_by  varchar2(15 char)               not null  , -- for audit columns.
+        --
+        primary key (ro_id),
+        unique (ro_name),
+        check (ro_active_yn in ('Y', 'N'))
+      )
+    ]';
+  end tag_roles;
+  ----------
+  procedure tag_rights is
+  begin
+    execute immediate q'[
+      create table tag_rights (
+        ri_id          integer            generated by default on null as identity,
+        ri_name        varchar2(15 char)               not null  ,
+        ri_description varchar2(30 char)               not null  ,
+        ri_active_yn   varchar2(1 char)   default 'Y'  not null  ,
+        ri_version_id  integer                         not null  ,
+        ri_created_on  date                            not null  , -- This is only for demo purposes.
+        ri_created_by  char(15 char)                   not null  , -- In reality we expect more
+        ri_updated_at  timestamp                       not null  , -- unified names and types
+        ri_updated_by  varchar2(15 char)               not null  , -- for audit columns.
+        --
+        primary key (ri_id),
+        unique (ri_name),
+        check (ri_active_yn in ('Y', 'N'))
+      )
+    ]';
+  end tag_rights;
+  ----------
+  procedure tag_map_users_roles is
+  begin
+    execute immediate '
+      create table tag_map_users_roles (
+        mur_id          integer        generated always as identity,
+        mur_u_id        integer        not null  ,
+        mur_ro_id       integer        not null  ,
+        mur_created_on  timestamp      not null  ,
+        mur_created_by  char(15 char)  not null  ,
+        --
+        primary key (mur_id),
+        unique (mur_u_id, mur_ro_id),
+        foreign key (mur_u_id) references tag_users,
+        foreign key (mur_ro_id) references tag_roles
+      )
+    ';
+  end tag_map_users_roles;
+  ----------
+  procedure tag_map_roles_rights is
+  begin
+    execute immediate '
+      create table tag_map_roles_rights (
+        mrr_ro_id       integer        not null  ,
+        mrr_ri_id       integer        not null  ,
+        mrr_created_on  timestamp      not null  ,
+        mrr_created_by  char(15 char)  not null  ,
+        --
+        primary key (mrr_ro_id, mrr_ri_id),
+        foreign key (mrr_ro_id) references tag_roles,
+        foreign key (mrr_ri_id) references tag_rights
+      )
+    ';
+  end tag_map_roles_rights;
   ----------
   procedure tag_all_data_types_single_pk is
   begin
@@ -379,6 +457,10 @@ procedure util_create_test_table_objects is
 begin
   tag_global_version_sequence;
   tag_users;
+  tag_roles;
+  tag_rights;
+  tag_map_users_roles;
+  tag_map_roles_rights;
   tag_all_data_types_single_pk;
   tag_all_data_types_multi_pk;
 end util_create_test_table_objects;

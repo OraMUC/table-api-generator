@@ -9,8 +9,8 @@ end;
 --create table
 create table test_om_tapigen_log (
   id              integer             generated always as identity,
-  table_name      varchar2(128 char)  not null  ,
   test_name       varchar2(128 char)  not null  ,
+  table_name      varchar2(128 char)  not null  ,
   generated_on    timestamp           not null  ,
   generated_by    varchar2(30 char)   not null  ,
   generated_code  clob                          ,
