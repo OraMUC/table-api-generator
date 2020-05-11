@@ -1021,7 +1021,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
     -----------------------------------------------------------------------------
 
-    FUNCTION get_column_padding_value (
+    FUNCTION get_operator_padding (
       p_extra_padding integer default 0
     )
     RETURN integer IS
@@ -1033,7 +1033,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         END +
         g_status.rpad_columns +
         p_extra_padding;
-    END get_column_padding_value;
+    END get_operator_padding;
 
     -----------------------------------------------------------------------------
 
@@ -1146,16 +1146,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_insert_columns RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND check_identity_visibility(i)
           AND check_audit_visibility_create(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_double_quote(g_columns(i).column_name) ||
             get_column_comment(i) ||
             c_list_delimiter;
@@ -1172,16 +1172,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_insert_params RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND check_identity_visibility(i)
           AND check_audit_visibility_create(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             CASE
               WHEN g_columns(i).is_pk_yn = 'Y'
                 AND NOT g_status.pk_is_multi_column
@@ -1211,16 +1211,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_insert_bulk_params RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND check_identity_visibility(i)
           AND check_audit_visibility_create(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             CASE
               WHEN g_columns(i).is_pk_yn = 'Y'
                 AND NOT g_status.pk_is_multi_column
@@ -1250,12 +1250,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_columns_w_pk_full RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_double_quote(g_columns(i).column_name) ||
           get_column_comment(i) ||
           c_list_delimiter;
@@ -1272,9 +1272,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_params_w_pk RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
@@ -1282,7 +1282,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
             ' IN ' || util_double_quote(g_params.table_name) || '.' ||
             CASE
@@ -1321,9 +1321,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_params_w_pk_cust_defaults RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
+      v_operator_padding pls_integer;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
+      v_operator_padding := get_operator_padding(5);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
@@ -1331,10 +1333,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
             ' IN ' || util_double_quote(g_params.table_name) || '.' ||
-            rpad(util_double_quote(g_columns(i).column_name) || '%TYPE', get_column_padding_value(5)) ||
+            rpad(util_double_quote(g_columns(i).column_name) || '%TYPE', v_operator_padding) ||
             ' DEFAULT get_a_row().' || util_double_quote(g_columns(i).column_name) ||
             get_column_comment(i) ||
             c_list_delimiter;
@@ -1352,12 +1354,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_params_w_pk_io RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
           CASE WHEN g_columns(i).is_pk_yn = 'Y'
             THEN ' IN            '
@@ -1378,9 +1380,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_map_par_eq_newcol_w_pk RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
@@ -1388,7 +1390,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
             ' => :new.' || util_double_quote(g_columns(i).column_name) ||
             get_column_comment(i) ||
@@ -1406,9 +1408,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_map_par_eq_param_w_pk RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
@@ -1416,7 +1418,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
             ' => ' || util_get_parameter_name(g_columns(i).column_name, NULL) ||
             get_column_comment(i) ||
@@ -1434,9 +1436,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_map_par_eq_rowtypcol_w_pk RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
@@ -1444,7 +1446,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           AND check_identity_visibility(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
             ' => p_row.' || util_double_quote(g_columns(i).column_name) ||
             get_column_comment(i) ||
@@ -1462,17 +1464,19 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_set_col_eq_param_wo_pk RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
+      v_operator_padding pls_integer;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
+      v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).is_pk_yn = 'N'
           AND check_audit_visibility_update(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
-            rpad(util_double_quote(g_columns(i).column_name), get_column_padding_value) ||
+            v_list_padding ||
+            rpad(util_double_quote(g_columns(i).column_name), v_operator_padding) ||
             ' = ' ||
             CASE
               WHEN g_columns(i).audit_type IS NOT NULL THEN
@@ -1497,17 +1501,19 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_i_set_col_eq_param RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
+      v_operator_padding pls_integer;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
+      v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).column_name = g_iterator.column_name_compare
           OR g_columns(i).audit_type LIKE 'UPDATED%'
           OR g_columns(i).row_version_expression IS NOT NULL
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
-            rpad(util_double_quote(g_columns(i).column_name), get_column_padding_value) ||
+            v_list_padding ||
+            rpad(util_double_quote(g_columns(i).column_name), v_operator_padding) ||
             ' = ' ||
             CASE
               WHEN g_columns(i).audit_type IS NOT NULL THEN
@@ -1533,17 +1539,19 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_set_col_eq_par_bulk_wo_pk RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
+      v_operator_padding pls_integer;
     BEGIN
-      v_padding := get_list_padding(8);
+      v_list_padding := get_list_padding(8);
+      v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).is_pk_yn = 'N'
           AND check_audit_visibility_update(i)
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
-            rpad(util_double_quote(g_columns(i).column_name), get_column_padding_value) ||
+            v_list_padding ||
+            rpad(util_double_quote(g_columns(i).column_name), v_operator_padding) ||
             ' = ' ||
             CASE
               WHEN g_columns(i).audit_type IS NOT NULL THEN
@@ -1568,14 +1576,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_set_par_eq_rowtycol_wo_pk RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).is_pk_yn = 'N'
         THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
             ' := v_row.' ||
             util_double_quote(g_columns(i).column_name) || '; ' ||
@@ -1593,12 +1601,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_params RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_columns) ||
           ' IN ' ||
           util_double_quote(g_params.table_name) || '.' ||
@@ -1616,12 +1624,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_column_types RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_double_quote(g_pk_columns(i).column_name) || ' ' ||
           util_double_quote(g_params.table_name) || '.' ||
           util_double_quote(g_pk_columns(i).column_name) || '%TYPE /*PK*/' ||
@@ -1638,12 +1646,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_columns RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_double_quote(g_pk_columns(i).column_name) ||
           ' /*PK*/' ||
           c_list_delimiter;
@@ -1659,12 +1667,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_return_columns RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           'v_return.' ||
           util_double_quote(g_pk_columns(i).column_name) ||
           c_list_delimiter;
@@ -1675,41 +1683,17 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
     -----------------------------------------------------------------------------
     /*
-    v_return(i).col1 := v_pk_tab.col1;
-    v_return(i).col2 := v_pk_tab.col2;
-    */
-    FUNCTION list_pk_return_columns_bulk RETURN t_tab_vc2_2k IS
-      v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
-    BEGIN
-      v_padding := get_list_padding(4);
-      FOR i IN 1 .. g_pk_columns.count LOOP
-        v_result(v_result.count + 1) :=
-          v_padding ||
-          'v_return(i).' ||
-          util_double_quote(g_pk_columns(i).column_name) ||
-          ' := v_pk_tab(i).' ||
-          util_double_quote(g_pk_columns(i).column_name) ||
-          '; /*PK*/' ||
-          c_lf;
-      END LOOP;
-      trim_list(v_result);
-      RETURN v_result;
-    END list_pk_return_columns_bulk;
-
-    -----------------------------------------------------------------------------
-    /*
         COALESCE( col1, '@@@@@@@@@@@@@@@' ) = COALESCE( p_col1, '@@@@@@@@@@@@@@@' )
     AND COALESCE( col2, '@@@@@@@@@@@@@@@' ) = COALESCE( p_col2, '@@@@@@@@@@@@@@@' )
     */
     FUNCTION list_pk_columns_where_clause RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           'AND ' ||
           util_get_attribute_compare(
             p_data_type         => g_pk_columns(i).data_type,
@@ -1730,12 +1714,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_column_bulk_compare RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(8);
+      v_list_padding := get_list_padding(8);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           'AND ' ||
           util_get_attribute_compare(
             p_data_type         => g_pk_columns(i).data_type,
@@ -1757,12 +1741,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_column_bulk_fetch RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(10);
+      v_list_padding := get_list_padding(10);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           'AND ' ||
           util_get_attribute_compare(
             p_data_type         => g_pk_columns(i).data_type,
@@ -1783,12 +1767,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_map_param_eq_param RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) ||
           ' => ' ||
           util_get_parameter_name(g_pk_columns(i).column_name, NULL) ||
@@ -1805,12 +1789,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_map_param_eq_return RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) ||
           ' => v_return.' ||
           util_double_quote(g_pk_columns(i).column_name) ||
@@ -1827,12 +1811,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_map_param_eq_rowparam RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) ||
           ' => p_row.' ||
           util_double_quote(g_pk_columns(i).column_name) ||
@@ -1850,12 +1834,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_pk_map_param_eq_oldcol RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(6);
+      v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_pk_columns.count LOOP
         v_result(v_result.count + 1) :=
-          v_padding ||
+          v_list_padding ||
           util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) ||
           ' => ' || ':old.' ||
           util_double_quote(g_pk_columns(i).column_name) ||
@@ -1872,13 +1856,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_uk_params RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_uk_columns.count LOOP
         IF g_uk_columns(i).constraint_name = g_iterator.current_uk_constraint THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_uk_columns(i).column_name, g_status.rpad_uk_columns) ||
             ' IN ' || util_double_quote(g_params.table_name) ||
             '.' || util_double_quote(g_uk_columns(i).column_name) ||
@@ -1897,13 +1881,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_uk_column_compare RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(8);
+      v_list_padding := get_list_padding(8);
       FOR i IN 1 .. g_uk_columns.count LOOP
         IF g_uk_columns(i).constraint_name = g_iterator.current_uk_constraint THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             'AND ' ||
             util_get_attribute_compare(
               p_data_type         => g_uk_columns(i).data_type,
@@ -1925,13 +1909,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_uk_map_param_eq_param RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_uk_columns.count LOOP
         IF g_uk_columns(i).constraint_name = g_iterator.current_uk_constraint THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             util_get_parameter_name(g_uk_columns(i).column_name, g_status.rpad_uk_columns) ||
             ' => ' ||
             util_get_parameter_name(g_uk_columns(i).column_name, NULL) ||
@@ -1949,15 +1933,17 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_rowcols_w_cust_defaults RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
+      v_operator_padding pls_integer;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
+      v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).data_custom_default IS NOT NULL THEN
           v_result(v_result.count + 1) :=
-            v_padding ||
+            v_list_padding ||
             'v_row.' ||
-            rpad(util_double_quote(g_columns(i).column_name), get_column_padding_value) ||
+            rpad(util_double_quote(g_columns(i).column_name), v_operator_padding) ||
             ' := ' || coalesce(g_columns(i).data_custom_default, g_columns(i).data_default) ||
             get_column_comment(i) || ';' ||
             c_lf;
@@ -1976,14 +1962,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     */
     FUNCTION list_spec_custom_defaults RETURN t_tab_vc2_2k IS
       v_result t_tab_vc2_2k;
-      v_padding t_vc2_30;
+      v_list_padding t_vc2_30;
     BEGIN
-      v_padding := get_list_padding(4);
+      v_list_padding := get_list_padding(4);
       v_result(v_result.count + 1) := '<custom_defaults>' || c_lf;
       FOR i IN 1 .. g_columns.count LOOP
         IF g_columns(i).data_custom_default IS NOT NULL THEN
           v_result(v_result.count + 1) :=
-            v_padding || '<column source="' ||
+            v_list_padding || '<column source="' ||
             rpad(g_columns(i).custom_default_source || '"', 8) ||
             ' name="' || g_columns(i).column_name || '"><![CDATA[' ||
             g_columns(i).data_custom_default || ']]></column>' ||
@@ -2042,8 +2028,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_pk_columns;
       WHEN 'LIST_PK_RETURN_COLUMNS' THEN
         RETURN list_pk_return_columns;
-      WHEN 'LIST_PK_RETURN_COLUMNS_BULK' THEN
-        RETURN list_pk_return_columns_bulk;
       WHEN 'LIST_PK_COLUMNS_WHERE_CLAUSE' THEN
         RETURN list_pk_columns_where_clause;
       WHEN 'LIST_PK_COLUMN_BULK_COMPARE' THEN

@@ -35,7 +35,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
 
   FUNCTION get_name RETURN VARCHAR2 IS
   BEGIN
-    RETURN 'OraMUC table API generator (v' || om_tapigen.c_generator_version || ')';
+    RETURN 'OraMUC Table API Generator (v' || om_tapigen.c_generator_version || ')';
   END get_name;
 
   FUNCTION get_description RETURN VARCHAR2 IS
