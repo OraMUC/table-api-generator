@@ -1,6 +1,15 @@
 # Example API
 
-This is an example API for the following table definition:
+<!-- toc -->
+
+- [Table Definition](#table-definition)
+- [API Generation](#api-generation)
+- [Package Specification](#package-specification)
+- [Package body](#package-body)
+
+<!-- tocstop -->
+
+## Table Definition
 
 ```sql
 create table app_users (
@@ -19,6 +28,8 @@ create table app_users (
   check (au_active_yn in ('Y', 'N'))
 );
 ```
+
+## API Generation
 
 This API was generated with the default options and provided audit column mappings in SQL Developer using the oddgen extension. You could get the same result by calling the PL/SQL package directly (for all possible options see the [parameters documentation](parameters.md)):
 

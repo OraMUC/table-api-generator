@@ -3,8 +3,9 @@
 The generator is creating the following objects for each table during the compilation phase (with the create or replace clause):
 
 - `#TABLE_NAME#_API`: The API package itself
-- `#TABLE_NAME#_DML_V`: An optional DML view, mainly a helper for APEX tabular forms
+- `#TABLE_NAME#_DML_V`: An optional DML view, mainly a helper for low code frontends like APEX
 - `#TABLE_NAME#_IOIUD`: An optional instead of trigger on the DML view, which calls simply the table API
+- `#TABLE_NAME#_V`: An optional 1:1 view, useful when you want to separate the tables into an own schema without direct user access
 
 If you want to check if generated objects with their names already exist before the very first API compilation, you can use this pipelined table function:
 

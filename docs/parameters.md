@@ -2,43 +2,44 @@
 
 <!-- toc -->
 
-- [p_table_name](#p_table_name)
-- [p_owner](#p_owner)
-- [p_enable_insertion_of_rows](#p_enable_insertion_of_rows)
-- [p_enable_column_defaults](#p_enable_column_defaults)
-- [p_enable_update_of_rows](#p_enable_update_of_rows)
-- [p_enable_deletion_of_rows](#p_enable_deletion_of_rows)
-- [p_enable_parameter_prefixes](#p_enable_parameter_prefixes)
-- [p_enable_proc_with_out_params](#p_enable_proc_with_out_params)
-- [p_enable_getter_and_setter](#p_enable_getter_and_setter)
-- [p_col_prefix_in_method_names](#p_col_prefix_in_method_names)
-- [p_return_row_instead_of_pk](#p_return_row_instead_of_pk)
-- [p_double_quote_names](#p_double_quote_names)
-- [p_default_bulk_limit](#p_default_bulk_limit)
-- [p_enable_dml_view](#p_enable_dml_view)
-- [p_enable_one_to_one_view](#p_enable_one_to_one_view)
-- [p_api_name](#p_api_name)
-- [p_sequence_name](#p_sequence_name)
-- [p_exclude_column_list](#p_exclude_column_list)
-- [p_audit_column_mappings](#p_audit_column_mappings)
-- [p_audit_user_expression](#p_audit_user_expression)
-- [p_row_version_column_mapping](#p_row_version_column_mapping)
-- [p_enable_custom_defaults](#p_enable_custom_defaults)
-- [p_custom_default_values](#p_custom_default_values)
+- [p_table_name (since v0.0.0 ;-)](#p_table_name-since-v000--)
+- [p_owner (since v0.5.0)](#p_owner-since-v050)
+- [p_enable_insertion_of_rows (since v0.4.0)](#p_enable_insertion_of_rows-since-v040)
+- [p_enable_column_defaults (since v0.5.0)](#p_enable_column_defaults-since-v050)
+- [p_enable_update_of_rows (since v0.4.0)](#p_enable_update_of_rows-since-v040)
+- [p_enable_deletion_of_rows (since v0.4.0)](#p_enable_deletion_of_rows-since-v040)
+- [p_enable_parameter_prefixes (since v0.5.0)](#p_enable_parameter_prefixes-since-v050)
+- [p_enable_proc_with_out_params (since v0.5.0)](#p_enable_proc_with_out_params-since-v050)
+- [p_enable_getter_and_setter (since v0.5.0)](#p_enable_getter_and_setter-since-v050)
+- [p_col_prefix_in_method_names (since v0.3.0)](#p_col_prefix_in_method_names-since-v030)
+- [p_return_row_instead_of_pk (since v0.5.0)](#p_return_row_instead_of_pk-since-v050)
+- [p_double_quote_names (since v0.6.0)](#p_double_quote_names-since-v060)
+- [p_default_bulk_limit (since v0.6.0)](#p_default_bulk_limit-since-v060)
+- [p_enable_dml_view (since v0.4.0)](#p_enable_dml_view-since-v040)
+- [p_enable_one_to_one_view (since v0.6.0)](#p_enable_one_to_one_view-since-v060)
+- [p_api_name (since v0.5.0)](#p_api_name-since-v050)
+- [p_sequence_name (since v0.2.0)](#p_sequence_name-since-v020)
+- [p_exclude_column_list (since v0.5.0)](#p_exclude_column_list-since-v050)
+- [p_audit_column_mappings (since v0.6.0)](#p_audit_column_mappings-since-v060)
+- [p_audit_user_expression (since v0.6.0)](#p_audit_user_expression-since-v060)
+- [p_row_version_column_mapping (since v0.6.0)](#p_row_version_column_mapping-since-v060)
+- [p_enable_custom_defaults (since v0.5.0)](#p_enable_custom_defaults-since-v050)
+- [p_custom_default_values (since v0.5.0)](#p_custom_default_values-since-v050)
+- [Removed Parameters](#removed-parameters)
 
 <!-- tocstop -->
 
-## p_table_name
+## p_table_name (since v0.0.0 ;-)
 
 - String (all_objects.object_name%TYPE), mandatory
 - The table for which an API should be generated
 
-## p_owner
+## p_owner (since v0.5.0)
 
 - Stríng (all_users.username%TYPE), default: user
 - If not null, the API is generated for the given schema
 
-## p_enable_insertion_of_rows
+## p_enable_insertion_of_rows (since v0.4.0)
 
 - Boolean, default: true
 - Selfexplanatory, isn't it?
@@ -47,12 +48,12 @@
 - If false, then create_row and create_or_update_row procedure and function is NOT generated
 - If false, then the corresponding DML view(`#TABLE_NAME_24#_DML_V`) instead of trigger (`#TABLE_NAME_24#_IOIUD`) raises an exception on an insert attempt
 
-## p_enable_column_defaults
+## p_enable_column_defaults (since v0.5.0)
 
 - Boolean, default: false
 - If true, the data dictionary defaults of the columns are used for the create methods
 
-## p_enable_update_of_rows
+## p_enable_update_of_rows (since v0.4.0)
 
 - Boolean, default: true
 - Selfexplanatory, isn't it?
@@ -62,7 +63,7 @@
 - If false, then setter procedures for each columns are NOT generated
 - If false, then the corresponding DML view(`#TABLE_NAME_24#_DML_V`) instead of trigger (`#TABLE_NAME_24#_IOIUD`) raises an exception on an update attempt
 
-## p_enable_deletion_of_rows
+## p_enable_deletion_of_rows (since v0.4.0)
 
 - Boolean, default: false
 - Selfexplanatory, isn't it?
@@ -70,23 +71,23 @@
 - If false, then the delete_row procedure is NOT generated
 - If false, then the corresponding DML view(`#TABLE_NAME_24#_DML_V`) instead of trigger (`#TABLE_NAME_24#_IOIUD`) raises an exception on a delete attempt
 
-## p_enable_parameter_prefixes
+## p_enable_parameter_prefixes (since v0.5.0)
 
 - Boolean, default: true
 - If true, the parameter names of functions and procedures will be prefixed with 'p_'
 - If you want to have the parameter names equal the column names then set this to false
 
-## p_enable_proc_with_out_params
+## p_enable_proc_with_out_params (since v0.5.0)
 
 - Boolean, dafault: true
 - If true, a helper method with out params is generated - can be useful for managing session state (e.g. fetch process in APEX)
 
-## p_enable_getter_and_setter
+## p_enable_getter_and_setter (since v0.5.0)
 
 - Boolean, default: true
 - If true, for each column a get function and a set procedure is created
 
-## p_col_prefix_in_method_names
+## p_col_prefix_in_method_names (since v0.3.0)
 
 - Boolean, default: true
 - The generator is generally shorten your column names to 26 characters to build the names for the column based getter and setter methods (get_xxx, set_xxx)
@@ -95,36 +96,36 @@
 - If he find one, this column prefix is first deleted from your column name before building the short name with 26 characters
 - If he could not find a column prefix, then the generator throws an exception (should we simple ignore this? let us know...)
 
-## p_return_row_instead_of_pk
+## p_return_row_instead_of_pk (since v0.5.0)
 
 - Boolean, default: false
 - If true, all relevant functions returning the row instead of the primary key column
 
-## p_double_quote_names
+## p_double_quote_names (since v0.6.0)
 
 - Boolean, default: true
 - If true, object names (owner, table, columns) are placed in double quotes
 
-## p_default_bulk_limit
+## p_default_bulk_limit (since v0.6.0)
 
 - Integer, default: 1000
 - The default bulk size for the set based methods (create_rows, read_rows, update_rows)
 - You can overwrite this at runtime by calling `your_table_api.set_bulk_limit(500);`
 
-## p_enable_dml_view
+## p_enable_dml_view (since v0.4.0)
 
 - Boolean, default: false
 - If true, an updatable view named `#TABLE_NAME#_DML_V` is created as logical layer above the database table
 - If true, a view trigger named `#TABLE_NAME#_IOIUD` is created to handle DML operations on the view
 - If false, view and trigger are NOT generated
 
-## p_enable_one_to_one_view
+## p_enable_one_to_one_view (since v0.6.0)
 
 - Boolean, default: false
 - If true, a 1:1 view with read only is generated
 - Can be useful when you want to separate the tables into an own schema without direct user access
 
-## p_api_name
+## p_api_name (since v0.5.0)
 
 - String (all_objects.object_name%TYPE), default: null
 - If not null, the given name is used for the API
@@ -134,7 +135,7 @@
   - `#TABLE_NAME_-20_20#` is treated as `substr(table_name,-20,20)`
   - For table EMP and `p_api_name => '#TABLE_NAME_26#_API'` you get `EMP_API`
 
-## p_sequence_name
+## p_sequence_name (since v0.2.0)
 
 - String (all_objects.object_name%TYPE), default: null
 - If a sequence name is given here, then the resulting API is taken the ID for the create_row methods and you don't need to create a trigger for your table only for the sequence handling
@@ -143,33 +144,33 @@
 - Example 2: `SEQ_#PK_COLUMN_26#`
 - Example 3: `#COLUMN_PREFIX#_SEQ`
 
-## p_exclude_column_list
+## p_exclude_column_list (since v0.5.0)
 
 - String (varchar2), default: null
 - If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded)
 - Note that the excluded columns are included in all return values and possible getter methods and also can be submitted with the row based insert and update methods (values will be ignored, sure)
 - Example: `'LAST_CHANGED_BY,LAST_CHANGED_ON'`
 
-## p_audit_column_mappings
+## p_audit_column_mappings (since v0.6.0)
 
 - String (varchar2)
 - If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...)
 - Supports column prefix placeholders to be able to reuse the same mappings in multiple tables with different column_prefixes
 - Example: `created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_ON, updated_by=#PREFIX#_UPDATED_BY`
 
-## p_audit_user_expression
+## p_audit_user_expression (since v0.6.0)
 
 - String (varchar2), default: `coalesce(sys_context('apex$session','app_user'), sys_context('userenv','os_user'), sys_context('userenv','session_user'))`
 - This default should be ok for most of the projects, align it to your needs
 
-## p_row_version_column_mapping
+## p_row_version_column_mapping (since v0.6.0)
 
 - String (varchar2), default: null
 - If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier)
 - Supports column prefix placeholders to be able to reuse the same mappings in multiple tables with different column_prefixes
 - Example with a global version sequence: `#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval`
 
-## p_enable_custom_defaults
+## p_enable_custom_defaults (since v0.5.0)
 
 - Boolean, default: false
 - If set to true, this will create a set of new methods mainly for testing and dummy data generation purposes:
@@ -250,8 +251,16 @@ END;
 /
 ```
 
-## p_custom_default_values
+## p_custom_default_values (since v0.5.0)
 
 - XMLTYPE, default null
 - Custom values in XML format, if the generator provided defaults are not ok
 - See also parameter p_enable_custom_defaults
+
+## Removed Parameters
+
+### p_reuse_existing_api_params (available until v0.5.x)
+
+- Boolean, default: true
+- If true, all following parameters are ignored, if the generator can find the original parameters in the package specification of the existing API - for new API's this parameter is ignored and the following parameters are used
+- If false, the generator ignores any existing API options and you are able to redefine the parameters

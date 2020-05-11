@@ -1,9 +1,23 @@
+# How to modify an API without programming
+
+<!-- toc -->
+
+- [Generate the API](#generate-the-api)
+- [Modify with PL/SQL](#modify-with-plsql)
+
+<!-- tocstop -->
+
+## Generate the API
+
 --> Generate API
 BEGIN
   om_tapigen.compile_api(p_table_name => 'EMPLOYEES');
 END;
 /
 
+## Modify with PL/SQL
+
+```sql
 -- Modify API to own needs - consider to create a feature request(issue) if you think this is helpful for other users too.
 -- https://github.com/OraMUC/table-api-generator/issues/new
 
@@ -37,7 +51,7 @@ BEGIN
                             'INSERT INTO EMPLOYEES ( '),
                     'VALUES ( v_pk, ',
                     'VALUES ( ');
-                    
+
   --dbms_output.put_line(v_clob);
   util_execute_sql(v_clob);
 
@@ -46,3 +60,4 @@ EXCEPTION
     NULL;
 END;
 /
+```

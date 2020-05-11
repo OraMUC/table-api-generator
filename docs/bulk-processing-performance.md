@@ -1,5 +1,15 @@
 # Bulk Processing Performance
 
+<!-- toc -->
+
+- [Create the table](#create-the-table)
+- [Create the API](#create-the-api)
+- [Example row by row (slow by slow) processing](#example-row-by-row-slow-by-slow-processing)
+- [Example set based processing](#example-set-based-processing)
+- [Analyze statements](#analyze-statements)
+
+<!-- tocstop -->
+
 ## Create the table
 
 ```sql

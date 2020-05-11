@@ -4,7 +4,7 @@ Please install first the [oddgen](https://www.oddgen.org/) extension. Our wrappe
 
 ![SQL Developer Integration](images/sql-developer-integration.png)
 
-## Multiple Ways To Your API's
+## Multiple Ways To Your APIs
 
 You should first think about if you want to version control the generated APIs or the generator itself and the PL/SQL scripts to compile the API. Both ways and any other combination in between are valid solutions and depending on your needs. Fortunately the generator supports three (four, if you take SQL Developer into account) ways to your API. There are three methods in the generator package: compile_api, compile_api_and_get_code, get_code. The last method is used in the SQL Developer integration. This means SQL Developer is not compiling your API, it is simply a helper to generate the code for you with a graphical configuration form and output to a worksheet or the clipboard of your operating system. If you want to fully script your APIs generation then SQL Developer is a no go.
 

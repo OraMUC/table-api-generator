@@ -7,7 +7,7 @@
     "url": "https://github.com/OraMUC/table-api-generator.git"
   },
   "scripts": {
-    "prebuild": "npx ploc --in src/OM_TAPIGEN.pks --out README.md && npx markdown-toc -i --maxdepth 2 docs/parameters.md && npx markdown-toc -i --maxdepth 2 docs/getting-started.md && npx markdown-toc -i --maxdepth 2 docs/changelog.md",
+    "prebuild": "npx ploc --in src/OM_TAPIGEN.pks --out README.md && node docs/scripts/build.js",
     "build": "node src/build.js",
     "postbuild": "echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @om_tapigen_install.sql && echo tapigen was compiled > test/tapigen_compiled_trigger",
     "watch-src": "chokidar src/* --initial -c \"npm run build\"",

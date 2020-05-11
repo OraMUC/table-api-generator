@@ -1,5 +1,14 @@
 # Bulk Processing
 
+<!-- toc -->
+
+- [Create the Table](#create-the-table)
+- [Create the API](#create-the-api)
+- [Example Insert](#example-insert)
+- [Example Update](#example-update)
+
+<!-- tocstop -->
+
 ## Create the Table
 
 ```sql
