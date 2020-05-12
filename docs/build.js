@@ -5,7 +5,7 @@ const navRegex = /<!-- *nav *-->[\s\S]*?<!-- *navstop *-->/gi;
 const renderNavigation = function (type) {
     var menu = '';
     const entries = [
-        {top:true,  name:"Index",                                 file:"index.md"},
+        {top:true,  name:"Index",                                 file:"README.md"},
         {top:true,  name:"Changelog",                             file:"changelog.md"},
         {top:true,  name:"Getting Started",                       file:"getting-started.md"},
         {top:true,  name:"Parameters",                            file:"parameters.md"},
@@ -20,7 +20,7 @@ const renderNavigation = function (type) {
         if (type === 'top' && entry.top){
             menu += '| [' + entry.name + '](' + entry.file + ')\n';
         }
-        else if (type === 'index' && entry.file !== 'index.md') {
+        else if (type === 'index' && entry.file !== 'README.md') {
             menu += '- [' + entry.name + '](' + entry.file + ')\n';
         }
     });
@@ -34,14 +34,13 @@ glob('docs/*.md', function (err, files) {
     if (err) throw err;
     files.forEach(function (file) {
         var content = fs.readFileSync(file, 'utf8');
-        if (file === 'docs/index.md') {
+        if (file === 'docs/README.md') {
             content = content.replace(navRegex, renderNavigation('index'));
         }
         else {
             content = content.replace(navRegex, renderNavigation('top'));
             content = toc.insert(content, {maxdepth: 2, bullets: '-'});
         }
-        console.log(file);
         fs.writeFileSync(file, content);
     });
 });

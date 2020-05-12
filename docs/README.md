@@ -1,4 +1,4 @@
-# Document Index
+# OraMUC Table API Generator - Documentation Index
 
 <!-- nav -->
 

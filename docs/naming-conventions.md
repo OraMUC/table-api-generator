@@ -1,6 +1,6 @@
 <!-- nav -->
 
-[Index](index.md)
+[Index](README.md)
 | [Changelog](changelog.md)
 | [Getting Started](getting-started.md)
 | [Parameters](parameters.md)
