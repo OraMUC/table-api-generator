@@ -1,3 +1,15 @@
+<!-- nav -->
+
+[Index](index.md)
+| [Changelog](changelog.md)
+| [Getting Started](getting-started.md)
+| [Parameters](parameters.md)
+| [Naming Conventions](naming-conventions.md)
+| [Bulk Processing](bulk-processing.md)
+| [Example API](example-api.md)
+
+<!-- navstop -->
+
 # Naming Conventions
 
 The generator is creating the following objects for each table during the compilation phase (with the create or replace clause):

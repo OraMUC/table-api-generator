@@ -1,3 +1,15 @@
+<!-- nav -->
+
+[Index](index.md)
+| [Changelog](changelog.md)
+| [Getting Started](getting-started.md)
+| [Parameters](parameters.md)
+| [Naming Conventions](naming-conventions.md)
+| [Bulk Processing](bulk-processing.md)
+| [Example API](example-api.md)
+
+<!-- navstop -->
+
 # SQL Developer Integration
 
 Please install first the [oddgen](https://www.oddgen.org/) extension. Our wrapper package is autodiscovered by this extension.

@@ -1,3 +1,15 @@
+<!-- nav -->
+
+[Index](index.md)
+| [Changelog](changelog.md)
+| [Getting Started](getting-started.md)
+| [Parameters](parameters.md)
+| [Naming Conventions](naming-conventions.md)
+| [Bulk Processing](bulk-processing.md)
+| [Example API](example-api.md)
+
+<!-- navstop -->
+
 # Getting Started
 
 <!-- toc -->
@@ -85,7 +97,6 @@ SELECT *
 ```
 
 The leading dictionary information is the API package name. It could be, you found API's where the table_name is NULL - this means your API is existing, but your table not anymore. Thats the reason for the order by clause in the example query. You can use this pipelined function for quality assurance or for building a metadata repository with the generation parameters of your API's.
-
 
 ## Complete Example
 
