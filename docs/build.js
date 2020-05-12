@@ -12,7 +12,7 @@ const renderNavigation = function (type) {
         {top:true,  name:"Naming Conventions",                    file:"naming-conventions.md"},
         {top:true,  name:"Bulk Processing",                       file:"bulk-processing.md"},
         {top:true,  name:"Example API",                           file:"example-api.md"},
-        {top:true,  name:"SQL Developer Integration",             file:"sql-developer-integration.md"},
+        {top:true,  name:"SQL Developer",                         file:"sql-developer-integration.md"},
         {top:false, name:"Advanced: Bulk Processing Performance", file:"bulk-processing-performance.md"},
         {top:false, name:"Advanced: Example API Modifikation",    file:"example-modify-api.md"},
     ];
