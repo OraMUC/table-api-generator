@@ -4,10 +4,9 @@
 | [Changelog](changelog.md)
 | [Getting Started](getting-started.md)
 | [Parameters](parameters.md)
-| [Naming Conventions](naming-conventions.md)
 | [Bulk Processing](bulk-processing.md)
 | [Example API](example-api.md)
-| [SQL Developer](sql-developer-integration.md)
+| [SQL Developer Integration](sql-developer-integration.md)
 
 <!-- navstop -->
 
@@ -18,7 +17,7 @@
 - [Table Definition](#table-definition)
 - [API Generation](#api-generation)
 - [Package Specification](#package-specification)
-- [Package body](#package-body)
+- [Package Body](#package-body)
 
 <!-- tocstop -->
 
@@ -273,7 +272,7 @@ END "APP_USERS_API";
 /
 ```
 
-## Package body
+## Package Body
 
 ```sql
 CREATE OR REPLACE PACKAGE BODY "TESTS"."APP_USERS_API" IS

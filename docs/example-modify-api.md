@@ -4,14 +4,15 @@
 | [Changelog](changelog.md)
 | [Getting Started](getting-started.md)
 | [Parameters](parameters.md)
-| [Naming Conventions](naming-conventions.md)
 | [Bulk Processing](bulk-processing.md)
 | [Example API](example-api.md)
-| [SQL Developer](sql-developer-integration.md)
+| [SQL Developer Integration](sql-developer-integration.md)
 
 <!-- navstop -->
 
 # How to modify an API without programming
+
+We have been asked for this, so this shows only how you can technically modify an API without programming - align the shown replacements to you needs. Consider to [create a feature request (issue)](https://github.com/OraMUC/table-api-generator/issues/new), if you think your modification is helpful for other users too.
 
 <!-- toc -->
 
@@ -31,9 +32,6 @@ END;
 ## Modify with PL/SQL
 
 ```sql
--- Modify API to own needs - consider to create a feature request(issue) if you think this is helpful for other users too.
--- https://github.com/OraMUC/table-api-generator/issues/new
-
 DECLARE
   v_clob        CLOB;
   v_cursor      NUMBER;

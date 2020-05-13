@@ -4,14 +4,15 @@
 | [Changelog](changelog.md)
 | [Getting Started](getting-started.md)
 | [Parameters](parameters.md)
-| [Naming Conventions](naming-conventions.md)
 | [Bulk Processing](bulk-processing.md)
 | [Example API](example-api.md)
-| [SQL Developer](sql-developer-integration.md)
+| [SQL Developer Integration](sql-developer-integration.md)
 
 <!-- navstop -->
 
 # Bulk Processing Performance
+
+These are some scripts to compare the performance of standard SQL, standard API and set based API usage. Align it to your needs, run it multiple times and have fun...
 
 <!-- toc -->
 
@@ -19,7 +20,7 @@
 - [Create the API](#create-the-api)
 - [Example row by row (slow by slow) processing](#example-row-by-row-slow-by-slow-processing)
 - [Example set based processing](#example-set-based-processing)
-- [Analyze statements](#analyze-statements)
+- [Analyze data](#analyze-data)
 
 <!-- tocstop -->
 
@@ -140,7 +141,7 @@ end;
 /
 ```
 
-### Update 100,000 Rows with API
+### Update 100,000 rows with API
 
 ```sql
 set timing on
@@ -159,7 +160,7 @@ end;
 
 ## Example set based processing
 
-### Create 100,000 Rows
+### Create 100,000 rows
 
 ```sql
 set timing on
@@ -181,7 +182,7 @@ end;
 /
 ```
 
-### Update 100,000 Rows
+### Update 100,000 rows
 
 ```sql
 set timing on
@@ -217,7 +218,7 @@ end;
 /
 ```
 
-## Analyze statements
+## Analyze data
 
 ```sql
 select * from app_users;

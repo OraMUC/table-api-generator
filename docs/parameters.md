@@ -4,10 +4,9 @@
 | [Changelog](changelog.md)
 | [Getting Started](getting-started.md)
 | [Parameters](parameters.md)
-| [Naming Conventions](naming-conventions.md)
 | [Bulk Processing](bulk-processing.md)
 | [Example API](example-api.md)
-| [SQL Developer](sql-developer-integration.md)
+| [SQL Developer Integration](sql-developer-integration.md)
 
 <!-- navstop -->
 
@@ -193,74 +192,78 @@
   - The default values are provided by the generator and can be overwritten by passing data to the new parameter `p_custom_column_defaults xmltype default null` - you can grab the defaults from the end of the package spec - see example below:
 
 ```sql
-om_tapigen.compile_api(
-  p_table_name                    => 'EMPLOYEES',
-  p_reuse_existing_api_params     => false,
-  p_enable_proc_with_out_params   => false,
-  p_enable_getter_and_setter      => false,
-  p_return_row_instead_of_pk      => true,
-  p_enable_dml_view               => false,
-  p_api_name                      => 'EMPLOYEES_API',
-  p_sequence_name                 => 'EMPLOYEES_SEQ',
-  p_exclude_column_list           => 'SALARY,COMMISSION_PCT',
-  p_enable_custom_defaults        => true,
-  p_custom_default_values         => xmltype(q'#
-    <custom_defaults>
-      <column name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
-    </custom_defaults>#')
+create table app_users (
+  au_id          integer            generated always as identity,
+  au_first_name  varchar2(15 char)                         ,
+  au_last_name   varchar2(15 char)                         ,
+  au_email       varchar2(30 char)               not null  ,
+  au_credits     integer                                   ,
+  au_active_yn   varchar2(1 char)   default 'Y'  not null  ,
+  au_created_on  date                            not null  , -- This is only for demo purposes.
+  au_created_by  char(15 char)                   not null  , -- In reality we expect more
+  au_updated_at  timestamp                       not null  , -- unified names and types
+  au_updated_by  varchar2(15 char)               not null  , -- for audit columns.
+  --
+  primary key (au_id),
+  unique (au_email),
+  check (au_active_yn in ('Y', 'N'))
 );
+
+begin
+  om_tapigen.compile_api(
+    p_table_name                    => 'APP_USERS',
+    p_enable_custom_defaults        => true,
+    p_custom_default_values         => xmltype(q'#
+      <custom_defaults>
+        <column name="AU_CREDITS"><![CDATA[round(dbms_random.value(1000,3000))]]></column>
+      </custom_defaults>#')
+  );
+end;
+/
 ```
 
-The custom defaults are saved as a comment at the end of the package spec to be reusable by the generator - here an example from the `EMPLOYEES_API` above:
+The custom defaults are saved as a comment at the end of the package spec to be reusable by the generator - here an example from the `APP_USERS_API` above:
 
 ```sql
-  -- end of package spec --
-
   /*
-  Only custom defaults with the source "USER" are used when "p_reuse_existing_api_params" is set to true.
-  All other custom defaults are only listed for convenience and determined at runtime by the generator.
   You can simply copy over the defaults to your generator call - the attribute "source" is ignored then.
   <custom_defaults>
-    <column source="TAPIGEN" name="EMPLOYEE_ID"><![CDATA["EMPLOYEES_SEQ".nextval]]></column>
-    <column source="TAPIGEN" name="FIRST_NAME"><![CDATA[substr(sys_guid(),1,20)]]></column>
-    <column source="TAPIGEN" name="LAST_NAME"><![CDATA[substr(sys_guid(),1,25)]]></column>
-    <column source="TAPIGEN" name="EMAIL"><![CDATA[substr(sys_guid(),1,15) || '@dummy.com']]></column>
-    <column source="TAPIGEN" name="PHONE_NUMBER"><![CDATA[substr('+1.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,999))),3,'0') || '.' || lpad(to_char(trunc(dbms_random.value(1,9999))),4,'0'),1,20)]]></column>
-    <column source="TAPIGEN" name="HIRE_DATE"><![CDATA[to_date(trunc(dbms_random.value(to_char(date'1900-01-01','j'),to_char(date'2099-12-31','j'))),'j')]]></column>
-    <column source="TAPIGEN" name="JOB_ID"><![CDATA['AC_ACCOUNT']]></column>
-    <column source="USER"    name="SALARY"><![CDATA[round(dbms_random.value(1000,10000),2)]]></column>
-    <column source="TAPIGEN" name="COMMISSION_PCT"><![CDATA[round(dbms_random.value(0,.99),2)]]></column>
-    <column source="TAPIGEN" name="MANAGER_ID"><![CDATA[100]]></column>
-    <column source="TAPIGEN" name="DEPARTMENT_ID"><![CDATA[10]]></column>
+    <column source="TAPIGEN" name="AU_FIRST_NAME"><![CDATA[initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, 15))))]]></column>
+    <column source="TAPIGEN" name="AU_LAST_NAME"><![CDATA[initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, 15))))]]></column>
+    <column source="TAPIGEN" name="AU_EMAIL"><![CDATA[sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12))) || '@' || sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12))) || '.' || sys.dbms_random.string('L', round(sys.dbms_random.value(2, 4)))]]></column>
+    <column source="USER"    name="AU_CREDITS"><![CDATA[round(dbms_random.value(1000,3000))]]></column>
+    <column source="TABLE"   name="AU_ACTIVE_YN"><![CDATA['Y'  ]]></column>
+    <column source="TAPIGEN" name="AU_CREATED_ON"><![CDATA[to_date(round(sys.dbms_random.value(to_char(date '1900-01-01', 'j'), to_char(date '2099-12-31', 'j'))), 'j')]]></column>
+    <column source="TAPIGEN" name="AU_CREATED_BY"><![CDATA[sys.dbms_random.string('A', round(sys.dbms_random.value(1, 15)))]]></column>
+    <column source="TAPIGEN" name="AU_UPDATED_AT"><![CDATA[systimestamp]]></column>
+    <column source="TAPIGEN" name="AU_UPDATED_BY"><![CDATA[sys.dbms_random.string('A', round(sys.dbms_random.value(1, 15)))]]></column>
   </custom_defaults>
   */
 END "EMPLOYEES_API";
 /
 ```
 
-You can let the generator do the work to generate defaults, grab the XML from the spec, modify it to your needs and use it in your generator call. In the example above I would modify the `HIRE_DATE` and the `SALARY` because the generator provided only  default random data depending on the data type and length.
+You can let the generator do the work to generate defaults, grab the XML from the spec, modify it to your needs and use it in your generator call with the parameter p_custom_default_values.
 
 With the provided defaults you are now able to do this:
 
 ```sql
 -- create 100 rows without providing any data...
-BEGIN
-  FOR i IN 1..100 LOOP
-    employees_api.create_a_row;
-  END LOOP;
-END;
+begin
+  for i in 1..100 loop
+    app_users_api.create_a_row;
+  end loop;
+end;
 /
 
 -- of course, you can use the parameters if you like...
-BEGIN
-  FOR i IN 1..100 LOOP
-    employees_api.create_a_row(
-      p_job_id          => 'AD_VP',
-      p_manager_id      => 100,
-      p_department_id   => 90
+begin
+  for i in 1..100 loop
+    app_users_api.create_a_row(
+      p_au_credits => 100
     );
-  END LOOP;
-END;
+  end loop;
+end;
 /
 ```
 
@@ -277,3 +280,11 @@ END;
 - Boolean, default: true
 - If true, all following parameters are ignored, if the generator can find the original parameters in the package specification of the existing API - for new API's this parameter is ignored and the following parameters are used
 - If false, the generator ignores any existing API options and you are able to redefine the parameters
+
+### p_enable_generic_change_log (available until v0.5.x)
+
+- Boolean, default: false
+- If true, one log entry is created for each changed column over all API enabled schema tables in one generic log table - very handy to create a record history in the user interface
+- The table generic_change_log and a corresponding sequence generic_change_log_seq is created in the schema during the API creation on the very first API that uses this feature
+- We could long describe this feature - try it out in your development system and decide, if you want to have it or not
+- One last thing: This could NOT replace a historicization, but can deliver things, that would not so easy with a historicization - we use both sometimes together...

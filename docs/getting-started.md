@@ -4,10 +4,9 @@
 | [Changelog](changelog.md)
 | [Getting Started](getting-started.md)
 | [Parameters](parameters.md)
-| [Naming Conventions](naming-conventions.md)
 | [Bulk Processing](bulk-processing.md)
 | [Example API](example-api.md)
-| [SQL Developer](sql-developer-integration.md)
+| [SQL Developer Integration](sql-developer-integration.md)
 
 <!-- navstop -->
 
@@ -16,6 +15,7 @@
 <!-- toc -->
 
 - [Installation](#installation)
+- [Naming Conventions](#naming-conventions)
 - [Usage](#usage)
 - [Parameters](#parameters)
 - [View existing APIs](#view-existing-apis)
@@ -27,15 +27,27 @@
 
 We recommend to install the package `om_tapigen` in a central tools schema. Because the package runs with invokers rights you need to create a private or public synonym for SQL functions inside the package.
 
-1. Download the [latest version][latest] and unzip the source code
-1. Run the SQL script `install.sql` in the root folder or compile the spec and body of the package `om_tapigen` and optional `om_tapigen_oddgen_wrapper` for the SQL Developer integration
-1. If installed in central tools schema
+1. Download the [latest version](https://github.com/OraMUC/table-api-generator/releases/latest) and unzip the source code
+1. Run the SQL script `install.sql` in the root folder
+1. If installed in a central tools schema
     - grant execute rights: `GRANT EXECUTE ON om_tapigen TO PUBLIC;`
-    - create synonym:
-        - public in tools schema: `CREATE PUBLIC SYNONYM om_tapigen FOR om_tapigen;`
-        - or private in target schema: `CREATE SYNONYM om_tapigen FOR <yourToolsSchema>.om_tapigen;`
+    - create synonym - public in tools schema: `CREATE PUBLIC SYNONYM om_tapigen FOR om_tapigen;`
+    - or private in target schema: `CREATE SYNONYM om_tapigen FOR <yourToolsSchema>.om_tapigen;`
 
-[latest]: https://github.com/OraMUC/table-api-generator/releases/latest
+## Naming Conventions
+
+The generator is creating the following objects for each table during the compilation phase (with the create or replace clause):
+
+- `#TABLE_NAME#_API`: The API package itself
+- `#TABLE_NAME#_DML_V`: An optional DML view, mainly a helper for low code frontends like APEX
+- `#TABLE_NAME#_IOIUD`: An optional instead of trigger on the DML view, which calls simply the table API
+- `#TABLE_NAME#_V`: An optional 1:1 view, useful when you want to separate the tables into an own schema without direct user access
+
+If you want to check if generated objects with their names already exist before the very first API compilation, you can use this pipelined table function:
+
+```sql
+select * from table(om_tapigen.view_naming_conflicts);
+```
 
 ## Usage
 
@@ -112,7 +124,8 @@ SELECT *
 BEGIN
   FOR i IN (SELECT table_name FROM user_tables /*WHERE...*/) LOOP
     om_tapigen.compile_api(
-      --these are the defaults, align to your needs, you can omit unchanged parameters
+      --these are the defaults, align it to your needs
+      --you can omit unchanged parameters
       p_table_name                  => i.table_name,
       p_owner                       => user,
       p_enable_insertion_of_rows    => true,
@@ -147,7 +160,7 @@ SELECT *
 
 --> recreate the API's after changes in your model
 BEGIN
-  --use same statement as above... , ideal use some version control
+  --use same statement as above... , ideal use some version control system
 END;
 ```
 

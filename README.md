@@ -61,12 +61,12 @@ functionality.
 
 DOCS
 
-- [Example API for the demo table HR.EMPLOYEES](https://github.com/OraMUC/table-api-generator/blob/master/docs/example-api.md)
+- [Changelog](https://github.com/OraMUC/table-api-generator/blob/master/docs/changelog.md)
 - [Getting started](https://github.com/OraMUC/table-api-generator/blob/master/docs/getting-started.md)
 - [Detailed parameter descriptions](https://github.com/OraMUC/table-api-generator/blob/master/docs/parameters.md)
-- [Naming conventions](https://github.com/OraMUC/table-api-generator/blob/master/docs/naming-conventions.md)
+- [Bulk processing](https://github.com/OraMUC/table-api-generator/blob/master/docs/bulk-processing.md)
+- [Example API](https://github.com/OraMUC/table-api-generator/blob/master/docs/example-api.md)
 - [SQL Developer integration](https://github.com/OraMUC/table-api-generator/blob/master/docs/sql-developer-integration.md)
-- [Changelog](https://github.com/OraMUC/table-api-generator/blob/master/docs/changelog.md)
 
 LINKS
 
