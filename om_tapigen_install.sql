@@ -714,10 +714,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   -----------------------------------------------------------------------------
   -- private global cursors (g_cur_*)
   -----------------------------------------------------------------------------
-  /* Because we use the SQL Developer PLSQL Cop plug-in we need to duplicate
+
+  /*
+  Because we use the SQL Developer PLSQL Cop plug-in we need to duplicate
   the whole cursor for the conditional compilation to avoid syntax errors.
   Also see the issue on GitHub:
-  https://github.com/Trivadis/plsql-cop-sqldev/issues/4 */
+  https://github.com/Trivadis/plsql-cop-sqldev/issues/4
+  */
   $IF $$db_version < 121 $THEN
   CURSOR g_cur_columns IS
     WITH not_null_columns AS
@@ -908,14 +911,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
            NULL AS r_column_name
       FROM t;
   $END
+
   -----------------------------------------------------------------------------
-  -- util_execute_sql is a private helper procedure that parses and executes
-  -- generated code with the help of DBMS_SQL package. Execute immediate is not
-  -- used here directly, because of the missing possibility of parsing a
-  -- statement in a performant way. Executing immediate and catching
-  -- the error is more expensive than parsing the statement and catching the
-  -- error.
-  -----------------------------------------------------------------------------
+
   PROCEDURE util_execute_sql(p_sql IN OUT NOCOPY CLOB) IS
     v_cursor      PLS_INTEGER;
     v_exec_result PLS_INTEGER;
@@ -931,13 +929,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_execute_sql;
 
   -----------------------------------------------------------------------------
-  -- util_string_to_bool is a private helper function to deliver a
-  -- boolean representation of an string value. True is returned,if:
-  --   true,yes,y,1
-  -- is given. False is returned when:
-  --   false,no,n,0
-  -- is given.
-  -----------------------------------------------------------------------------
+
   FUNCTION util_string_to_bool(p_string IN VARCHAR2) RETURN BOOLEAN IS
   BEGIN
     RETURN CASE WHEN lower(p_string) IN('true', 'yes', 'y', '1') THEN TRUE WHEN lower(p_string) IN('false',
@@ -947,10 +939,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_string_to_bool;
 
   -----------------------------------------------------------------------------
-  -- util_bool_to_string is a private helper function to deliver a
-  -- varchar2 representation of an boolean value. 'TRUE' is returned,if
-  -- boolean value is true. 'FALSE' is returned when boolean value is false.
-  -----------------------------------------------------------------------------
+
   FUNCTION util_bool_to_string(p_bool IN BOOLEAN) RETURN VARCHAR2 IS
   BEGIN
     RETURN CASE WHEN p_bool THEN 'TRUE' WHEN NOT p_bool THEN 'FALSE' ELSE NULL END;
@@ -962,14 +951,21 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_double_quote;
 
   -----------------------------------------------------------------------------
-  -- util_get_attribute_surrogate is a private helper function to find out a
-  -- datatype dependent surrogate. This is required for comparing two
-  -- values of a column e.g. old value and new value. There is the special case
-  -- of null comparisison in Oracle,what means null compared with null is
-  -- never true. That is the reason to compare:
-  --     coalesce(old value,surrogate) = coalesce(new value,surrogate)
-  -- that is true,if both sides are null.
-  -----------------------------------------------------------------------------
+  /*
+  util_get_attribute_surrogate is a private helper function to get a datatype
+  dependent surrogate. This is required for comparing two values of a column
+  e.g. old value and new value. There is the special case of null comparison in
+  Oracle: null compared with null is never true. That is the reason to compare
+  it in this way:
+
+      coalesce(old_value, surrogate) = coalesce(new_value, surrogate)
+
+  For a string this could be:
+
+      coalesce(old_value, '@@@@@@@@@@@@@@@') = coalesce(new_value, '@@@@@@@@@@@@@@@')
+
+  This will be evaluated to true if both values are null.
+  */
   FUNCTION util_get_attribute_surrogate(p_data_type IN user_tab_cols.data_type%TYPE) RETURN VARCHAR2 IS
     v_return t_vc2_100;
   BEGIN
@@ -995,11 +991,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_get_attribute_surrogate;
 
   -----------------------------------------------------------------------------
-  -- util_get_attribute_compare is a private helper function to deliver the
-  -- described (take a look at function util_get_attribute_surrogate) compare
-  -- code for two attributes. In addition to that, the compare operation must
-  -- be dynamically, because e.g. "=" or "<>" or other operations are required.
-  -----------------------------------------------------------------------------
+  /*
+  util_get_attribute_compare is a private helper function to deliver the
+  described (take a look at function util_get_attribute_surrogate) compare
+  code for two attributes. In addition to that, the compare operation must
+  be dynamically, because e.g. "=" or "<>" or other operations are required.
+  */
   FUNCTION util_get_attribute_compare
   (
     p_data_type         IN user_tab_cols.data_type%TYPE,
@@ -1036,9 +1033,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_get_attribute_compare;
 
   -----------------------------------------------------------------------------
-  -- util_get_vc2_4000_operation is a private helper function to deliver a
-  -- varchar2 representation of an attribute in dependency of its datatype.
-  -----------------------------------------------------------------------------
+  /*
+  util_get_vc2_4000_operation is a private helper function to deliver a
+  varchar2 representation of an attribute in dependency of its datatype.
+  */
   FUNCTION util_get_vc2_4000_operation
   (
     p_data_type      IN all_tab_cols.data_type%TYPE,
@@ -1064,10 +1062,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_get_vc2_4000_operation;
 
   -----------------------------------------------------------------------------
-  -- util_get_user_name is a private helper function to deliver the current
-  -- username. If a valid APEX session exists,then the APEX application user
-  -- is taken,otherwise the current connected operation system user.
-  -----------------------------------------------------------------------------
+
   FUNCTION util_get_user_name RETURN all_users.username%TYPE IS
   BEGIN
     RETURN upper (coalesce(
@@ -1077,9 +1072,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_get_user_name;
 
   -----------------------------------------------------------------------------
-  -- util_get_parameter_name is a private helper function to deliver a cleaned
-  -- normalized parameter name.
-  -----------------------------------------------------------------------------
+  /*
+  util_get_parameter_name is a private helper function to deliver a cleaned
+  normalized parameter name.
+  */
   FUNCTION util_get_parameter_name
   (
     p_column_name IN VARCHAR2,
@@ -1107,9 +1103,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_get_parameter_name;
 
   -----------------------------------------------------------------------------
-  -- util_get_column_name is a private helper function to deliver a cleaned
-  -- normalized column name.
-  -----------------------------------------------------------------------------
+  /*
+  util_get_column_name is a private helper function to deliver a cleaned
+  normalized column name.
+  */
   FUNCTION util_get_column_name
   (
     p_column_name IN VARCHAR2,
@@ -1133,9 +1130,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_get_column_name;
 
   -----------------------------------------------------------------------------
-  -- util_get_method_name is a private helper function to deliver a cleaned
-  -- normalized method name for the getter and setter functions/procedures.
-  -----------------------------------------------------------------------------
+  /*
+  util_get_method_name is a private helper function to deliver a cleaned
+  normalized method name for the getter and setter functions/procedures.
+  */
   FUNCTION util_get_method_name(p_column_name IN VARCHAR2) RETURN VARCHAR2 IS
     v_return user_objects.object_name%TYPE;
   BEGIN
@@ -2596,11 +2594,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_generate_list;
 
   -----------------------------------------------------------------------------
-  -- util_clob_append is a private helper procedure to append a varchar2 value
-  -- to an existing clob. The idea is to increase performance by avoiding the
-  -- slow DBMS_LOB.append call. Only for the final append or if the varchar
-  -- cache is fullfilled,this call is done.
-  -----------------------------------------------------------------------------
+  /*
+  util_clob_append is a private helper procedure to append a varchar2 value
+  to an existing clob. The idea is to increase performance by avoiding the
+  slow DBMS_LOB.append call. Only for the final append or if the varchar
+  cache is fullfilled, this call is done.
+  */
   PROCEDURE util_clob_append
   (
     p_clob               IN OUT NOCOPY CLOB,
@@ -2640,12 +2639,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   END util_clob_append;
 
   -----------------------------------------------------------------------------
-  -- util_template_replace is a private helper procedure:
-  -- * processes static or dynamic replacements
-  -- * slices the templates in blocks of code at the replacement positions
-  -- * appends the slices to the resulting clobs for spec, body, view and trigger
-  -- * uses a varchar2 cache to speed up the clob processing
-  -----------------------------------------------------------------------------
+  /*
+  util_template_replace is a private helper procedure:
+  - processes static or dynamic replacements
+  - slices the templates in blocks of code at the replacement positions
+  - appends the slices to the resulting clobs for spec, body, views and trigger
+  - uses a varchar2 cache to speed up the clob processing
+  */
   PROCEDURE util_template_replace(
     p_scope                 IN VARCHAR2 DEFAULT NULL) IS
     v_current_pos       PLS_INTEGER := 1;
@@ -3148,13 +3148,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       END LOOP;
       util_debug_stop_one_step;
     END init_fetch_constraints;
-
-    -----------------------------------------------------------------------------
-    /* constraint columns
-    constraint_name
-    column_name
-    column_name_length
-    data_type         */
 
     -----------------------------------------------------------------------------
 
