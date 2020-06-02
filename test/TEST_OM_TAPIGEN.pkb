@@ -22,7 +22,7 @@ procedure test_all_tables_with_defaults is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(7);
+  ut.expect(util_count_generated_objects).to_equal(9);
 end test_all_tables_with_defaults;
 
 --------------------------------------------------------------------------------
@@ -50,7 +50,7 @@ procedure test_all_tables_enable_dml_and_1_to_1_view is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(28);
+  ut.expect(util_count_generated_objects).to_equal(36);
 end test_all_tables_enable_dml_and_1_to_1_view;
 
 --------------------------------------------------------------------------------
@@ -76,7 +76,7 @@ procedure test_all_tables_return_row_instead_of_pk_true is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(7);
+  ut.expect(util_count_generated_objects).to_equal(9);
 end test_all_tables_return_row_instead_of_pk_true;
 
 --------------------------------------------------------------------------------
@@ -102,7 +102,7 @@ procedure test_all_tables_double_quote_names_false is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(7);
+  ut.expect(util_count_generated_objects).to_equal(9);
 end test_all_tables_double_quote_names_false;
 
 --------------------------------------------------------------------------------
@@ -129,7 +129,7 @@ procedure test_all_tables_audit_column_mappings_configured is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(7);
+  ut.expect(util_count_generated_objects).to_equal(9);
 end test_all_tables_audit_column_mappings_configured;
 
 --------------------------------------------------------------------------------
@@ -296,6 +296,58 @@ end test_table_users_create_and_update_methods;
 
 --------------------------------------------------------------------------------
 
+procedure test_table_with_very_short_column_names is
+  l_table_name t_name := 'TAG_SHORT_COLUMN_NAMES';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name => l_table_name
+    );
+    test_om_tapigen_log_api.create_row (
+      p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(1);
+end test_table_with_very_short_column_names;
+
+--------------------------------------------------------------------------------
+
+procedure test_table_with_very_long_column_names is
+  l_table_name t_name := 'TAG_LONG_COLUMN_NAMES';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name => l_table_name
+    );
+    test_om_tapigen_log_api.create_row (
+      p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(1);
+end test_table_with_very_long_column_names;
+
+--------------------------------------------------------------------------------
+
 procedure util_drop_and_create_test_table_objects is
 begin
   util_drop_test_table_objects;
@@ -436,23 +488,51 @@ procedure util_create_test_table_objects is
   begin
     execute immediate '
       create table tag_all_data_types_multi_pk (
-        adt2_id             integer       generated always as identity,
-        adt2_varchar        varchar2(15)            ,
-        adt2_char           char(1)       not null  ,
-        adt2_integer        integer                 ,
-        adt2_number         number                  ,
-        adt2_number_x_5     number(*,5)             ,
-        adt2_number_20_5    number(20,5)            ,
-        adt2_float          float                   ,
-        adt2_float_size_30  float(30)               ,
-        adt2_xmltype        xmltype                 ,
-        adt2_clob           clob                    ,
-        adt2_blob           blob                    ,
+        adt2_id             integer            generated always as identity,
+        adt2_varchar        varchar2(15 char)            ,
+        adt2_char           char(1 char)       not null  ,
+        adt2_integer        integer                      ,
+        adt2_number         number                       ,
+        adt2_number_x_5     number(*,5)                  ,
+        adt2_number_20_5    number(20,5)                 ,
+        adt2_float          float                        ,
+        adt2_float_size_30  float(30)                    ,
+        adt2_xmltype        xmltype                      ,
+        adt2_clob           clob                         ,
+        adt2_blob           blob                         ,
         --
         primary key (adt2_id, adt2_varchar)
       )
     ';
   end tag_all_data_types_multi_pk;
+  ----------
+  procedure tag_short_column_names is
+  begin
+    execute immediate '
+      create table tag_short_column_names (
+        scn_id  integer            generated always as identity,
+        scn_a   varchar2(15 char)  ,
+        scn_b   integer            ,
+        scn_c   number             ,
+        --
+        primary key (scn_id)
+      )
+    ';
+  end tag_short_column_names;
+  ----------
+  procedure tag_long_column_names is
+  begin
+    execute immediate '
+      create table tag_long_column_names (
+        lcn_id  integer            generated always as identity,
+        lcn_a_very_very_very_very_very_long_column_name_to_test_how_far_we_can_go_with_a_descend_database_version  varchar2(15 char)  ,
+        lcn_another_long_column_name_although_not_as_long_as_the_first_one_but_long_enough_for_our_tests           integer            ,
+        lcn_a_short_one_just_for_fun                                                                               number             ,
+        --
+        primary key (lcn_id)
+      )
+    ';
+  end tag_long_column_names;
   ----------
 begin
   tag_global_version_sequence;
@@ -463,6 +543,8 @@ begin
   tag_map_roles_rights;
   tag_all_data_types_single_pk;
   tag_all_data_types_multi_pk;
+  tag_short_column_names;
+  tag_long_column_names;
 end util_create_test_table_objects;
 
 --------------------------------------------------------------------------------

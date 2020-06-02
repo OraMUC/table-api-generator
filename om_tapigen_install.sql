@@ -33,7 +33,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.29';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.30';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -2822,13 +2822,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                           NULL
                       END);
         WHEN 'ROWTYPE_PARAM' THEN
-          code_append(rpad('p_row', g_status.rpad_columns + 2) || ' IN ' || util_double_quote(g_params.table_name) || '%ROWTYPE');
+          code_append('p_row IN ' || util_double_quote(g_params.table_name) || '%ROWTYPE');
         WHEN 'BULK_LIMIT_PARAM' THEN
-          code_append(rpad('p_bulk_limit', g_status.rpad_columns + 2) || ' IN PLS_INTEGER');
+          code_append('p_bulk_limit IN PLS_INTEGER');
         WHEN 'TABTYPE_PARAM' THEN
-          code_append(rpad('p_rows_tab', g_status.rpad_columns + 2) || ' IN t_rows_tab');
+          code_append('p_rows_tab IN t_rows_tab');
         WHEN 'REFCURSOR_PARAM' THEN
-          code_append(rpad('p_ref_cursor', g_status.rpad_columns + 2) || ' IN t_strong_ref_cursor');
+          code_append('p_ref_cursor IN t_strong_ref_cursor');
         WHEN 'I_COLUMN_NAME' THEN
           code_append(g_iterator.column_name);
         WHEN 'I_METHOD_NAME' THEN

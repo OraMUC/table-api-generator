@@ -40,6 +40,12 @@ procedure test_table_users_delete_methods_only;
 --%test
 procedure test_table_users_create_and_update_methods;
 
+--%test
+procedure test_table_with_very_short_column_names;
+
+--%test
+procedure test_table_with_very_long_column_names;
+
 --------------------------------------------------------------------------------
 
 subtype t_name is varchar2(128);
