@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.30';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.31';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -82,8 +82,6 @@ SUBTYPE t_vc2_30           IS VARCHAR2(30 CHAR);
 SUBTYPE t_vc2_64           IS VARCHAR2(64 CHAR);
 SUBTYPE t_vc2_100          IS VARCHAR2(100 CHAR);
 SUBTYPE t_vc2_200          IS VARCHAR2(200 CHAR);
-SUBTYPE t_vc2_500          IS VARCHAR2(500 CHAR);
-SUBTYPE t_vc2_2k           IS VARCHAR2(2000 CHAR);
 SUBTYPE t_vc2_4k           IS VARCHAR2(4000 CHAR);
 SUBTYPE t_vc2_16K          IS VARCHAR2(16000 CHAR);
 SUBTYPE t_vc2_32K          IS VARCHAR2(32767 CHAR);
