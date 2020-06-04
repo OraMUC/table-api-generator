@@ -103,9 +103,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   --
 
   TYPE t_rec_template_options IS RECORD(
-    use_column_defaults   BOOLEAN,
-    crud_mode             t_vc2_10,
-    padding               INTEGER);
+    use_column_defaults BOOLEAN,
+    respect_g_iterator  BOOLEAN,
+    crud_mode           t_vc2_10,
+    padding             INTEGER);
 
   --
 
@@ -1097,7 +1098,51 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     END check_audit_visibility_update;
 
     -----------------------------------------------------------------------------
+    /*
+    We trim here the lists, so that it looks nice in the source code.
+    A list contains a number of rows, each row contains two columns:
 
+    | col1 varchar(200)    | col2 varchar(2000)                   |
+    |----------------------|--------------------------------------|
+    | '   p_column_name_1' | ' in table_name.column_name_1%type,' |
+    | '   p_col_name_2'    | ' in table_name.col_name_2%type,'    |
+
+    When we append the list to the code the two cols are simply concatenated.
+    What we here do is, we loop over the list array and left trim the first col1
+    and right trim the list separator (comma in our example) in the last col2.
+    The result is something like this:
+
+    | col1 varchar(200)    | col2 varchar(2000)                   |
+    |----------------------|--------------------------------------|
+    | 'p_column_name_1'    | ' in table_name.column_name_1%type,' |
+    | '   p_col_name_2   ' | ' in table_name.col_name_2%type'     |
+
+    When we look at the template code you will see something like this:
+
+        PROCEDURE create_row (
+          {% LIST_PARAMS_W_PK %} )
+        IS
+        BEGIN
+        ...
+
+    When our list placeholder `{% LIST_PARAMS_W_PK %}` gets replaced by
+    the template engine the result would be something like this:
+
+        PROCEDURE create_row (
+          p_column_name_1 in table_name.column_name_1%type,
+          p_col_name_2    in table_name.col_name_2%type )
+        IS
+        BEGIN
+        ...
+
+    The first line of the list has already a left padding from the template
+    (`{% LIST_PARAMS_W_PK %}` is four spaces left padded). Starting from the
+    second line we need to do the padding of four spaces by ourself.
+
+    You get the idea... As always there are some special things - in our case
+    some of the list entries starting with `AND ` or `, `  - these
+    cases needs to be handled too.
+    */
     PROCEDURE trim_list(p_list in out nocopy t_tab_list) is
     BEGIN
       IF p_list.count > 0 THEN
@@ -1113,7 +1158,43 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     END trim_list;
 
     -----------------------------------------------------------------------------
+    /*
+    We try here to align the lists, so that it looks nice in the source code.
+    A list contains a number of rows, each row contains two columns:
 
+    | col1 varchar(200)    | col2 varchar(2000)                   |
+    |----------------------|--------------------------------------|
+    | '   p_column_name_1' | ' in table_name.column_name_1%type,' |
+    | '   p_col_name_2'    | ' in table_name.col_name_2%type,'    |
+
+    When we append the list to the code the two cols are simply concatenated.
+    What we here do is, we loop over the list array and find the maximum
+    string length of the col1. Then we loop again over the list array and use
+    the max string length to rpad all col1 strings, so that they are aligned.
+    The result is something like this:
+
+    | col1 varchar(200)    | col2 varchar(2000)                   |
+    |----------------------|--------------------------------------|
+    | '   p_column_name_1' | ' in table_name.column_name_1%type,' |
+    | '   p_col_name_2   ' | ' in table_name.col_name_2%type,'    |
+
+    The result in the code should look like this:
+
+        p_column_name_1 in table_name.column_name_1%type,
+        p_col_name_2    in table_name.col_name_2%type,
+        ...
+
+    Or like this:
+
+        column_name_1 = p_column_name_1,
+        col_name_2    = p_col_name_2,
+        ...
+
+    You get the idea... As always there are some special things - in our case
+    the generated getter and setter methods. Here we have not all columns in
+    the list - g_iterator.parameter_name comes from the getter/setter
+    generator loop and need to be taken into account too.
+    */
     PROCEDURE align_list_col1(p_list IN OUT NOCOPY t_tab_list) IS
       v_length     pls_integer;
       v_max_length pls_integer := 0;
@@ -1124,7 +1205,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           v_max_length := v_length;
         END IF;
       END LOOP;
-      IF g_iterator.parameter_name IS NOT NULL THEN
+      IF g_template_options.respect_g_iterator THEN
         v_length := length(g_iterator.parameter_name) + 4;
         IF v_length > v_max_length THEN
           v_max_length := v_length;
@@ -2395,6 +2476,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           util_string_to_bool(regexp_substr(
             srcstr        => v_match,
             pattern       => 'USE_COLUMN_DEFAULTS=([A-Z]+)',
+            position      => 1,
+            occurrence    => 1,
+            modifier      => 'i',
+            subexpression => 1)),
+          FALSE);
+      g_template_options.respect_g_iterator :=
+        nvl(
+          util_string_to_bool(regexp_substr(
+            srcstr        => v_match,
+            pattern       => 'RESPECT_G_ITERATOR=([A-Z]+)',
             position      => 1,
             occurrence    => 1,
             modifier      => 'i',
@@ -4220,13 +4311,13 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
 
           g_code_blocks.template := '
   PROCEDURE set_{{ I_METHOD_NAME }} (
-    {% LIST_PK_PARAMS %},
+    {% LIST_PK_PARAMS respect_g_iterator=true %},
     {{ I_PARAMETER_NAME }} IN {{ TABLE_NAME }}.{{ I_COLUMN_NAME }}%TYPE );';
           util_template_replace('API SPEC');
 
           g_code_blocks.template := '
   PROCEDURE set_{{ I_METHOD_NAME }} (
-    {% LIST_PK_PARAMS %},
+    {% LIST_PK_PARAMS respect_g_iterator=true %},
     {{ I_PARAMETER_NAME }} IN {{ TABLE_NAME }}.{{ I_COLUMN_NAME }}%TYPE )
   IS
   BEGIN
@@ -4239,8 +4330,6 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   END set_{{ I_METHOD_NAME }};';
           util_template_replace('API BODY');
 
-          --reset parameter name (is used for list alignment)
-          g_iterator.parameter_name := null;
         END IF;
       END LOOP;
       util_debug_stop_one_step;
