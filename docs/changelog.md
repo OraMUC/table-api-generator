@@ -39,6 +39,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - added: support for audit columns (parameters p_audit_column_mappings and p_audit_user_expression)
 - added: support for a row version column (parameter p_row_version_column_mapping)
 - added: support for a 1:1 view with read only (parameter p_enable_one_to_one_view)
+- added: support for naming the generated views (parameters p_dml_view_name and p_one_to_one_view_name)
 - added: double quoting of table and column names can now be configured (parameter p_double_quote_names, default true)
 - added: update function with return clause (mainly for use in create_or_update_row to prevent read row after update)
 - added: unit tests with utPLSQL (it will be a permanent task to improve the tests with every new feature or bugfix)

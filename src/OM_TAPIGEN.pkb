@@ -30,7 +30,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     double_quote_names          BOOLEAN,
     default_bulk_limit          INTEGER,
     enable_dml_view             BOOLEAN,
+    dml_view_name               all_objects.object_name%TYPE,
     enable_one_to_one_view      BOOLEAN,
+    one_to_one_view_name        all_objects.object_name%TYPE,
     api_name                    all_objects.object_name%TYPE,
     sequence_name               all_sequences.sequence_name%TYPE,
     exclude_column_list         t_vc2_4k,
@@ -901,6 +903,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --
     v_row.package_status_key := 'api_name';
     v_row.value              := g_params.api_name;
+    pipe row(v_row);
+    --
+    v_row.package_status_key := 'dml_view_name';
+    v_row.value              := g_params.dml_view_name;
+    pipe row(v_row);
+    --
+    v_row.package_status_key := 'one_to_one_view_name';
+    v_row.value              := g_params.one_to_one_view_name;
     pipe row(v_row);
     --
     v_row.package_status_key := 'column_prefix';
@@ -2354,11 +2364,15 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         WHEN 'API_NAME_XML' THEN
           code_append(g_params.api_name);
         WHEN 'DML_VIEW_NAME' THEN
-          code_append(util_double_quote(substr(g_params.table_name, 1, c_ora_max_name_len - 6)||'_DML_V'));
+          code_append(util_double_quote(g_params.dml_view_name));
+        WHEN 'DML_VIEW_NAME_XML' THEN
+          code_append(g_params.dml_view_name);
+        WHEN 'ONE_TO_ONE_VIEW_NAME' THEN
+          code_append(util_double_quote(g_params.one_to_one_view_name));
+        WHEN 'ONE_TO_ONE_VIEW_NAME_XML' THEN
+          code_append(g_params.one_to_one_view_name);
         WHEN 'TRIGGER_NAME' THEN
           code_append(util_double_quote(substr(g_params.table_name, 1, c_ora_max_name_len - 6)||'_IOIUD'));
-        WHEN 'ONE_TO_ONE_VIEW_NAME' THEN
-          code_append(util_double_quote(substr(g_params.table_name, 1, c_ora_max_name_len - 2)||'_V'));
         WHEN 'IDENTITY_TYPE' THEN
           IF g_status.identity_type IS NOT NULL THEN
             code_append(' with column '||g_status.identity_column||' generated '||g_status.identity_type||' as identity');
@@ -2583,7 +2597,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_double_quote_names          IN BOOLEAN,
     p_default_bulk_limit          IN INTEGER,
     p_enable_dml_view             IN BOOLEAN,
+    p_dml_view_name               IN VARCHAR2,
     p_enable_one_to_one_view      IN BOOLEAN,
+    p_one_to_one_view_name        IN VARCHAR2,
     p_api_name                    IN VARCHAR2,
     p_sequence_name               IN VARCHAR2,
     p_exclude_column_list         IN VARCHAR2,
@@ -2632,7 +2648,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_params.double_quote_names          := p_double_quote_names;
       g_params.default_bulk_limit          := p_default_bulk_limit;
       g_params.enable_dml_view             := p_enable_dml_view;
+      g_params.dml_view_name               := util_get_substituted_name(coalesce(p_dml_view_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_DML_V'));
       g_params.enable_one_to_one_view      := p_enable_one_to_one_view;
+      g_params.one_to_one_view_name        := util_get_substituted_name(coalesce(p_one_to_one_view_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_V'));
       g_params.api_name                    := util_get_substituted_name(coalesce(p_api_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'));
       g_params.sequence_name               := CASE WHEN p_sequence_name IS NOT NULL THEN util_get_substituted_name(p_sequence_name) ELSE NULL END;
       g_params.exclude_column_list         := p_exclude_column_list;
@@ -2676,28 +2694,30 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
     -----------------------------------------------------------------------------
 
-    PROCEDURE init_check_if_api_name_exists IS
-      v_object_type all_objects.object_type%TYPE;
-
+    PROCEDURE init_check_if_api_objects_exist IS
+      v_existing_objects_list t_vc2_4k;
       CURSOR v_cur IS
-        SELECT object_type
+        SELECT listagg('- ' || object_name || ' is known as '|| object_type, chr(10))
+               within group (order by object_name) as existing_objects_list
           FROM all_objects
          WHERE owner = g_params.owner
-           AND object_name = g_params.api_name
-           AND object_type NOT IN ('PACKAGE', 'PACKAGE BODY');
+           AND (   object_name = g_params.api_name             AND object_type NOT IN ('PACKAGE', 'PACKAGE BODY')
+                OR object_name = g_params.dml_view_name        AND object_type != 'VIEW'
+                OR object_name = g_params.one_to_one_view_name AND object_type != 'VIEW' );
     BEGIN
-      util_debug_start_one_step(p_action => 'init_check_if_api_name_exists');
+      util_debug_start_one_step(p_action => 'init_check_if_api_objects_exist');
       OPEN v_cur;
-      FETCH v_cur
-        INTO v_object_type;
+      FETCH v_cur INTO v_existing_objects_list;
       CLOSE v_cur;
-      IF (v_object_type IS NOT NULL) THEN
-        raise_application_error(c_generator_error_number,
-                                'API name "' || g_params.api_name || '" does already exist as an object type "' ||
-                                v_object_type || '". Please provide a different API name.');
+      IF (v_existing_objects_list IS NOT NULL) THEN
+        raise_application_error(
+          c_generator_error_number,
+          'Some of the API object names already exist with different object types.' || chr(10)
+          || 'Please review these objects or choose other names for your API objects:' || chr(10)
+          || v_existing_objects_list);
       END IF;
       util_debug_stop_one_step;
-    END init_check_if_api_name_exists;
+    END init_check_if_api_objects_exist;
 
     -----------------------------------------------------------------------------
 
@@ -3239,9 +3259,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     g_params.table_name := p_table_name;
     init_check_if_table_exists;
     init_process_parameters;
-    IF g_params.api_name IS NOT NULL THEN
-      init_check_if_api_name_exists;
-    END IF;
+    init_check_if_api_objects_exist;
     IF g_params.sequence_name IS NOT NULL THEN
       init_check_if_sequence_exists;
     END IF;
@@ -3304,7 +3322,9 @@ CREATE OR REPLACE PACKAGE {{ OWNER }}.{{ API_NAME }} IS
     p_double_quote_names="{{ DOUBLE_QUOTE_NAMES }}"
     p_default_bulk_limit="{{ DEFAULT_BULK_LIMIT }}"
     p_enable_dml_view="{{ ENABLE_DML_VIEW }}"
+    p_dml_view_name="{{ DML_VIEW_NAME_XML }}"
     p_enable_one_to_one_view="{{ ENABLE_ONE_TO_ONE_VIEW }}"
+    p_one_to_one_view_name="{{ ONE_TO_ONE_VIEW_NAME_XML }}"
     p_api_name="{{ API_NAME_XML }}"
     p_sequence_name="{{ SEQUENCE_NAME_XML }}"
     p_exclude_column_list="{{ EXCLUDE_COLUMN_LIST }}"
@@ -4804,7 +4824,9 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_double_quote_names          IN BOOLEAN DEFAULT TRUE,
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_dml_view_name               IN VARCHAR2 DEFAULT NULL,
     p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
+    p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
@@ -4831,7 +4853,9 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_double_quote_names          => p_double_quote_names,
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
+              p_dml_view_name               => p_dml_view_name,
               p_enable_one_to_one_view      => p_enable_one_to_one_view,
+              p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
               p_exclude_column_list         => p_exclude_column_list,
@@ -4863,7 +4887,9 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_double_quote_names          IN BOOLEAN DEFAULT TRUE,
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_dml_view_name               IN VARCHAR2 DEFAULT NULL,
     p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
+    p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
@@ -4893,7 +4919,9 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_double_quote_names          => p_double_quote_names,
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
+              p_dml_view_name               => p_dml_view_name,
               p_enable_one_to_one_view      => p_enable_one_to_one_view,
+              p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
               p_exclude_column_list         => p_exclude_column_list,
@@ -4926,7 +4954,9 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_double_quote_names          IN BOOLEAN DEFAULT TRUE,
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
+    p_dml_view_name               IN VARCHAR2 DEFAULT NULL,
     p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
+    p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
@@ -4953,7 +4983,9 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_double_quote_names          => p_double_quote_names,
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
+              p_dml_view_name               => p_dml_view_name,
               p_enable_one_to_one_view      => p_enable_one_to_one_view,
+              p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
               p_exclude_column_list         => p_exclude_column_list,
@@ -5043,7 +5075,9 @@ WITH api_names AS (
                 x.p_double_quote_names,
                 x.p_default_bulk_limit,
                 x.p_enable_dml_view,
+                x.p_dml_view_name,
                 x.p_enable_one_to_one_view,
+                x.p_one_to_one_view_name,
                 x.p_api_name,
                 x.p_sequence_name,
                 x.p_exclude_column_list,
@@ -5076,7 +5110,9 @@ WITH api_names AS (
                            p_double_quote_names          VARCHAR2 (5 CHAR)    PATH '@p_double_quote_names',
                            p_default_bulk_limit          INTEGER              PATH '@p_default_bulk_limit',
                            p_enable_dml_view             VARCHAR2 (5 CHAR)    PATH '@p_enable_dml_view',
+                           p_dml_view_name               VARCHAR2 (128 CHAR)  PATH '@p_dml_view_name',
                            p_enable_one_to_one_view      VARCHAR2 (5 CHAR)    PATH '@p_enable_one_to_one_view',
+                           p_one_to_one_view_name        VARCHAR2 (128 CHAR)  PATH '@p_one_to_one_view_name',
                            p_api_name                    VARCHAR2 (128 CHAR)  PATH '@p_api_name',
                            p_sequence_name               VARCHAR2 (128 CHAR)  PATH '@p_sequence_name',
                            p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH '@p_exclude_column_list',
@@ -5141,7 +5177,9 @@ SELECT NULL AS errors,
        apis.p_double_quote_names,
        apis.p_default_bulk_limit,
        apis.p_enable_dml_view,
+       apis.p_dml_view_name,
        apis.p_enable_one_to_one_view,
+       apis.p_one_to_one_view_name,
        apis.p_api_name,
        apis.p_sequence_name,
        apis.p_exclude_column_list,

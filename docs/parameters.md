@@ -28,7 +28,9 @@
 - [p_double_quote_names (since v0.6.0)](#p_double_quote_names-since-v060)
 - [p_default_bulk_limit (since v0.6.0)](#p_default_bulk_limit-since-v060)
 - [p_enable_dml_view (since v0.4.0)](#p_enable_dml_view-since-v040)
+- [p_dml_view_name (since v0.6.0)](#p_dml_view_name-since-v060)
 - [p_enable_one_to_one_view (since v0.6.0)](#p_enable_one_to_one_view-since-v060)
+- [p_one_to_one_view_name (since v0.6.0)](#p_one_to_one_view_name-since-v060)
 - [p_api_name (since v0.5.0)](#p_api_name-since-v050)
 - [p_sequence_name (since v0.2.0)](#p_sequence_name-since-v020)
 - [p_exclude_column_list (since v0.5.0)](#p_exclude_column_list-since-v050)
@@ -43,7 +45,7 @@
 
 ## p_table_name (since v0.0.0 ;-)
 
-- String (all_objects.object_name%TYPE), mandatory
+- String (varchar2), mandatory
 - The table for which an API should be generated
 
 ## p_owner (since v0.5.0)
@@ -131,25 +133,45 @@
 - If true, a view trigger named `#TABLE_NAME#_IOIUD` is created to handle DML operations on the view
 - If false, view and trigger are NOT generated
 
+## p_dml_view_name (since v0.6.0)
+
+- String (varchar2), default: null
+- If not null, the given name is used for the DML view
+- You can use substitutions - examples:
+  - `#TABLE_NAME_20#` is treated as `substr(table_name, 1, 20)`
+  - `#TABLE_NAME_5_20#` is treated as `substr(table_name, 5, 20)`
+  - `#TABLE_NAME_-20_20#` is treated as `substr(table_name, -20, 20)`
+  - For table EMP and `p_dml_view_name => '#TABLE_NAME_26#_V'` you get `EMP_V`
+
 ## p_enable_one_to_one_view (since v0.6.0)
 
 - Boolean, default: false
 - If true, a 1:1 view with read only is generated
 - Can be useful when you want to separate the tables into an own schema without direct user access
 
+## p_one_to_one_view_name (since v0.6.0)
+
+- String (varchar2), default: null
+- If not null, the given name is used for the 1:1 view
+- You can use substitutions - examples:
+  - `#TABLE_NAME_20#` is treated as `substr(table_name, 1, 20)`
+  - `#TABLE_NAME_5_20#` is treated as `substr(table_name, 5, 20)`
+  - `#TABLE_NAME_-20_20#` is treated as `substr(table_name, -20, 20)`
+  - For table EMP and `p_one_to_one_view_name => '#TABLE_NAME_26#_V'` you get `EMP_V`
+
 ## p_api_name (since v0.5.0)
 
-- String (all_objects.object_name%TYPE), default: null
+- String (varchar2), default: null
 - If not null, the given name is used for the API
 - You can use substitutions - examples:
-  - `#TABLE_NAME_20#` is treated as `substr(table_name,1,20)`
-  - `#TABLE_NAME_5_20#` is treated as `substr(table_name,5,20)`
-  - `#TABLE_NAME_-20_20#` is treated as `substr(table_name,-20,20)`
+  - `#TABLE_NAME_20#` is treated as `substr(table_name, 1, 20)`
+  - `#TABLE_NAME_5_20#` is treated as `substr(table_name, 5, 20)`
+  - `#TABLE_NAME_-20_20#` is treated as `substr(table_name, -20, 20)`
   - For table EMP and `p_api_name => '#TABLE_NAME_26#_API'` you get `EMP_API`
 
 ## p_sequence_name (since v0.2.0)
 
-- String (all_objects.object_name%TYPE), default: null
+- String (varchar2), default: null
 - If a sequence name is given here, then the resulting API is taken the ID for the create_row methods and you don't need to create a trigger for your table only for the sequence handling
 - you can use the following substitution Strings, the generator is replacing this at runtime: `#TABLE_NAME_24#`, `#TABLE_NAME_26#`, `#TABLE_NAME_28#`, `#PK_COLUMN_26#`, `#PK_COLUMN_28#`, `#COLUMN_PREFIX#`
 - Example 1: `#TABLE_NAME_26#_SEQ`

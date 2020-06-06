@@ -296,6 +296,43 @@ end test_table_users_create_and_update_methods;
 
 --------------------------------------------------------------------------------
 
+procedure test_table_users_different_api_object_names is
+  l_table_name t_name := 'TAG_USERS';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name                 => l_table_name,
+      p_enable_dml_view            => true,
+      p_dml_view_name              => '#TABLE_NAME#_DMLV',
+      p_enable_one_to_one_view     => true,
+      p_one_to_one_view_name       => '#TABLE_NAME#_121V',
+      p_api_name                   => '#TABLE_NAME#_TAPI',
+      p_double_quote_names         => false,
+      p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
+    );
+    test_om_tapigen_log_api.create_row (
+      p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(4);
+  ut.expect(util_check_if_package_exists('TAG_USERS_TAPI')).to_be_true;
+  ut.expect(util_check_if_view_exists('TAG_USERS_DMLV')).to_be_true;
+  ut.expect(util_check_if_view_exists('TAG_USERS_121V')).to_be_true;
+end test_table_users_different_api_object_names;
+
+--------------------------------------------------------------------------------
+
 procedure test_table_with_very_short_column_names is
   l_table_name t_name := 'TAG_SHORT_COLUMN_NAMES';
   l_code clob;
@@ -606,6 +643,33 @@ begin
     and object_name like 'TAG\_%' escape '\';
   return l_return;
 end util_count_generated_objects;
+
+--------------------------------------------------------------------------------
+
+function  util_check_if_view_exists (p_name varchar2) return boolean is
+  l_return boolean := false;
+begin
+  for i in (select view_name from user_views where view_name = p_name)
+  loop
+    l_return := true;
+  end loop;
+return l_return;
+end util_check_if_view_exists;
+
+--------------------------------------------------------------------------------
+
+function  util_check_if_package_exists (p_name varchar2) return boolean is
+  l_return boolean := false;
+begin
+  for i in (select object_name
+              from user_objects
+             where object_name = p_name
+               and object_type = 'PACKAGE')
+  loop
+    l_return := true;
+  end loop;
+return l_return;
+end util_check_if_package_exists;
 
 --------------------------------------------------------------------------------
 

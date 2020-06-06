@@ -46,6 +46,9 @@ procedure test_table_with_very_short_column_names;
 --%test
 procedure test_table_with_very_long_column_names;
 
+--%test
+procedure test_table_users_different_api_object_names;
+
 --------------------------------------------------------------------------------
 
 subtype t_name is varchar2(128);
@@ -88,6 +91,10 @@ function util_get_regex_substr_count (
   p_regex_substr varchar2,
   p_regex_count  varchar2
 ) return integer;
+
+function  util_check_if_view_exists (p_name varchar2) return boolean;
+
+function  util_check_if_package_exists (p_name varchar2) return boolean;
 
 --------------------------------------------------------------------------------
 

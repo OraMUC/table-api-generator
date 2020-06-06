@@ -13,7 +13,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_double_quote_names          CONSTANT param_type := 'Place column and table names in double quotes';
   c_default_bulk_limit          CONSTANT param_type := 'Default bulk size for set based methods';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
+  c_dml_view_name               CONSTANT param_type := 'DML view name (e.g. #TABLE_NAME#_DML_V)';
   c_enable_one_to_one_view      CONSTANT param_type := 'Enable 1:1 view with read only';
+  c_one_to_one_view_name        CONSTANT param_type := '1:1 view name (e.g. #TABLE_NAME#_V)';
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
   c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #TABLE_NAME_26#_SEQ)';
   c_exclude_column_list         CONSTANT param_type := 'Exclude column list (comma separated)';
@@ -64,7 +66,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_double_quote_names)          := 'true';
     v_params(c_default_bulk_limit)          := '1000';
     v_params(c_enable_dml_view)             := 'false';
+    v_params(c_dml_view_name)               := NULL;
     v_params(c_enable_one_to_one_view)      := 'false';
+    v_params(c_one_to_one_view_name)        := NULL;
     v_params(c_api_name)                    := NULL;
     v_params(c_sequence_name)               := NULL;
     v_params(c_exclude_column_list)         := NULL;
@@ -92,7 +96,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       c_double_quote_names,
       c_default_bulk_limit,
       c_enable_dml_view,
+      c_dml_view_name,
       c_enable_one_to_one_view,
+      c_one_to_one_view_name,
       c_api_name,
       c_sequence_name,
       c_exclude_column_list,
@@ -143,7 +149,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       p_double_quote_names          => util_string_to_bool(in_params(c_double_quote_names)),
       p_default_bulk_limit          => to_number(in_params(c_default_bulk_limit)),
       p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
+      p_dml_view_name               => in_params(c_dml_view_name),
       p_enable_one_to_one_view      => util_string_to_bool(in_params(c_enable_one_to_one_view)),
+      p_one_to_one_view_name        => in_params(c_one_to_one_view_name),
       p_api_name                    => in_params(c_api_name),
       p_sequence_name               => in_params(c_sequence_name),
       p_exclude_column_list         => in_params(c_exclude_column_list),
