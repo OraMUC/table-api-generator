@@ -39,7 +39,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - added: support for audit columns (parameters p_audit_column_mappings and p_audit_user_expression)
 - added: support for a row version column (parameter p_row_version_column_mapping)
 - added: support for a 1:1 view with read only (parameter p_enable_one_to_one_view)
-- added: support for naming the generated views (parameters p_dml_view_name and p_one_to_one_view_name)
+- added: support for naming all generated objects (parameters p_dml_view_name, p_dml_view_trigger_name and p_one_to_one_view_name)
 - added: double quoting of table and column names can now be configured (parameter p_double_quote_names, default true)
 - added: update function with return clause (mainly for use in create_or_update_row to prevent read row after update)
 - added: unit tests with utPLSQL (it will be a permanent task to improve the tests with every new feature or bugfix)
@@ -47,7 +47,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - removed: prevent updates if columns do not differ (remove was needed to support all possible column types and for performance reasons)
 - removed: parameter p_reuse_existing_api_params (usage was was not logic, simply provide always your needed parameters and create scripts or a wrapper)
 - removed: procedure recreate_existing_apis (this was a parameterless procedure which reused the existing API parameters, you can still do this with the help of the pipelined function view_existing_apis)
-- fixed: identity columns are always hidden on create methods (is now handled correct and in the sense of an API)
+- fixed: identity columns are always hidden on create methods (is now handled correct and in the sense of a table API)
 
 ## 0.5.2 (2020-05-09)
 

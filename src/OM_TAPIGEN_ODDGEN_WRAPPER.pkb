@@ -5,7 +5,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_enable_column_defaults      CONSTANT param_type := 'Enable column defaults (for create methods)';
   c_enable_update_of_rows       CONSTANT param_type := 'Enable update of rows';
   c_enable_deletion_of_rows     CONSTANT param_type := 'Enable deletion of rows';
-  c_enable_parameter_prefixes   CONSTANT param_type := 'Enable parameter prefixes (p_ + colname)';
+  c_enable_parameter_prefixes   CONSTANT param_type := 'Enable parameter prefixes (p_ + column_name)';
   c_enable_proc_with_out_params CONSTANT param_type := 'Enable procedure with out parameters';
   c_enable_getter_and_setter    CONSTANT param_type := 'Enable getter/setter methods';
   c_col_prefix_in_method_names  CONSTANT param_type := 'Keep column prefix in getter/setter method names';
@@ -14,10 +14,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_default_bulk_limit          CONSTANT param_type := 'Default bulk size for set based methods';
   c_enable_dml_view             CONSTANT param_type := 'Enable DML view';
   c_dml_view_name               CONSTANT param_type := 'DML view name (e.g. #TABLE_NAME#_DML_V)';
+  c_dml_view_trigger_name       CONSTANT param_type := 'DML view trigger_name (e.g. #TABLE_NAME#_IOIUD)';
   c_enable_one_to_one_view      CONSTANT param_type := 'Enable 1:1 view with read only';
-  c_one_to_one_view_name        CONSTANT param_type := '1:1 view name (e.g. #TABLE_NAME#_V)';
-  c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME#_API)';
-  c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #TABLE_NAME_26#_SEQ)';
+  c_one_to_one_view_name        CONSTANT param_type := '1:1 view name (e.g. #TABLE_NAME_28#_V)';
+  c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME_26#_API)';
+  c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #COLUMN_PREFIX#_SEQ)';
   c_exclude_column_list         CONSTANT param_type := 'Exclude column list (comma separated)';
   c_audit_column_mappings       CONSTANT param_type := 'Audit column mappings (comma separated)';
   c_audit_user_expression       CONSTANT param_type := 'Audit user expression';
@@ -67,6 +68,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_default_bulk_limit)          := '1000';
     v_params(c_enable_dml_view)             := 'false';
     v_params(c_dml_view_name)               := NULL;
+    v_params(c_dml_view_trigger_name)       := NULL;
     v_params(c_enable_one_to_one_view)      := 'false';
     v_params(c_one_to_one_view_name)        := NULL;
     v_params(c_api_name)                    := NULL;
@@ -97,6 +99,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       c_default_bulk_limit,
       c_enable_dml_view,
       c_dml_view_name,
+      c_dml_view_trigger_name,
       c_enable_one_to_one_view,
       c_one_to_one_view_name,
       c_api_name,
@@ -150,6 +153,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       p_default_bulk_limit          => to_number(in_params(c_default_bulk_limit)),
       p_enable_dml_view             => util_string_to_bool(in_params(c_enable_dml_view)),
       p_dml_view_name               => in_params(c_dml_view_name),
+      p_dml_view_trigger_name       => in_params(c_dml_view_trigger_name),
       p_enable_one_to_one_view      => util_string_to_bool(in_params(c_enable_one_to_one_view)),
       p_one_to_one_view_name        => in_params(c_one_to_one_view_name),
       p_api_name                    => in_params(c_api_name),

@@ -29,6 +29,7 @@
 - [p_default_bulk_limit (since v0.6.0)](#p_default_bulk_limit-since-v060)
 - [p_enable_dml_view (since v0.4.0)](#p_enable_dml_view-since-v040)
 - [p_dml_view_name (since v0.6.0)](#p_dml_view_name-since-v060)
+- [p_dml_view_trigger_name (since v0.6.0)](#p_dml_view_trigger_name-since-v060)
 - [p_enable_one_to_one_view (since v0.6.0)](#p_enable_one_to_one_view-since-v060)
 - [p_one_to_one_view_name (since v0.6.0)](#p_one_to_one_view_name-since-v060)
 - [p_api_name (since v0.5.0)](#p_api_name-since-v050)
@@ -137,11 +138,25 @@
 
 - String (varchar2), default: null
 - If not null, the given name is used for the DML view
-- You can use substitutions - examples:
+- You can use the substitutions `#TABLE_NAME#`, `#COLUMN_PREFIX#` and `#PK_COLUMN#` (the first column on multicolumn primary keys)
+- Examples:
+  - `#TABLE_NAME#` is substituted as `table_name`
   - `#TABLE_NAME_20#` is treated as `substr(table_name, 1, 20)`
   - `#TABLE_NAME_5_20#` is treated as `substr(table_name, 5, 20)`
   - `#TABLE_NAME_-20_20#` is treated as `substr(table_name, -20, 20)`
-  - For table EMP and `p_dml_view_name => '#TABLE_NAME_26#_V'` you get `EMP_V`
+  - For TABLE_NAME_WITH_29_CHARACTERS and `p_dml_view_name => '#TABLE_NAME_24#_DML_V'` you get `TABLE_NAME_WITH_29_CHARA_DML_V`
+
+## p_dml_view_trigger_name (since v0.6.0)
+
+- String (varchar2), default: null
+- If not null, the given name is used for the DML view trigger
+- You can use the substitutions `#TABLE_NAME#`, `#COLUMN_PREFIX#` and `#PK_COLUMN#` (the first column on multicolumn primary keys)
+- Examples:
+  - `#TABLE_NAME#` is substituted as `table_name`
+  - `#TABLE_NAME_20#` is treated as `substr(table_name, 1, 20)`
+  - `#TABLE_NAME_5_20#` is treated as `substr(table_name, 5, 20)`
+  - `#TABLE_NAME_-20_20#` is treated as `substr(table_name, -20, 20)`
+  - For TABLE_NAME_WITH_29_CHARACTERS and `p_dml_view_trigger_name => '#TABLE_NAME_24#_IOIUD'` you get `TABLE_NAME_WITH_29_CHARA_IOIUD`
 
 ## p_enable_one_to_one_view (since v0.6.0)
 
@@ -153,21 +168,25 @@
 
 - String (varchar2), default: null
 - If not null, the given name is used for the 1:1 view
-- You can use substitutions - examples:
+- You can use the substitutions `#TABLE_NAME#`, `#COLUMN_PREFIX#` and `#PK_COLUMN#` (the first column on multicolumn primary keys)
+- Examples:
+  - `#TABLE_NAME#` is substituted as `table_name`
   - `#TABLE_NAME_20#` is treated as `substr(table_name, 1, 20)`
   - `#TABLE_NAME_5_20#` is treated as `substr(table_name, 5, 20)`
   - `#TABLE_NAME_-20_20#` is treated as `substr(table_name, -20, 20)`
-  - For table EMP and `p_one_to_one_view_name => '#TABLE_NAME_26#_V'` you get `EMP_V`
+  - For TABLE_NAME_WITH_29_CHARACTERS and `p_one_to_one_view_name => '#TABLE_NAME_28#_V'` you get `TABLE_NAME_WITH_29_CHARACTER_V`
 
 ## p_api_name (since v0.5.0)
 
 - String (varchar2), default: null
 - If not null, the given name is used for the API
-- You can use substitutions - examples:
+- You can use the substitutions `#TABLE_NAME#`, `#COLUMN_PREFIX#` and `#PK_COLUMN#` (the first column on multicolumn primary keys)
+- Examples:
+  - `#TABLE_NAME#` is substituted as `table_name`
   - `#TABLE_NAME_20#` is treated as `substr(table_name, 1, 20)`
   - `#TABLE_NAME_5_20#` is treated as `substr(table_name, 5, 20)`
   - `#TABLE_NAME_-20_20#` is treated as `substr(table_name, -20, 20)`
-  - For table EMP and `p_api_name => '#TABLE_NAME_26#_API'` you get `EMP_API`
+  - For TABLE_NAME_WITH_29_CHARACTERS and `p_api_name => '#TABLE_NAME_26#_API'` you get `TABLE_NAME_WITH_29_CHARACT_API`
 
 ## p_sequence_name (since v0.2.0)
 

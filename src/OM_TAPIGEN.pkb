@@ -9,7 +9,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   c_list_delimiter              CONSTANT t_vc2_2 := ',' || chr(10);
   c_custom_defaults_present_msg CONSTANT t_vc2_30 := 'SEE_END_OF_API_PACKAGE_SPEC';
   c_spec_options_min_line       CONSTANT INTEGER := 5;
-  c_spec_options_max_line       CONSTANT INTEGER := 40;
+  c_spec_options_max_line       CONSTANT INTEGER := 42;
   c_debug_max_runs              CONSTANT INTEGER := 1000;
 
   -----------------------------------------------------------------------------
@@ -31,6 +31,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     default_bulk_limit          INTEGER,
     enable_dml_view             BOOLEAN,
     dml_view_name               all_objects.object_name%TYPE,
+    dml_view_trigger_name       all_objects.object_name%TYPE,
     enable_one_to_one_view      BOOLEAN,
     one_to_one_view_name        all_objects.object_name%TYPE,
     api_name                    all_objects.object_name%TYPE,
@@ -632,15 +633,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         v_position := regexp_substr(v_replace_string, '-?\d+', 1, 1);
         v_length   := regexp_substr(v_replace_string, '\d+', 1, 2);
 
-        -- 1. To be backward compatible we have to support things like this TABLE_NAME_26.
-        -- 2. If someone want to use the substr version he has always to provide position and length.
-        -- 3. Negative position is supported like this #TABLE_NAME_-15_15# (the second number can not be omitted like in substr,see 1.)
+        -- 1. Possible substitutions: #TABLE_NAME#, #COLUMN_PREFIX# and #PK_COLUMN# (the first column on multicolumn primary keys)
+        -- 2. To be backward compatible we have to support things like this #TABLE_NAME_26# (this is like substr(table_name, 1, 26))
+        -- 3. If someone want to use the substr version he has always to provide position and length.
+        -- 4. Negative position is supported like this #TABLE_NAME_-15_15# (the second number can not be omitted like in substr, see 2.)
         IF v_position IS NULL AND v_length IS NULL THEN
+          v_position := 1;
           v_length   := 200;
-          v_position := 1;
         ELSIF v_position IS NOT NULL AND v_length IS NULL THEN
-          v_length   := v_position;
           v_position := 1;
+          v_length   := v_position; -- see point 2. above
         END IF;
 
         v_return := replace(p_name_template,
@@ -907,6 +909,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --
     v_row.package_status_key := 'dml_view_name';
     v_row.value              := g_params.dml_view_name;
+    pipe row(v_row);
+    --
+    v_row.package_status_key := 'dml_view_trigger_name';
+    v_row.value              := g_params.dml_view_trigger_name;
     pipe row(v_row);
     --
     v_row.package_status_key := 'one_to_one_view_name';
@@ -2367,12 +2373,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(util_double_quote(g_params.dml_view_name));
         WHEN 'DML_VIEW_NAME_XML' THEN
           code_append(g_params.dml_view_name);
+        WHEN 'DML_VIEW_TRIGGER_NAME' THEN
+          code_append(util_double_quote(g_params.dml_view_trigger_name));
+        WHEN 'DML_VIEW_TRIGGER_NAME_XML' THEN
+          code_append(g_params.dml_view_trigger_name);
         WHEN 'ONE_TO_ONE_VIEW_NAME' THEN
           code_append(util_double_quote(g_params.one_to_one_view_name));
         WHEN 'ONE_TO_ONE_VIEW_NAME_XML' THEN
           code_append(g_params.one_to_one_view_name);
-        WHEN 'TRIGGER_NAME' THEN
-          code_append(util_double_quote(substr(g_params.table_name, 1, c_ora_max_name_len - 6)||'_IOIUD'));
         WHEN 'IDENTITY_TYPE' THEN
           IF g_status.identity_type IS NOT NULL THEN
             code_append(' with column '||g_status.identity_column||' generated '||g_status.identity_type||' as identity');
@@ -2598,6 +2606,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_default_bulk_limit          IN INTEGER,
     p_enable_dml_view             IN BOOLEAN,
     p_dml_view_name               IN VARCHAR2,
+    p_dml_view_trigger_name       IN VARCHAR2,
     p_enable_one_to_one_view      IN BOOLEAN,
     p_one_to_one_view_name        IN VARCHAR2,
     p_api_name                    IN VARCHAR2,
@@ -2648,9 +2657,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_params.double_quote_names          := p_double_quote_names;
       g_params.default_bulk_limit          := p_default_bulk_limit;
       g_params.enable_dml_view             := p_enable_dml_view;
-      g_params.dml_view_name               := util_get_substituted_name(coalesce(p_dml_view_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_DML_V'));
+      g_params.dml_view_name               := util_get_substituted_name(coalesce(p_dml_view_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 6) || '#_DML_V'));
+      g_params.dml_view_trigger_name       := util_get_substituted_name(coalesce(p_dml_view_trigger_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 6) || '#_IOIUD'));
       g_params.enable_one_to_one_view      := p_enable_one_to_one_view;
-      g_params.one_to_one_view_name        := util_get_substituted_name(coalesce(p_one_to_one_view_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_V'));
+      g_params.one_to_one_view_name        := util_get_substituted_name(coalesce(p_one_to_one_view_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 2) || '#_V'));
       g_params.api_name                    := util_get_substituted_name(coalesce(p_api_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'));
       g_params.sequence_name               := CASE WHEN p_sequence_name IS NOT NULL THEN util_get_substituted_name(p_sequence_name) ELSE NULL END;
       g_params.exclude_column_list         := p_exclude_column_list;
@@ -2701,9 +2711,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                within group (order by object_name) as existing_objects_list
           FROM all_objects
          WHERE owner = g_params.owner
-           AND (   object_name = g_params.api_name             AND object_type NOT IN ('PACKAGE', 'PACKAGE BODY')
-                OR object_name = g_params.dml_view_name        AND object_type != 'VIEW'
-                OR object_name = g_params.one_to_one_view_name AND object_type != 'VIEW' );
+           AND (   object_name = g_params.api_name              AND object_type NOT IN ('PACKAGE', 'PACKAGE BODY')
+                OR object_name = g_params.dml_view_name         AND object_type != 'VIEW'
+                OR object_name = g_params.dml_view_trigger_name AND object_type != 'TRIGGER'
+                OR object_name = g_params.one_to_one_view_name  AND object_type != 'VIEW' );
     BEGIN
       util_debug_start_one_step(p_action => 'init_check_if_api_objects_exist');
       OPEN v_cur;
@@ -3323,6 +3334,7 @@ CREATE OR REPLACE PACKAGE {{ OWNER }}.{{ API_NAME }} IS
     p_default_bulk_limit="{{ DEFAULT_BULK_LIMIT }}"
     p_enable_dml_view="{{ ENABLE_DML_VIEW }}"
     p_dml_view_name="{{ DML_VIEW_NAME_XML }}"
+    p_dml_view_trigger_name="{{ DML_VIEW_TRIGGER_NAME_XML }}"
     p_enable_one_to_one_view="{{ ENABLE_ONE_TO_ONE_VIEW }}"
     p_one_to_one_view_name="{{ ONE_TO_ONE_VIEW_NAME_XML }}"
     p_api_name="{{ API_NAME_XML }}"
@@ -4530,7 +4542,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
       util_debug_start_one_step(p_action => 'gen_dml_view_trigger');
 
       g_code_blocks.template := '
-CREATE OR REPLACE TRIGGER {{ OWNER }}.{{ TRIGGER_NAME }}
+CREATE OR REPLACE TRIGGER {{ OWNER }}.{{ DML_VIEW_TRIGGER_NAME }}
   INSTEAD OF INSERT OR UPDATE OR DELETE
   ON {{ DML_VIEW_NAME }}
   FOR EACH ROW
@@ -4562,7 +4574,7 @@ BEGIN
     raise_application_error ({{ GENERATOR_ERROR_NUMBER }}, ''Deletion of a row is not allowed.'');'
                           END || '
   END IF;
-END {{ TRIGGER_NAME }};';
+END {{ DML_VIEW_TRIGGER_NAME }};';
       util_template_replace('DML TRIGGER');
 
       util_debug_stop_one_step;
@@ -4825,6 +4837,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
     p_dml_view_name               IN VARCHAR2 DEFAULT NULL,
+    p_dml_view_trigger_name       IN VARCHAR2 DEFAULT NULL,
     p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
     p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
@@ -4854,6 +4867,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
               p_dml_view_name               => p_dml_view_name,
+              p_dml_view_trigger_name       => p_dml_view_trigger_name,
               p_enable_one_to_one_view      => p_enable_one_to_one_view,
               p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
@@ -4888,6 +4902,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
     p_dml_view_name               IN VARCHAR2 DEFAULT NULL,
+    p_dml_view_trigger_name       IN VARCHAR2 DEFAULT NULL,
     p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
     p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
@@ -4920,6 +4935,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
               p_dml_view_name               => p_dml_view_name,
+              p_dml_view_trigger_name       => p_dml_view_trigger_name,
               p_enable_one_to_one_view      => p_enable_one_to_one_view,
               p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
@@ -4955,6 +4971,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_default_bulk_limit          IN INTEGER DEFAULT 1000,
     p_enable_dml_view             IN BOOLEAN DEFAULT FALSE,
     p_dml_view_name               IN VARCHAR2 DEFAULT NULL,
+    p_dml_view_trigger_name       IN VARCHAR2 DEFAULT NULL,
     p_enable_one_to_one_view      IN BOOLEAN DEFAULT FALSE,
     p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
@@ -4984,6 +5001,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_default_bulk_limit          => p_default_bulk_limit,
               p_enable_dml_view             => p_enable_dml_view,
               p_dml_view_name               => p_dml_view_name,
+              p_dml_view_trigger_name       => p_dml_view_trigger_name,
               p_enable_one_to_one_view      => p_enable_one_to_one_view,
               p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
@@ -5076,6 +5094,7 @@ WITH api_names AS (
                 x.p_default_bulk_limit,
                 x.p_enable_dml_view,
                 x.p_dml_view_name,
+                x.p_dml_view_trigger_name,
                 x.p_enable_one_to_one_view,
                 x.p_one_to_one_view_name,
                 x.p_api_name,
@@ -5111,6 +5130,7 @@ WITH api_names AS (
                            p_default_bulk_limit          INTEGER              PATH '@p_default_bulk_limit',
                            p_enable_dml_view             VARCHAR2 (5 CHAR)    PATH '@p_enable_dml_view',
                            p_dml_view_name               VARCHAR2 (128 CHAR)  PATH '@p_dml_view_name',
+                           p_dml_view_trigger_name       VARCHAR2 (128 CHAR)  PATH '@p_dml_view_trigger_name',
                            p_enable_one_to_one_view      VARCHAR2 (5 CHAR)    PATH '@p_enable_one_to_one_view',
                            p_one_to_one_view_name        VARCHAR2 (128 CHAR)  PATH '@p_one_to_one_view_name',
                            p_api_name                    VARCHAR2 (128 CHAR)  PATH '@p_api_name',
@@ -5178,6 +5198,7 @@ SELECT NULL AS errors,
        apis.p_default_bulk_limit,
        apis.p_enable_dml_view,
        apis.p_dml_view_name,
+       apis.p_dml_view_trigger_name,
        apis.p_enable_one_to_one_view,
        apis.p_one_to_one_view_name,
        apis.p_api_name,
