@@ -146,7 +146,6 @@ procedure test_table_users_create_methods_only is
       p_enable_insertion_of_rows   => true,
       p_enable_update_of_rows      => false,
       p_enable_deletion_of_rows    => false,
-      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -186,7 +185,6 @@ procedure test_table_users_update_methods_only is
       p_enable_insertion_of_rows   => false,
       p_enable_update_of_rows      => true,
       p_enable_deletion_of_rows    => false,
-      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -226,7 +224,6 @@ procedure test_table_users_delete_methods_only is
       p_enable_insertion_of_rows   => false,
       p_enable_update_of_rows      => false,
       p_enable_deletion_of_rows    => true,
-      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -270,7 +267,6 @@ procedure test_table_users_create_and_update_methods is
       p_enable_one_to_one_view     => true,
       p_enable_custom_defaults     => true,
       p_double_quote_names         => false,
-      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -312,7 +308,6 @@ procedure test_table_users_default_api_object_names is
       p_enable_dml_view            => true,
       p_enable_one_to_one_view     => true,
       p_double_quote_names         => false,
-      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -352,7 +347,6 @@ procedure test_table_users_different_api_object_names is
       p_one_to_one_view_name       => '#TABLE_NAME#_121V',
       p_api_name                   => '#TABLE_NAME#_TAPI',
       p_double_quote_names         => false,
-      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -438,7 +432,9 @@ procedure test_table_with_tenant_id_visible is
     l_code := om_tapigen.compile_api_and_get_code(
       p_table_name             => l_table_name,
       p_enable_dml_view        => true,
-      p_enable_one_to_one_view => true
+      p_enable_one_to_one_view => true,
+      p_double_quote_names     => false,
+      p_tenant_column_mapping  => '#PREFIX#_TENANT_ID=100'
     );
     test_om_tapigen_log_api.create_row (
       p_test_name      => util_get_test_name,
@@ -453,6 +449,12 @@ begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_api_return_invalid_object_names).to_be_null;
   ut.expect(util_count_generated_objects).to_equal(4);
+  ut.expect(util_get_regex_substr_count(l_code,'create_row \(.*?\)', 'p_tv_')).to_equal(3);
+  ut.expect(util_get_regex_substr_count(l_code,'update_row \(.*?\)', 'p_tv_')).to_equal(3);
+  ut.expect(util_get_regex_substr_count(l_code,'insert into tag_tenant_visible \(.*?\)', 'tv_')).to_equal(4);
+  ut.expect(util_get_regex_substr_count(l_code,'insert into tag_tenant_visible \(.*?\)', 'tv_tenant_id')).to_equal(1);
+  ut.expect(util_get_regex_substr_count(l_code,'update\s+tag_tenant_visible\s+set.*?where', 'tv_')).to_equal(4);
+  ut.expect(regexp_count(l_code, 'where\s+tv_id =.*?and tv_tenant_id = .*?(;|return)', 1, 'in')).to_equal(8);
 end test_table_with_tenant_id_visible;
 
 --------------------------------------------------------------------------------
@@ -466,7 +468,9 @@ procedure test_table_with_tenant_id_invisible is
     l_code := om_tapigen.compile_api_and_get_code(
       p_table_name             => l_table_name,
       p_enable_dml_view        => true,
-      p_enable_one_to_one_view => true
+      p_enable_one_to_one_view => true,
+      p_double_quote_names     => false,
+      p_tenant_column_mapping  => '#PREFIX#_TENANT_ID=100'
     );
     test_om_tapigen_log_api.create_row (
       p_test_name      => util_get_test_name,
@@ -481,6 +485,13 @@ begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_api_return_invalid_object_names).to_be_null;
   ut.expect(util_count_generated_objects).to_equal(4);
+  ut.expect(util_get_regex_substr_count(l_code,'create_row \(.*?\)', 'p_ti_')).to_equal(3);
+  ut.expect(util_get_regex_substr_count(l_code,'update_row \(.*?\)', 'p_ti_')).to_equal(3);
+  ut.expect(util_get_regex_substr_count(l_code,'insert into tag_tenant_invisible \(.*?\)', 'ti_')).to_equal(4);
+  ut.expect(util_get_regex_substr_count(l_code,'insert into tag_tenant_invisible \(.*?\)', 'ti_tenant_id')).to_equal(1);
+  ut.expect(util_get_regex_substr_count(l_code,'update\s+tag_tenant_invisible\s+set.*?where', 'ti_')).to_equal(4);
+  ut.expect(util_get_regex_substr_count(l_code,'update\s+tag_tenant_invisible\s+set.*?where', 'ti_')).to_equal(4);
+  ut.expect(regexp_count(l_code, 'where\s+ti_id =.*?and ti_tenant_id = .*?(;|return)', 1, 'in')).to_equal(8);
 end test_table_with_tenant_id_invisible;
 
 --------------------------------------------------------------------------------
@@ -509,7 +520,6 @@ procedure util_create_test_table_objects is
         u_last_name   varchar2(15 char)                         ,
         u_email       varchar2(30 char)               not null  ,
         u_active_yn   varchar2(1 char)   default 'Y'  not null  ,
-        u_tenant_id   integer                         not null  ,
         u_version_id  integer                         not null  ,
         u_created_on  date                            not null  , -- This is only for demo purposes.
         u_created_by  char(15 char)                   not null  , -- In reality we expect more
@@ -851,7 +861,7 @@ function  util_get_spec_regex_count (
   l_spec clob;
 begin
   l_spec := regexp_substr(p_code, '(CREATE OR REPLACE PACKAGE.*)CREATE OR REPLACE PACKAGE BODY', 1, 1, 'in', 1);
-  return regexp_count(l_spec, p_regex_count);
+  return regexp_count(l_spec, p_regex_count, 1, 'in');
 end util_get_spec_regex_count;
 
 --------------------------------------------------------------------------------
@@ -865,7 +875,7 @@ function util_get_regex_substr_count (
 begin
   l_substr := regexp_substr(p_code, p_regex_substr, 1, 1, 'in');
   --logger.log('l_substr: '|| l_substr);
-  return regexp_count(l_substr, p_regex_count);
+  return regexp_count(l_substr, p_regex_count, 1, 'in');
 end util_get_regex_substr_count;
 
 --------------------------------------------------------------------------------

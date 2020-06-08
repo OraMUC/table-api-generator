@@ -1143,7 +1143,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF (g_columns(i).is_hidden_yn = 'N' OR g_columns(i).is_hidden_yn = 'Y' AND g_columns(i).tenant_expression IS NOT NULL)
+          AND g_columns(i).is_excluded_yn = 'N'
           AND check_identity_visibility(i)
           AND check_audit_visibility_create(i)
         THEN
@@ -1171,7 +1172,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF (g_columns(i).is_hidden_yn = 'N' OR g_columns(i).is_hidden_yn = 'Y' AND g_columns(i).tenant_expression IS NOT NULL)
+          AND g_columns(i).is_excluded_yn = 'N'
           AND check_identity_visibility(i)
           AND check_audit_visibility_create(i)
         THEN
@@ -1214,7 +1216,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF (g_columns(i).is_hidden_yn = 'N' OR g_columns(i).is_hidden_yn = 'Y' AND g_columns(i).tenant_expression IS NOT NULL)
+          AND g_columns(i).is_excluded_yn = 'N'
           AND check_identity_visibility(i)
           AND check_audit_visibility_create(i)
         THEN
@@ -1257,12 +1260,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
-        v_index := v_result.count + 1;
-        v_result(v_index).col1 := v_list_padding;
-        v_result(v_index).col2 :=
-          util_double_quote(g_columns(i).column_name) ||
-          get_column_comment(i) ||
-          c_list_delimiter;
+        IF g_columns(i).is_hidden_yn = 'N' THEN
+          v_index := v_result.count + 1;
+          v_result(v_index).col1 := v_list_padding;
+          v_result(v_index).col2 :=
+            util_double_quote(g_columns(i).column_name) ||
+            get_column_comment(i) ||
+            c_list_delimiter;
+        END IF;
       END LOOP;
       trim_list(v_result);
       RETURN v_result;
@@ -1281,7 +1286,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
           AND g_columns(i).row_version_expression IS NULL
           AND g_columns(i).tenant_expression IS NULL
@@ -1335,7 +1341,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_list_padding := get_list_padding(4);
       v_operator_padding := get_operator_padding(5);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
           AND g_columns(i).row_version_expression IS NULL
           AND g_columns(i).tenant_expression IS NULL
@@ -1369,17 +1376,19 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_columns.count LOOP
-        v_index := v_result.count + 1;
-        v_result(v_index).col1 := v_list_padding ||
-          util_get_parameter_name(g_columns(i).column_name);
-        v_result(v_index).col2 :=
-          CASE WHEN g_columns(i).is_pk_yn = 'Y'
-            THEN ' IN            '
-            ELSE '    OUT NOCOPY '
-          END || util_double_quote(g_params.table_name) || '.' ||
-          util_double_quote(g_columns(i).column_name) || '%TYPE' ||
-          get_column_comment(i) ||
-          c_list_delimiter;
+        IF g_columns(i).is_hidden_yn = 'N' THEN
+          v_index := v_result.count + 1;
+          v_result(v_index).col1 := v_list_padding ||
+            util_get_parameter_name(g_columns(i).column_name);
+          v_result(v_index).col2 :=
+            CASE WHEN g_columns(i).is_pk_yn = 'Y'
+              THEN ' IN            '
+              ELSE '    OUT NOCOPY '
+            END || util_double_quote(g_params.table_name) || '.' ||
+            util_double_quote(g_columns(i).column_name) || '%TYPE' ||
+            get_column_comment(i) ||
+            c_list_delimiter;
+        END IF;
       END LOOP;
       align_list_col1(v_result);
       trim_list(v_result);
@@ -1398,7 +1407,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
           AND g_columns(i).row_version_expression IS NULL
           AND g_columns(i).tenant_expression IS NULL
@@ -1430,7 +1440,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
           AND g_columns(i).row_version_expression IS NULL
           AND g_columns(i).tenant_expression IS NULL
@@ -1462,7 +1473,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(6);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).audit_type IS NULL
           AND g_columns(i).row_version_expression IS NULL
           AND g_columns(i).tenant_expression IS NULL
@@ -1496,7 +1508,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_list_padding := get_list_padding(6);
       v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).is_pk_yn = 'N'
           AND check_audit_visibility_update(i)
           AND g_columns(i).tenant_expression IS NULL
@@ -1578,7 +1591,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_list_padding := get_list_padding(8);
       v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_excluded_yn = 'N'
           AND g_columns(i).is_pk_yn = 'N'
           AND check_audit_visibility_update(i)
           AND g_columns(i).tenant_expression IS NULL
@@ -1617,7 +1631,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     BEGIN
       v_list_padding := get_list_padding(4);
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_pk_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+          AND g_columns(i).is_pk_yn = 'N'
         THEN
           v_index := v_result.count + 1;
           v_result(v_index).col1 := v_list_padding ||
@@ -4263,8 +4278,9 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       util_debug_start_one_step(p_action => 'gen_getter_functions');
       FOR i IN 1 .. g_columns.count
       LOOP
-        IF g_columns(i).is_pk_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
         AND g_columns(i).tenant_expression is NULL
+        AND g_columns(i).is_pk_yn = 'N'
         THEN
           g_iterator.column_name := util_double_quote(g_columns(i).column_name);
           g_iterator.method_name := util_get_method_name(g_columns(i).column_name);
@@ -4297,7 +4313,8 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_setter_procedures');
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_hidden_yn = 'N'
+        AND g_columns(i).is_excluded_yn = 'N'
         AND g_columns(i).is_pk_yn = 'N'
         AND g_columns(i).audit_type IS NULL
         AND g_columns(i).row_version_expression IS NULL

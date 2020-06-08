@@ -54,10 +54,10 @@ procedure test_table_users_default_api_object_names;
 procedure test_table_users_different_api_object_names;
 
 --%test
-procedure test_table_with_tenant_id_visible;
+procedure test_table_with_tenant_id_invisible;
 
 --%test
-procedure test_table_with_tenant_id_invisible;
+procedure test_table_with_tenant_id_visible;
 
 --------------------------------------------------------------------------------
 
