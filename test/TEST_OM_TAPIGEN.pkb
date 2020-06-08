@@ -1,3 +1,4 @@
+prompt Compile package test_om_tapigen (body)
 create or replace package body test_om_tapigen is
 
 --------------------------------------------------------------------------------
@@ -22,7 +23,7 @@ procedure test_all_tables_with_defaults is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(9);
+  ut.expect(util_count_generated_objects).to_equal(11);
 end test_all_tables_with_defaults;
 
 --------------------------------------------------------------------------------
@@ -50,7 +51,7 @@ procedure test_all_tables_enable_dml_and_1_to_1_view is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(36);
+  ut.expect(util_count_generated_objects).to_equal(44);
 end test_all_tables_enable_dml_and_1_to_1_view;
 
 --------------------------------------------------------------------------------
@@ -76,7 +77,7 @@ procedure test_all_tables_return_row_instead_of_pk_true is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(9);
+  ut.expect(util_count_generated_objects).to_equal(11);
 end test_all_tables_return_row_instead_of_pk_true;
 
 --------------------------------------------------------------------------------
@@ -102,16 +103,16 @@ procedure test_all_tables_double_quote_names_false is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(9);
+  ut.expect(util_count_generated_objects).to_equal(11);
 end test_all_tables_double_quote_names_false;
 
 --------------------------------------------------------------------------------
 
-procedure test_all_tables_audit_column_mappings_configured is
+procedure test_users_roles_rights_audit_column_mappings_configured is
   ----------
   function compile_apis_return_invalid_object_names return varchar2 is
   begin
-    for i in cur_all_test_tables loop
+    for i in cur_user_roles_rights loop
       test_om_tapigen_log_api.create_row (
         p_test_name      => util_get_test_name,
         p_table_name     => i.table_name,
@@ -129,8 +130,8 @@ procedure test_all_tables_audit_column_mappings_configured is
 begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_apis_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(9);
-end test_all_tables_audit_column_mappings_configured;
+  ut.expect(util_count_generated_objects).to_equal(5);
+end test_users_roles_rights_audit_column_mappings_configured;
 
 --------------------------------------------------------------------------------
 
@@ -145,6 +146,7 @@ procedure test_table_users_create_methods_only is
       p_enable_insertion_of_rows   => true,
       p_enable_update_of_rows      => false,
       p_enable_deletion_of_rows    => false,
+      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -184,6 +186,7 @@ procedure test_table_users_update_methods_only is
       p_enable_insertion_of_rows   => false,
       p_enable_update_of_rows      => true,
       p_enable_deletion_of_rows    => false,
+      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -223,6 +226,7 @@ procedure test_table_users_delete_methods_only is
       p_enable_insertion_of_rows   => false,
       p_enable_update_of_rows      => false,
       p_enable_deletion_of_rows    => true,
+      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -266,6 +270,7 @@ procedure test_table_users_create_and_update_methods is
       p_enable_one_to_one_view     => true,
       p_enable_custom_defaults     => true,
       p_double_quote_names         => false,
+      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -296,45 +301,6 @@ end test_table_users_create_and_update_methods;
 
 --------------------------------------------------------------------------------
 
-procedure test_table_users_different_api_object_names is
-  l_table_name t_name := 'TAG_USERS';
-  l_code clob;
-  ----------
-  function compile_api_return_invalid_object_names return varchar2 is
-  begin
-    l_code := om_tapigen.compile_api_and_get_code(
-      p_table_name                 => l_table_name,
-      p_enable_dml_view            => true,
-      p_dml_view_name              => '#TABLE_NAME#_DMLV',
-      p_dml_view_trigger_name      => '#TABLE_NAME#_DMLT',
-      p_enable_one_to_one_view     => true,
-      p_one_to_one_view_name       => '#TABLE_NAME#_121V',
-      p_api_name                   => '#TABLE_NAME#_TAPI',
-      p_double_quote_names         => false,
-      p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
-      p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
-    );
-    test_om_tapigen_log_api.create_row (
-      p_test_name      => util_get_test_name,
-      p_table_name     => l_table_name,
-      p_generated_code => l_code
-    );
-    commit;
-    return util_get_list_of_invalid_generated_objects;
-  end compile_api_return_invalid_object_names;
-  ----------
-begin
-  ut.expect(util_count_generated_objects).to_equal(0);
-  ut.expect(compile_api_return_invalid_object_names).to_be_null;
-  ut.expect(util_count_generated_objects).to_equal(4);
-  ut.expect(util_check_if_package_exists('TAG_USERS_TAPI')).to_be_true;
-  ut.expect(util_check_if_view_exists('TAG_USERS_DMLV')).to_be_true;
-  ut.expect(util_check_if_trigger_exists('TAG_USERS_DMLT')).to_be_true;
-  ut.expect(util_check_if_view_exists('TAG_USERS_121V')).to_be_true;
-end test_table_users_different_api_object_names;
-
---------------------------------------------------------------------------------
-
 procedure test_table_users_default_api_object_names is
   l_table_name t_name := 'TAG_USERS';
   l_code clob;
@@ -346,6 +312,7 @@ procedure test_table_users_default_api_object_names is
       p_enable_dml_view            => true,
       p_enable_one_to_one_view     => true,
       p_double_quote_names         => false,
+      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
       p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
       p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
     );
@@ -367,6 +334,46 @@ begin
   ut.expect(util_check_if_trigger_exists('TAG_USERS_IOIUD')).to_be_true;
   ut.expect(util_check_if_view_exists('TAG_USERS_V')).to_be_true;
 end test_table_users_default_api_object_names;
+
+--------------------------------------------------------------------------------
+
+procedure test_table_users_different_api_object_names is
+  l_table_name t_name := 'TAG_USERS';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name                 => l_table_name,
+      p_enable_dml_view            => true,
+      p_dml_view_name              => '#TABLE_NAME#_DMLV',
+      p_dml_view_trigger_name      => '#TABLE_NAME#_DMLT',
+      p_enable_one_to_one_view     => true,
+      p_one_to_one_view_name       => '#TABLE_NAME#_121V',
+      p_api_name                   => '#TABLE_NAME#_TAPI',
+      p_double_quote_names         => false,
+      p_tenant_column_mapping      => '#PREFIX#_TENANT_ID=100',
+      p_row_version_column_mapping => '#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval',
+      p_audit_column_mappings      => 'created=#PREFIX#_CREATED_ON, created_by=#PREFIX#_CREATED_BY, updated=#PREFIX#_UPDATED_AT, updated_by=#PREFIX#_UPDATED_BY'
+    );
+    test_om_tapigen_log_api.create_row (
+      p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(4);
+  ut.expect(util_check_if_package_exists('TAG_USERS_TAPI')).to_be_true;
+  ut.expect(util_check_if_view_exists('TAG_USERS_DMLV')).to_be_true;
+  ut.expect(util_check_if_trigger_exists('TAG_USERS_DMLT')).to_be_true;
+  ut.expect(util_check_if_view_exists('TAG_USERS_121V')).to_be_true;
+end test_table_users_different_api_object_names;
 
 --------------------------------------------------------------------------------
 
@@ -422,6 +429,62 @@ end test_table_with_very_long_column_names;
 
 --------------------------------------------------------------------------------
 
+procedure test_table_with_tenant_id_visible is
+  l_table_name t_name := 'TAG_TENANT_VISIBLE';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name             => l_table_name,
+      p_enable_dml_view        => true,
+      p_enable_one_to_one_view => true
+    );
+    test_om_tapigen_log_api.create_row (
+      p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(4);
+end test_table_with_tenant_id_visible;
+
+--------------------------------------------------------------------------------
+
+procedure test_table_with_tenant_id_invisible is
+  l_table_name t_name := 'TAG_TENANT_INVISIBLE';
+  l_code clob;
+  ----------
+  function compile_api_return_invalid_object_names return varchar2 is
+  begin
+    l_code := om_tapigen.compile_api_and_get_code(
+      p_table_name             => l_table_name,
+      p_enable_dml_view        => true,
+      p_enable_one_to_one_view => true
+    );
+    test_om_tapigen_log_api.create_row (
+      p_test_name      => util_get_test_name,
+      p_table_name     => l_table_name,
+      p_generated_code => l_code
+    );
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_api_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_api_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(4);
+end test_table_with_tenant_id_invisible;
+
+--------------------------------------------------------------------------------
+
 procedure util_drop_and_create_test_table_objects is
 begin
   util_drop_test_table_objects;
@@ -446,6 +509,7 @@ procedure util_create_test_table_objects is
         u_last_name   varchar2(15 char)                         ,
         u_email       varchar2(30 char)               not null  ,
         u_active_yn   varchar2(1 char)   default 'Y'  not null  ,
+        u_tenant_id   integer                         not null  ,
         u_version_id  integer                         not null  ,
         u_created_on  date                            not null  , -- This is only for demo purposes.
         u_created_by  char(15 char)                   not null  , -- In reality we expect more
@@ -608,6 +672,36 @@ procedure util_create_test_table_objects is
     ';
   end tag_long_column_names;
   ----------
+  procedure tag_tenant_visible is
+  begin
+    execute immediate q'[
+      create table tag_tenant_visible (
+        tv_id           integer            generated by default on null as identity,
+        tv_name         varchar2(15 char)  not null  ,
+        tv_description  varchar2(60 char)            ,
+        tv_tenant_id    integer            not null  ,
+        --
+        primary key (tv_id),
+        unique (tv_name)
+      )
+    ]';
+  end tag_tenant_visible;
+  ----------
+  procedure tag_tenant_invisible is
+  begin
+    execute immediate q'[
+      create table tag_tenant_invisible (
+        ti_id           integer            generated by default on null as identity,
+        ti_name         varchar2(15 char)             not null  ,
+        ti_description  varchar2(60 char)                       ,
+        ti_tenant_id    integer            invisible  not null  ,
+        --
+        primary key (ti_id),
+        unique (ti_name)
+      )
+    ]';
+  end tag_tenant_invisible;
+  ----------
 begin
   tag_global_version_sequence;
   tag_users;
@@ -619,6 +713,8 @@ begin
   tag_all_data_types_multi_pk;
   tag_short_column_names;
   tag_long_column_names;
+  tag_tenant_visible;
+  tag_tenant_invisible;
 end util_create_test_table_objects;
 
 --------------------------------------------------------------------------------
@@ -776,3 +872,4 @@ end util_get_regex_substr_count;
 
 end test_om_tapigen;
 /
+show errors

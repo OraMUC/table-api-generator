@@ -1,3 +1,4 @@
+prompt Compile package test_om_tapigen (spec)
 CREATE OR REPLACE PACKAGE test_om_tapigen IS
 -- Minimum needed DB version:     12.1
 -- Needed system priviliges:      create procedure/sequence/table/trigger/view
@@ -26,7 +27,7 @@ procedure test_all_tables_return_row_instead_of_pk_true;
 procedure test_all_tables_double_quote_names_false;
 
 --%test
-procedure test_all_tables_audit_column_mappings_configured;
+procedure test_users_roles_rights_audit_column_mappings_configured;
 
 --%test
 procedure test_table_users_create_methods_only;
@@ -47,10 +48,16 @@ procedure test_table_with_very_short_column_names;
 procedure test_table_with_very_long_column_names;
 
 --%test
+procedure test_table_users_default_api_object_names;
+
+--%test
 procedure test_table_users_different_api_object_names;
 
 --%test
-procedure test_table_users_default_api_object_names;
+procedure test_table_with_tenant_id_visible;
+
+--%test
+procedure test_table_with_tenant_id_invisible;
 
 --------------------------------------------------------------------------------
 
@@ -60,6 +67,13 @@ cursor cur_all_test_tables is
   select table_name
     from user_tables
    where table_name like 'TAG\_%' escape '\';
+
+cursor cur_user_roles_rights is
+  select table_name
+    from user_tables
+   where table_name like 'TAG%USERS%'
+      or table_name like 'TAG%ROLES%'
+      or table_name like 'TAG%RIGHTS%';
 
 cursor cur_all_test_table_objects is
   select *
@@ -105,3 +119,4 @@ function  util_check_if_trigger_exists (p_name varchar2) return boolean;
 
 END test_om_tapigen;
 /
+show errors
