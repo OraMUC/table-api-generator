@@ -1769,6 +1769,20 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             p_compare_operation => '=') ||
           c_lf;
       END LOOP;
+      FOR i IN 1 .. g_columns.count LOOP
+        IF g_columns(i).tenant_expression IS NOT NULL THEN
+          v_index := v_result.count + 1;
+          v_result(v_index).col1 := v_list_padding || 'AND ';
+          v_result(v_index).col2 :=
+            util_get_attribute_compare(
+              p_data_type         => g_columns(i).data_type,
+              p_nullable          => util_string_to_bool(g_columns(i).is_nullable_yn),
+              p_first_attribute   => util_double_quote(g_columns(i).column_name),
+              p_second_attribute  => g_columns(i).tenant_expression,
+              p_compare_operation => '=') ||
+            c_lf;
+        END IF;
+      END LOOP;
       align_list_col1(v_result);
       trim_list(v_result);
       RETURN v_result;
@@ -1779,7 +1793,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         COALESCE( col1, '@@@@@@@@@@@@@@@' ) = COALESCE( p_rows_tab(i).col1, '@@@@@@@@@@@@@@@' )
     AND COALESCE( col2, '@@@@@@@@@@@@@@@' ) = COALESCE( p_rows_tab(i).col2, '@@@@@@@@@@@@@@@' )
     */
-    FUNCTION list_pk_column_bulk_compare RETURN t_tab_list IS
+    FUNCTION list_pk_column_where_bulk RETURN t_tab_list IS
       v_result       t_tab_list;
       v_list_padding t_vc2_30;
       v_index        pls_integer;
@@ -1797,10 +1811,24 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             p_compare_operation => '=') ||
           c_lf;
       END LOOP;
+      FOR i IN 1 .. g_columns.count LOOP
+        IF g_columns(i).tenant_expression IS NOT NULL THEN
+          v_index := v_result.count + 1;
+          v_result(v_index).col1 := v_list_padding || 'AND ';
+          v_result(v_index).col2 :=
+            util_get_attribute_compare(
+              p_data_type         => g_columns(i).data_type,
+              p_nullable          => util_string_to_bool(g_columns(i).is_nullable_yn),
+              p_first_attribute   => util_double_quote(g_columns(i).column_name),
+              p_second_attribute  => g_columns(i).tenant_expression,
+              p_compare_operation => '=') ||
+            c_lf;
+        END IF;
+      END LOOP;
       align_list_col1(v_result);
       trim_list(v_result);
       RETURN v_result;
-    END list_pk_column_bulk_compare;
+    END list_pk_column_where_bulk;
 
 
     -----------------------------------------------------------------------------
@@ -2129,8 +2157,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_pk_return_columns;
       WHEN 'LIST_PK_COLUMNS_WHERE_CLAUSE' THEN
         RETURN list_pk_columns_where_clause;
-      WHEN 'LIST_PK_COLUMN_BULK_COMPARE' THEN
-        RETURN list_pk_column_bulk_compare;
+      WHEN 'LIST_PK_COLUMN_WHERE_BULK' THEN
+        RETURN list_pk_column_where_bulk;
       WHEN 'LIST_PK_COLUMN_BULK_FETCH' THEN
         RETURN list_pk_column_bulk_fetch;
       WHEN 'LIST_PK_MAP_PARAM_EQ_PARAM' THEN
@@ -4076,7 +4104,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
       SET
         {% LIST_SET_COL_EQ_PAR_BULK_WO_PK %}
       WHERE
-        {% LIST_PK_COLUMN_BULK_COMPARE %};'
+        {% LIST_PK_COLUMN_WHERE_BULK %};'
             ELSE '
     /*
     There is no column anymore to update! All remaining columns are part of the
@@ -4264,7 +4292,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
   BEGIN
     FORALL i IN INDICES OF p_rows_tab
       DELETE FROM {{ TABLE_NAME }}
-       WHERE {% LIST_PK_COLUMN_BULK_COMPARE %};
+       WHERE {% LIST_PK_COLUMN_WHERE_BULK %};
   END delete_rows;';
       util_template_replace('API BODY');
 

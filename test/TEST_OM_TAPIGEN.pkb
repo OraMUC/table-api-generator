@@ -454,7 +454,7 @@ begin
   ut.expect(util_get_regex_substr_count(l_code,'insert into tag_tenant_visible \(.*?\)', 'tv_')).to_equal(4);
   ut.expect(util_get_regex_substr_count(l_code,'insert into tag_tenant_visible \(.*?\)', 'tv_tenant_id')).to_equal(1);
   ut.expect(util_get_regex_substr_count(l_code,'update\s+tag_tenant_visible\s+set.*?where', 'tv_')).to_equal(4);
-  ut.expect(regexp_count(l_code, 'where\s+tv_id =.*?and tv_tenant_id = .*?(;|return)', 1, 'in')).to_equal(8);
+  ut.expect(regexp_count(l_code, 'where\s+tv_.*? =.*?and tv_tenant_id = .*?(;|return)', 1, 'in')).to_equal(8);
 end test_table_with_tenant_id_visible;
 
 --------------------------------------------------------------------------------
@@ -491,7 +491,7 @@ begin
   ut.expect(util_get_regex_substr_count(l_code,'insert into tag_tenant_invisible \(.*?\)', 'ti_tenant_id')).to_equal(1);
   ut.expect(util_get_regex_substr_count(l_code,'update\s+tag_tenant_invisible\s+set.*?where', 'ti_')).to_equal(4);
   ut.expect(util_get_regex_substr_count(l_code,'update\s+tag_tenant_invisible\s+set.*?where', 'ti_')).to_equal(4);
-  ut.expect(regexp_count(l_code, 'where\s+ti_id =.*?and ti_tenant_id = .*?(;|return)', 1, 'in')).to_equal(8);
+  ut.expect(regexp_count(l_code, 'where\s+ti_.*? =.*?and ti_tenant_id = .*?(;|return)', 1, 'in')).to_equal(8);
 end test_table_with_tenant_id_invisible;
 
 --------------------------------------------------------------------------------
@@ -692,7 +692,7 @@ procedure util_create_test_table_objects is
         tv_tenant_id    integer            not null  ,
         --
         primary key (tv_id),
-        unique (tv_name)
+        unique (tv_name, tv_tenant_id)
       )
     ]';
   end tag_tenant_visible;
@@ -707,7 +707,7 @@ procedure util_create_test_table_objects is
         ti_tenant_id    integer            invisible  not null  ,
         --
         primary key (ti_id),
-        unique (ti_name)
+        unique (ti_name, ti_tenant_id)
       )
     ]';
   end tag_tenant_invisible;
