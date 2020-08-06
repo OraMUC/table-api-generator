@@ -1654,6 +1654,45 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       RETURN v_result;
     END list_uk_map_param_eq_param;
   
+  -----------------------------------------------------------------------------
+    -- A list of column defaults - used in the function get_default_row:
+    -- {% LIST_ROWCOLS_W_DEFAULTS %}
+    -- Example:
+    --   v_row.employee_id := employees_seq.nextval; --generated from SEQ
+    --   v_row.first_name  := 'Rowan';
+    --   v_row.last_name   := 'Atkinson';
+    --   ...
+    -----------------------------------------------------------------------------
+
+    FUNCTION list_rowcols_w_defaults RETURN t_tab_vc2_5k IS
+      v_result t_tab_vc2_5k;
+    BEGIN
+
+      FOR i IN g_columns.first .. g_columns.last LOOP
+        IF g_columns(i).data_default IS NOT NULL THEN
+          v_result(v_result.count + 1) := '    ' || 'v_row.' ||
+                                          rpad('"' || g_columns(i).column_name || '"', g_status.rpad_columns + 2) ||
+                                          ' := ' || g_columns(i).data_default || CASE
+                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
+                                             ' /*PK*/'
+                                          END || CASE
+                                            WHEN g_columns(i).is_uk_yn = 'Y' THEN
+                                             ' /*UK*/'
+                                          END || CASE
+                                            WHEN g_columns(i).is_fk_yn = 'Y' THEN
+                                             ' /*FK*/'
+                                          END || ';' || c_lf;
+        END IF;
+      END LOOP;
+
+      IF v_result.count > 0 THEN
+        v_result(v_result.first) := ltrim(v_result(v_result.first));
+        v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
+      END IF;
+
+      RETURN v_result;
+    END list_rowcols_w_defaults;
+
     -----------------------------------------------------------------------------
     -- A list of column defaults - used in the function get_a_row:
     -- {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
@@ -1772,6 +1811,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_uk_map_param_eq_param;
       WHEN 'LIST_SPEC_CUSTOM_DEFAULTS' THEN
         RETURN list_spec_custom_defaults;
+      WHEN 'LIST_ROWCOLS_W_DEFAULTS' THEN
+        RETURN list_rowcols_w_defaults;
       ELSE
         raise_application_error(c_generator_error_number, 'FIXME: Bug - list ' || p_list_name || ' not defined');
     END CASE;
@@ -3175,6 +3216,35 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_debug_stop_one_step;
     END gen_create_row_fnc;
   
+  -----------------------------------------------------------------------------
+   PROCEDURE gen_get_default_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_get_default_row_fnc');
+      g_code_blocks.template := '
+
+  /**
+   * Helper Proc from OC/MMI to get a record with default filled with default values
+   * as defined in column-definition.
+   */
+  FUNCTION get_default_row
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE;
+
+  ';
+
+      util_template_replace('API SPEC');
+      g_code_blocks.template := '
+
+  FUNCTION get_default_row
+  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
+    v_row "{{ TABLE_NAME }}"%ROWTYPE;
+  BEGIN
+    {% LIST_ROWCOLS_W_DEFAULTS %}
+    return v_row;
+  END get_default_row;';
+      util_template_replace('API BODY');
+      util_debug_stop_one_step;
+    END gen_get_default_row_fnc;
+
     -----------------------------------------------------------------------------
   
     PROCEDURE gen_create_row_prc IS
@@ -3849,6 +3919,10 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     gen_row_exists_fnc;
     gen_row_exists_yn_fnc;
   
+    IF g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
+      gen_get_default_row_fnc;
+    END IF;
+
     -- GET_PK_BY_UNIQUE_COLS functions only if no multi row pk is present
     -- use overloaded READ_ROW functions with unique paramams instead
     IF NOT g_status.pk_is_multi_column THEN
