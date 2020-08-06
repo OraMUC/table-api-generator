@@ -3223,8 +3223,8 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       g_code_blocks.template := '
 
   /**
-   * Helper Proc from OC/MMI to get a record with default filled with default values
-   * as defined in column-definition.
+   * Helper Proc to get a record filled with default values
+   * as defined in column definition
    */
   FUNCTION get_default_row
   RETURN "{{ TABLE_NAME }}"%ROWTYPE;
