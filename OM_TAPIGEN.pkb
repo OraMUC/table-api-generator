@@ -214,9 +214,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                             AND table_name = g_params.table_name
                          $END
                          $END
-
-
-
+                         
+      
+      
       ),
     t AS
      (SELECT DISTINCT column_id,
@@ -357,12 +357,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                  AND table_name = p_table_name
                  AND hidden_column = 'NO') LOOP
       v_count := v_count + 1;
-
+    
       IF v_count > 1 THEN
         v_return := NULL;
         EXIT;
       END IF;
-
+    
       v_return := i.prefix;
     END LOOP;
     RETURN v_return;
@@ -439,7 +439,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                    get_coalesce(p_first_attribute) || ' ' || p_compare_operation || ' ' ||
                    get_coalesce(p_second_attribute)
                 END;
-
+  
     RETURN v_return;
   END util_get_attribute_compare;
 
@@ -496,11 +496,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     v_return user_objects.object_name%TYPE;
   BEGIN
     v_return := regexp_replace(lower(p_column_name), '[^a-z0-9_]', NULL);
-
+  
     IF g_params.enable_parameter_prefixes THEN
       v_return := 'p_' || substr(v_return, 1, c_ora_max_name_len - 2);
     END IF;
-
+  
     IF p_rpad IS NOT NULL THEN
       v_return := rpad(v_return,
                        CASE
@@ -510,7 +510,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                           p_rpad
                        END);
     END IF;
-
+  
     RETURN v_return;
   END util_get_parameter_name;
 
@@ -528,7 +528,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                   ELSE
                    substr(v_return, length(g_status.column_prefix) + 2, c_ora_max_name_len - 4)
                 END;
-
+  
     RETURN v_return;
   END;
 
@@ -543,7 +543,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   BEGIN
     -- Get replace string
     v_replace_string := regexp_substr(p_name_template, '#[A-Za-z0-9_-]+#', 1, 1);
-
+  
     -- Check,if we have to do a replacement
     IF v_replace_string IS NULL THEN
       -- Without replacement we return simply the input
@@ -551,11 +551,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     ELSE
       -- Replace possible placeholders in name template
       v_base_name := rtrim(regexp_substr(upper(v_replace_string), '[A-Z_]+', 1, 1), '_');
-
+    
       -- logger.log('v_base_name: ' || v_base_name);
-
+    
       -- Check,if we have a valid base name
-
+    
       IF v_base_name NOT IN ('TABLE_NAME', 'PK_COLUMN', 'COLUMN_PREFIX') THEN
         -- Without a valid base name we return simply the input
         v_return := p_name_template;
@@ -563,7 +563,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         -- Search for start and stop positions
         v_position := regexp_substr(v_replace_string, '-?\d+', 1, 1);
         v_length   := regexp_substr(v_replace_string, '\d+', 1, 2);
-
+      
         -- 1. To be backward compatible we have to support things like this TABLE_NAME_26.
         -- 2. If someone want to use the substr version he has always to provide position and length.
         -- 3. Negative position is supported like this #TABLE_NAME_-15_15# (the second number can not be omitted like in substr,see 1.)
@@ -574,7 +574,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           v_length   := v_position;
           v_position := 1;
         END IF;
-
+      
         v_return := REPLACE(p_name_template,
                             v_replace_string,
                             substr(CASE v_base_name
@@ -589,7 +589,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                    v_length));
       END IF;
     END IF;
-
+  
     RETURN v_return;
   END util_get_substituted_name;
 
@@ -602,7 +602,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_owner       VARCHAR2 DEFAULT USER
   ) RETURN VARCHAR2 AS
     v_return LONG;
-
+  
     CURSOR c_utc IS
       SELECT data_default
         FROM all_tab_columns
@@ -611,12 +611,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
          AND column_name = p_column_name;
   BEGIN
     OPEN c_utc;
-
+  
     FETCH c_utc
       INTO v_return;
-
+  
     CLOSE c_utc;
-
+  
     RETURN substr(v_return, 1, 4000);
   END;
 
@@ -628,7 +628,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_owner           IN VARCHAR2 DEFAULT USER
   ) RETURN VARCHAR2 AS
     v_return LONG;
-
+  
     CURSOR c_search_condition IS
       SELECT search_condition
         FROM all_constraints
@@ -636,12 +636,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
          AND constraint_name = p_constraint_name;
   BEGIN
     OPEN c_search_condition;
-
+  
     FETCH c_search_condition
       INTO v_return;
-
+  
     CLOSE c_search_condition;
-
+  
     RETURN substr(v_return, 1, 4000);
   END;
 
@@ -670,11 +670,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_offset := v_index + v_delimiter_length;
       v_index  := instr(p_string, p_delimiter, v_offset);
     END LOOP;
-
+  
     IF v_string_length - v_offset + 1 > 0 THEN
       PIPE ROW(TRIM(substr(p_string, v_offset, v_string_length - v_offset + 1)));
     END IF;
-
+  
     RETURN;
   END util_split_to_table;
 
@@ -684,7 +684,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     v_return VARCHAR2(32767);
   BEGIN
     SELECT xmlserialize(document p_xml no indent) INTO v_return FROM dual;
-
+  
     RETURN v_return;
   END util_serialize_xml;
 
@@ -785,7 +785,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         PIPE ROW(v_return);
       END LOOP;
     END LOOP;
-
+  
   END;
 
   -----------------------------------------------------------------------------
@@ -925,20 +925,20 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   col3,
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_insert_columns RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
       FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).is_excluded_yn = 'N'
+        IF g_columns(i).is_excluded_yn = 'N' 
         AND NOT (
-          g_template_options.hide_identity_columns
+          g_template_options.hide_identity_columns 
           AND (
             nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
-            OR
+            OR 
             nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
-          )
-        )
+          )            
+        ) 
         THEN
           v_result(v_result.count + 1) := '      ' || '"' || g_columns(i).column_name || '"' || CASE
                                             WHEN g_columns(i).is_pk_yn = 'Y' THEN
@@ -952,13 +952,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_insert_columns;
-
+  
     -----------------------------------------------------------------------------
     -- Columns as flat list for insert - without p_column_exclude_list:
     -- {% LIST_INSERT_PARAMS %}
@@ -974,13 +974,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
         AND NOT (
-          g_template_options.hide_identity_columns
+          g_template_options.hide_identity_columns 
           AND (
             nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
-            OR
+            OR 
             nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
-          )
-        )
+          )            
+        ) 
         THEN
           v_result(v_result.count + 1) := '      ' || CASE
                                             WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND g_params.sequence_name IS NOT NULL THEN
@@ -991,13 +991,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_insert_params;
-
+  
     -----------------------------------------------------------------------------
     -- Columns as flat list - with p_column_exclude_list:
     -- {% LIST_COLUMNS_W_PK_FULL %}
@@ -1022,13 +1022,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                            ' /*FK*/'
                                         END || c_list_delimiter;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_columns_w_pk_full;
-
+  
     -----------------------------------------------------------------------------
     -- A block of code which compares new and old column values (without PK column) and
     -- counts the number  of differences:
@@ -1074,38 +1074,38 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                             WHEN g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
                                              ' THEN'
                                           END || c_lf;
-
+        
           IF g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
             v_result(v_result.count + 1) := '        v_count := v_count + 1;' || c_lf;
             v_result(v_result.count + 1) := '        create_change_log_entry (' || c_lf;
             v_result(v_result.count + 1) := '          p_table     => ''' || g_params.table_name || ''',' || c_lf;
-
+          
             v_result(v_result.count + 1) := '          p_column    => ''' || g_columns(i).column_name || ''',' || c_lf;
-
+          
             v_result(v_result.count + 1) := '          p_pk_id     => v_row."' || g_pk_columns(1).column_name || '",' || c_lf;
-
+          
             v_result(v_result.count + 1) := '          p_old_value => ' ||
                                             util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
                                                                         p_attribute_name => 'v_row."' || g_columns(i).column_name || '"') || ',' || c_lf;
-
+          
             v_result(v_result.count + 1) := '          p_new_value => ' ||
                                             util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
                                                                         p_attribute_name => util_get_parameter_name(g_columns(i).column_name,
                                                                                                                     NULL)) ||
                                             ' );' || c_lf;
-
+          
             v_result(v_result.count + 1) := '      END IF;' || c_lf;
           END IF;
         END IF;
       END LOOP;
-
+    
       IF g_params.enable_generic_change_log AND NOT g_status.pk_is_multi_column THEN
         v_result(v_result.count + 1) := '      IF v_count > 0';
       END IF;
-
+    
       RETURN v_result;
     END list_columns_wo_pk_compare;
-
+  
     -----------------------------------------------------------------------------
     -- Columns as parameter definition for create_row,update_row with PK:
     -- {% LIST_PARAMS_W_PK %}
@@ -1121,13 +1121,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
         AND NOT (
-          g_template_options.hide_identity_columns
+          g_template_options.hide_identity_columns 
           AND (
             nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
-            OR
+            OR 
             nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
-          )
-        )
+          )            
+        ) 
         THEN
           v_result(v_result.count + 1) := CASE
                                             WHEN g_template_options.padding IS NOT NULL THEN
@@ -1165,13 +1165,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_params_w_pk;
-
+  
     -----------------------------------------------------------------------------
     -- A parameter list with column defaults:
     -- {% LIST_PARAMS_W_PK_CUST_DEFAULTS %}
@@ -1187,13 +1187,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
         AND NOT (
-          g_template_options.hide_identity_columns
+          g_template_options.hide_identity_columns 
           AND (
             nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
-            OR
+            OR 
             nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
-          )
-        )
+          )            
+        ) 
         THEN
           v_result(v_result.count + 1) := '    ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
@@ -1211,13 +1211,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_params_w_pk_cust_defaults;
-
+  
     -----------------------------------------------------------------------------
     -- Columns as parameter IN OUT definition for read_row with PK:
     -- {% LIST_PARAMS_W_PK_IO %}
@@ -1249,13 +1249,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                            ' /*FK*/'
                                         END || c_list_delimiter;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_params_w_pk_io;
-
+  
     -----------------------------------------------------------------------------
     -- Map :new values to parameter for IOIUD-Trigger with PK:
     -- {% LIST_MAP_PAR_EQ_NEWCOL_W_PK %}
@@ -1271,13 +1271,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
         AND NOT (
-          g_template_options.hide_identity_columns
+          g_template_options.hide_identity_columns 
           AND (
             nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
-            OR
+            OR 
             nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
-          )
-        )
+          )            
+        ) 
         THEN
           v_result(v_result.count + 1) := '      ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
@@ -1293,13 +1293,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_map_par_eq_newcol_w_pk;
-
+  
     -----------------------------------------------------------------------------
     --  Map parameter to parameter as pass-through parameter with PK:
     -- {% LIST_MAP_PAR_EQ_PARAM_W_PK %}
@@ -1315,13 +1315,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
         AND NOT (
-          g_template_options.hide_identity_columns
+          g_template_options.hide_identity_columns 
           AND (
             nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
-            OR
+            OR 
             nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
-          )
-        )
+          )            
+        ) 
         THEN
           v_result(v_result.count + 1) := CASE
                                             WHEN g_template_options.padding IS NOT NULL THEN
@@ -1342,13 +1342,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_map_par_eq_param_w_pk;
-
+  
     -----------------------------------------------------------------------------
     -- map rowtype columns to parameter for rowtype handling with PK:
     -- {% LIST_MAP_PAR_EQ_ROWTYPCOL_W_PK %}
@@ -1364,13 +1364,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).is_excluded_yn = 'N'
         AND NOT (
-          g_template_options.hide_identity_columns
+          g_template_options.hide_identity_columns 
           AND (
             nvl(g_columns(i).identity_type, 'NULL') = 'ALWAYS'
-            OR
+            OR 
             nvl(g_columns(i).identity_type, 'NULL') = 'BY DEFAULT' AND g_columns(i).default_on_null_yn = 'N'
-          )
-        )
+          )            
+        ) 
         THEN
           v_result(v_result.count + 1) := '      ' ||
                                           util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns) ||
@@ -1386,13 +1386,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_map_par_eq_rowtypcol_w_pk;
-
+  
     -----------------------------------------------------------------------------
     -- A column list for updating a row without PK:
     -- {% LIST_SET_COL_EQ_PARAM_WO_PK %}
@@ -1420,13 +1420,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_set_col_eq_param_wo_pk;
-
+  
     -----------------------------------------------------------------------------
     -- A column list without pk for setting parameter to row columns:
     -- {% LIST_SET_PAR_EQ_ROWTYCOL_WO_PK %}
@@ -1445,13 +1445,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           ' := v_row."' || g_columns(i).column_name || '"; ' || c_lf;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
-
+    
       RETURN v_result;
     END list_set_par_eq_rowtycol_wo_pk;
-
+  
     -----------------------------------------------------------------------------
     -- Primary key parameter definition for create_row:
     -- {% LIST_PARAMS_PK %}
@@ -1470,13 +1470,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                         ' IN "' || g_params.table_name || '"."' || g_pk_columns(i).column_name ||
                                         '"%TYPE /*PK*/' || c_list_delimiter;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_pk_params;
-
+  
     -----------------------------------------------------------------------------
     -- Primary key columns parameter compare for get_pk_by_unique_cols functions:
     -- {% LIST_PK_COLUMN_COMPARE %}
@@ -1497,14 +1497,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                                                                                   NULL),
                                                                    p_compare_operation => '=') || c_lf;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), 'AND ');
-
+    
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
-
+    
       RETURN v_result;
     END list_pk_column_compare;
-
+  
     -----------------------------------------------------------------------------
     -- Primary key columns as "parameter => parameter" mapping for read_row functions:
     -- {% LIST_PK_MAP_PARAM_EQ_PARAM %}
@@ -1513,7 +1513,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   p_col2 => p_col2,
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_pk_map_param_eq_param RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -1527,13 +1527,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                                           END) || ' => ' ||
                                         util_get_parameter_name(g_pk_columns(i).column_name, NULL) || c_list_delimiter;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_pk_map_param_eq_param;
-
+  
     -----------------------------------------------------------------------------
     -- Primary key columns as "parameter => :old.column" mapping for DML view trigger:
     -- {% LIST_PK_MAP_PARAM_EQ_OLDCOL %}
@@ -1542,7 +1542,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   p_col2 => :old.col2,
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_pk_map_param_eq_oldcol RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -1556,13 +1556,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                                             END) || ' => ' || ':old."' || g_pk_columns(i).column_name || '"' ||
                                         c_list_delimiter;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_pk_map_param_eq_oldcol;
-
+  
     -----------------------------------------------------------------------------
     -- Unique columns as parameter definition for get_pk_by_unique_cols/read_row functions:
     -- {% LIST_UK_PARAMS %}
@@ -1572,7 +1572,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   p_col3 IN table.col3%TYPE,
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_uk_params RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -1584,13 +1584,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           '"%TYPE /*UK*/' || c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_uk_params;
-
+  
     -----------------------------------------------------------------------------
     -- Unique columns parameter compare for get_pk_by_unique_cols functions:
     -- {% LIST_UK_COLUMN_COMPARE %}
@@ -1599,7 +1599,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   AND COALESCE( "COL2",'@@@@@@@@@@@@@@@' ) = COALESCE( p_COL2,'@@@@@@@@@@@@@@@' )
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_uk_column_compare RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -1614,14 +1614,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                                      p_compare_operation => '=') || c_lf;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(ltrim(v_result(v_result.first)), 'AND ');
-
+    
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
-
+    
       RETURN v_result;
     END list_uk_column_compare;
-
+  
     -----------------------------------------------------------------------------
     -- Unique key columns as "parameter => parameter" mapping for read_row functions:
     -- {% LIST_UK_MAP_PARAM_EQ_PARAM %}
@@ -1630,7 +1630,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   p_col2 => p_col2,
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_uk_map_param_eq_param RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -1647,52 +1647,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           c_list_delimiter;
         END IF;
       END LOOP;
-
+    
       v_result(v_result.first) := ltrim(v_result(v_result.first));
       v_result(v_result.last) := rtrim(v_result(v_result.last), c_list_delimiter);
-
+    
       RETURN v_result;
     END list_uk_map_param_eq_param;
-
-    -----------------------------------------------------------------------------
-    -- A list of column defaults - used in the function get_default_row:
-    -- {% LIST_ROWCOLS_W_DEFAULTS %}
-    -- Example:
-    --   v_row.employee_id := employees_seq.nextval; --generated from SEQ
-    --   v_row.first_name  := 'Rowan';
-    --   v_row.last_name   := 'Atkinson';
-    --   ...
-    -----------------------------------------------------------------------------
-
-    FUNCTION list_rowcols_w_defaults RETURN t_tab_vc2_5k IS
-      v_result t_tab_vc2_5k;
-    BEGIN
-
-      FOR i IN g_columns.first .. g_columns.last LOOP
-        IF g_columns(i).data_default IS NOT NULL THEN
-          v_result(v_result.count + 1) := '    ' || 'v_row.' ||
-                                          rpad('"' || g_columns(i).column_name || '"', g_status.rpad_columns + 2) ||
-                                          ' := ' || g_columns(i).data_default || CASE
-                                            WHEN g_columns(i).is_pk_yn = 'Y' THEN
-                                             ' /*PK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_uk_yn = 'Y' THEN
-                                             ' /*UK*/'
-                                          END || CASE
-                                            WHEN g_columns(i).is_fk_yn = 'Y' THEN
-                                             ' /*FK*/'
-                                          END || ';' || c_lf;
-        END IF;
-      END LOOP;
-
-      IF v_result.count > 0 THEN
-        v_result(v_result.first) := ltrim(v_result(v_result.first));
-        v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
-      END IF;
-
-      RETURN v_result;
-    END list_rowcols_w_defaults;
-
+  
     -----------------------------------------------------------------------------
     -- A list of column defaults - used in the function get_a_row:
     -- {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
@@ -1702,11 +1663,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   v_row.last_name   := 'Atkinson';
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_rowcols_w_cust_defaults RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
-
+    
       FOR i IN g_columns.first .. g_columns.last LOOP
         IF g_columns(i).data_custom_default IS NOT NULL THEN
           v_result(v_result.count + 1) := '    ' || 'v_row.' ||
@@ -1723,15 +1684,15 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           END || ';' || c_lf;
         END IF;
       END LOOP;
-
+    
       IF v_result.count > 0 THEN
         v_result(v_result.first) := ltrim(v_result(v_result.first));
         v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
       END IF;
-
+    
       RETURN v_result;
     END list_rowcols_w_cust_defaults;
-
+  
     -----------------------------------------------------------------------------
     -- A list of custom column defaults - used to save the defaults in the spec:
     -- {% LIST_SPEC_CUSTOM_DEFAULTS %}
@@ -1741,7 +1702,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     --   v_row.last_name   := 'Atkinson';
     --   ...
     -----------------------------------------------------------------------------
-
+  
     FUNCTION list_spec_custom_defaults RETURN t_tab_vc2_5k IS
       v_result t_tab_vc2_5k;
     BEGIN
@@ -1754,19 +1715,19 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         END IF;
       END LOOP;
       v_result(v_result.count + 1) := '  </custom_defaults>' || c_lf;
-
+    
       IF v_result.count > 2 THEN
         v_result(v_result.last) := rtrim(v_result(v_result.last), c_lf);
       ELSE
         -- no data available, only the empty <custom_defaults> element
         v_result.delete;
       END IF;
-
+    
       RETURN v_result;
     END list_spec_custom_defaults;
-
+  
     -----------------------------------------------------------------------------
-
+  
   BEGIN
     CASE p_list_name
       WHEN 'LIST_INSERT_COLUMNS' THEN
@@ -1811,8 +1772,6 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_uk_map_param_eq_param;
       WHEN 'LIST_SPEC_CUSTOM_DEFAULTS' THEN
         RETURN list_spec_custom_defaults;
-        WHEN 'LIST_ROWCOLS_W_DEFAULTS' THEN
-        RETURN list_rowcols_w_defaults;
       ELSE
         raise_application_error(c_generator_error_number, 'FIXME: Bug - list ' || p_list_name || ' not defined');
     END CASE;
@@ -1833,16 +1792,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
   ) IS
   BEGIN
     p_clob_varchar_cache := p_clob_varchar_cache || p_varchar_to_append;
-
+  
     IF p_final_call THEN
       IF p_clob IS NULL THEN
         p_clob := p_clob_varchar_cache;
       ELSE
         dbms_lob.append(p_clob, p_clob_varchar_cache);
       END IF;
-
+    
       -- clear cache on final call
-
+    
       p_clob_varchar_cache := NULL;
     END IF;
   EXCEPTION
@@ -1852,9 +1811,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       ELSE
         dbms_lob.append(p_clob, p_clob_varchar_cache);
       END IF;
-
+    
       p_clob_varchar_cache := p_varchar_to_append;
-
+    
       IF p_final_call THEN
         dbms_lob.append(p_clob, p_clob_varchar_cache);
         -- clear cache on final call
@@ -1877,9 +1836,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     v_match             VARCHAR2(256 CHAR);
     v_tpl_len           PLS_INTEGER;
     v_dynamic_result    t_tab_vc2_5k;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE get_match_pos IS
       -- finds the first position of a substitution string like
       -- {{ TABLE_NAME }} or {% dynamic code %}
@@ -1887,9 +1846,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_match_pos_static  := instr(g_code_blocks.template, '{{', v_current_pos);
       v_match_pos_dynamic := instr(g_code_blocks.template, '{%', v_current_pos);
     END get_match_pos;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE code_append(p_code_snippet VARCHAR2) IS
     BEGIN
       IF p_scope = 'API SPEC' THEN
@@ -1902,22 +1861,22 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         util_clob_append(g_code_blocks.dml_view_trigger, g_code_blocks.dml_view_trigger_varchar_cache, p_code_snippet);
       END IF;
     END code_append;
-
+    
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE process_static_match IS
     BEGIN
       v_match_len := instr(g_code_blocks.template, '}}', v_match_pos_static) - v_match_pos_static - 2;
-
+    
       IF v_match_len <= 0 THEN
         raise_application_error(c_generator_error_number, 'FIXME: Bug - static substitution not properly closed');
       END IF;
-
+    
       v_match := upper(TRIM(substr(g_code_blocks.template, v_match_pos_static + 2, v_match_len)));
       -- (1) process text before the match
-
+    
       code_append(substr(g_code_blocks.template, v_current_pos, v_match_pos_static - v_current_pos));
-
+    
       -- (2) process the match
       CASE v_match
         WHEN 'GENERATOR' THEN
@@ -2041,22 +2000,22 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           raise_application_error(c_generator_error_number,
                                   'FIXME: Bug - static substitution ' || v_match || ' not defined');
       END CASE;
-
+    
       v_current_pos := v_match_pos_static + v_match_len + 4;
     END process_static_match;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE process_dynamic_match IS
     BEGIN
       v_match_len := instr(g_code_blocks.template, '%}', v_match_pos_dynamic) - v_match_pos_dynamic - 2;
-
+    
       IF v_match_len <= 0 THEN
         raise_application_error(c_generator_error_number, 'FIXME: Bug - dynamic substitution not properly closed');
       END IF;
-
+    
       v_match := upper(TRIM(substr(g_code_blocks.template, v_match_pos_dynamic + 2, v_match_len)));
-
+    
       g_template_options.use_column_defaults := nvl(util_string_to_bool(regexp_substr(srcstr        => v_match,
                                                                                       pattern       => 'DEFAULTS=([A-Z0-9]+)',
                                                                                       position      => 1,
@@ -2064,7 +2023,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                                                       modifier      => 'i',
                                                                                       subexpression => 1)),
                                                     FALSE);
-
+    
       g_template_options.hide_identity_columns := nvl(util_string_to_bool(regexp_substr(srcstr        => v_match,
                                                                                         pattern       => 'HIDE_IDENTITY_COLUMNS=([A-Z0-9]+)',
                                                                                         position      => 1,
@@ -2084,16 +2043,16 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                                 occurrence    => 1,
                                                                 modifier      => 'i',
                                                                 subexpression => 1);
-
+    
       -- (1) process text before the match
       code_append(substr(g_code_blocks.template, v_current_pos, v_match_pos_dynamic - v_current_pos));
-
+    
       -- (2) process the match
       v_dynamic_result.delete;
-
+    
       IF v_match LIKE 'LIST%' THEN
         v_dynamic_result := util_generate_list(v_match);
-
+      
       ELSIF v_match = 'RETURN_CLAUSE' THEN
 
         IF (g_params.return_row_instead_of_pk OR g_status.pk_is_multi_column) AND NOT g_status.xmltype_column_present THEN
@@ -2115,8 +2074,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           v_dynamic_result(v_dynamic_result.count + 1) := '    /* return clause does not support XMLTYPE column, so we have to do here an extra fetch */' || c_lf;
           v_dynamic_result(v_dynamic_result.count + 1) := '    v_return := read_row (' || c_lf;
           FOR i IN g_pk_columns.first .. g_pk_columns.last LOOP
-            v_dynamic_result(v_dynamic_result.count + 1) := '      ' ||
-              util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) ||
+            v_dynamic_result(v_dynamic_result.count + 1) := '      ' || 
+              util_get_parameter_name(g_pk_columns(i).column_name, g_status.rpad_pk_columns) || 
               ' => v_return."' || g_pk_columns(i).column_name || '"' || c_list_delimiter;
           END LOOP;
           v_dynamic_result(v_dynamic_result.last) := rtrim(v_dynamic_result(v_dynamic_result.last), c_list_delimiter) || ' );';
@@ -2130,26 +2089,26 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         raise_application_error(c_generator_error_number,
                                 'FIXME: Bug - dynamic substitution ' || v_match || ' not defined');
       END IF;
-
+    
       IF v_dynamic_result.count > 0 THEN
         FOR i IN v_dynamic_result.first .. v_dynamic_result.last LOOP
           code_append(v_dynamic_result(i));
         END LOOP;
       END IF;
-
+    
       v_current_pos := v_match_pos_dynamic + v_match_len + 4;
     END process_dynamic_match;
 
     -----------------------------------------------------------------------------
-
+  
   BEGIN
     -- plus one is needed to correct difference between length and position
     v_tpl_len := length(g_code_blocks.template) + 1;
     get_match_pos;
-
+  
     WHILE v_current_pos < v_tpl_len LOOP
       get_match_pos;
-
+    
       IF v_match_pos_static > 0 OR v_match_pos_dynamic > 0 THEN
         IF v_match_pos_static > 0 AND (v_match_pos_dynamic = 0 OR v_match_pos_static < v_match_pos_dynamic) THEN
           process_static_match;
@@ -2189,9 +2148,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_enable_custom_defaults      IN BOOLEAN,
     p_custom_default_values       IN xmltype
   ) IS
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_reset_globals IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_reset_globals');
@@ -2211,9 +2170,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_fk_columns.delete;
       util_debug_stop_one_step;
     END init_reset_globals;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_process_parameters IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_process_parameters');
@@ -2224,7 +2183,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                              ELSE
                                               p_enable_insertion_of_rows
                                            END;
-
+    
       g_params.enable_column_defaults := CASE
                                            WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                             coalesce(util_string_to_bool(g_params_existing_api.p_enable_column_defaults),
@@ -2232,7 +2191,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                            ELSE
                                             p_enable_column_defaults
                                          END;
-
+    
       g_params.enable_update_of_rows := CASE
                                           WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                            coalesce(util_string_to_bool(g_params_existing_api.p_enable_update_of_rows),
@@ -2240,7 +2199,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                           ELSE
                                            p_enable_update_of_rows
                                         END;
-
+    
       g_params.enable_deletion_of_rows := CASE
                                             WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                              coalesce(util_string_to_bool(g_params_existing_api.p_enable_deletion_of_rows),
@@ -2248,7 +2207,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                             ELSE
                                              p_enable_deletion_of_rows
                                           END;
-
+    
       g_params.enable_parameter_prefixes := CASE
                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_parameter_prefixes),
@@ -2256,7 +2215,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                               ELSE
                                                p_enable_parameter_prefixes
                                             END;
-
+    
       g_params.enable_proc_with_out_params := CASE
                                                 WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                                  coalesce(util_string_to_bool(g_params_existing_api.p_enable_proc_with_out_params),
@@ -2264,7 +2223,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                 ELSE
                                                  p_enable_proc_with_out_params
                                               END;
-
+    
       g_params.enable_getter_and_setter := CASE
                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                               coalesce(util_string_to_bool(g_params_existing_api.p_enable_getter_and_setter),
@@ -2272,7 +2231,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                              ELSE
                                               p_enable_getter_and_setter
                                            END;
-
+    
       g_params.col_prefix_in_method_names := CASE
                                                WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                                 coalesce(util_string_to_bool(g_params_existing_api.p_col_prefix_in_method_names),
@@ -2280,7 +2239,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                                ELSE
                                                 p_col_prefix_in_method_names
                                              END;
-
+    
       g_params.return_row_instead_of_pk := CASE
                                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                               coalesce(util_string_to_bool(g_params_existing_api.p_return_row_instead_of_pk),
@@ -2288,7 +2247,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                              ELSE
                                               p_return_row_instead_of_pk
                                            END;
-
+    
       g_params.enable_dml_view := CASE
                                     WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                      coalesce(util_string_to_bool(g_params_existing_api.p_enable_dml_view),
@@ -2296,7 +2255,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                     ELSE
                                      p_enable_dml_view
                                   END;
-
+    
       g_params.enable_generic_change_log := CASE
                                               WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                                coalesce(util_string_to_bool(g_params_existing_api.p_enable_generic_change_log),
@@ -2304,7 +2263,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                               ELSE
                                                p_enable_generic_change_log
                                             END;
-
+    
       g_params.api_name := CASE
                              WHEN g_params.reuse_existing_api_params AND g_status.api_exists AND
                                   g_params_existing_api.p_api_name IS NOT NULL THEN
@@ -2313,7 +2272,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                               util_get_substituted_name(nvl(p_api_name,
                                                             '#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'))
                            END;
-
+    
       g_params.sequence_name := CASE
                                   WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                    g_params_existing_api.p_sequence_name
@@ -2325,14 +2284,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                       NULL
                                    END
                                 END;
-
+    
       g_params.exclude_column_list := CASE
                                         WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                          g_params_existing_api.p_exclude_column_list
                                         ELSE
                                          p_exclude_column_list
                                       END;
-
+    
       g_params.enable_custom_defaults := CASE
                                            WHEN g_params.reuse_existing_api_params AND g_status.api_exists THEN
                                             coalesce(util_string_to_bool(g_params_existing_api.p_enable_custom_defaults),
@@ -2342,12 +2301,12 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                                          END;
       util_debug_stop_one_step;
     END init_process_parameters;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_check_if_table_exists IS
       v_object_name all_objects.object_name%TYPE;
-
+    
       CURSOR v_cur IS
         SELECT table_name
           FROM all_tables
@@ -2364,9 +2323,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       END IF;
       util_debug_stop_one_step;
     END init_check_if_table_exists;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_fetch_existing_api_params IS
       CURSOR v_cur IS
         SELECT * FROM TABLE(view_existing_apis(p_table_name => g_params.table_name, p_owner => g_params.owner));
@@ -2385,9 +2344,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         CLOSE v_cur;
         RAISE;
     END init_fetch_existing_api_params;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_check_table_column_prefix IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_check_table_column_prefix');
@@ -2400,9 +2359,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       END IF;
       util_debug_stop_one_step;
     END init_check_table_column_prefix;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_check_if_log_table_exists IS
       v_count PLS_INTEGER;
     BEGIN
@@ -2420,36 +2379,36 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           FROM all_objects
          WHERE owner = g_params.owner
            AND object_name = 'GENERIC_CHANGE_LOG_PK';
-
+      
         IF v_count > 0 THEN
           raise_application_error(c_generator_error_number,
                                   'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_PK already exists.');
         END IF;
-
+      
         -- check sequence
         SELECT COUNT(*)
           INTO v_count
           FROM all_objects
          WHERE owner = g_params.owner
            AND object_name = 'GENERIC_CHANGE_LOG_SEQ';
-
+      
         IF v_count > 0 THEN
           raise_application_error(c_generator_error_number,
                                   'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_SEQ already exists.');
         END IF;
-
+      
         -- check index
         SELECT COUNT(*)
           INTO v_count
           FROM all_objects
          WHERE owner = g_params.owner
            AND object_name = 'GENERIC_CHANGE_LOG_IDX';
-
+      
         IF v_count > 0 THEN
           raise_application_error(c_generator_error_number,
                                   'Stop trying to create generic change log table: Object with the name GENERIC_CHANGE_LOG_IDX already exists.');
         END IF;
-
+      
         EXECUTE IMMEDIATE q'[
 create table generic_change_log (
   gcl_id        NUMBER not null,
@@ -2463,7 +2422,7 @@ create table generic_change_log (
   constraint generic_change_log_pk primary key (gcl_id)
 )
 ]';
-
+      
         EXECUTE IMMEDIATE q'[
 create sequence generic_change_log_seq nocache noorder nocycle]';
         EXECUTE IMMEDIATE q'[
@@ -2487,12 +2446,12 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END LOOP;
       util_debug_stop_one_step;
     END init_check_if_log_table_exists;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_check_if_api_name_exists IS
       v_object_type all_objects.object_type%TYPE;
-
+    
       CURSOR v_cur IS
         SELECT object_type
           FROM all_objects
@@ -2512,12 +2471,12 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END IF;
       util_debug_stop_one_step;
     END init_check_if_api_name_exists;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_check_if_sequence_exists IS
       v_object_name all_objects.object_name%TYPE;
-
+    
       CURSOR v_cur IS
         SELECT sequence_name
           FROM all_sequences
@@ -2536,9 +2495,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END IF;
       util_debug_stop_one_step;
     END init_check_if_sequence_exists;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_create_temporary_lobs IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_create_temporary_lobs');
@@ -2548,9 +2507,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       dbms_lob.createtemporary(lob_loc => g_code_blocks.dml_view_trigger, cache => FALSE);
       util_debug_stop_one_step;
     END init_create_temporary_lobs;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_fetch_columns IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_fetch_columns');
@@ -2564,9 +2523,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
         CLOSE g_cur_columns;
         RAISE;
     END init_fetch_columns;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_fetch_constraints IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_fetch_constraints');
@@ -2585,16 +2544,16 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END LOOP;
       util_debug_stop_one_step;
     END init_fetch_constraints;
-
+  
     -----------------------------------------------------------------------------
     /* constraint columns
-    constraint_name
-    column_name
+    constraint_name   
+    column_name       
     column_name_length
     data_type         */
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_fetch_constraint_columns IS
       v_idx PLS_INTEGER;
     BEGIN
@@ -2678,7 +2637,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END LOOP;
       util_debug_stop_one_step;
     END init_fetch_constraint_columns;
-
+  
     PROCEDURE init_process_columns IS
     BEGIN
       util_debug_start_one_step(p_action => 'init_process_columns');
@@ -2690,7 +2649,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
         IF length(g_columns(i).column_name) > g_status.rpad_columns THEN
           g_status.rpad_columns := length(g_columns(i).column_name);
         END IF;
-        -- set initial pk info (will be refined in init_process_pk_columns)
+        -- set initial pk info (will be refined in init_process_pk_columns)        
         g_columns(i).is_pk_yn := 'N';
         -- create reverse index to get collection id by column name
         g_columns_reverse_index(g_columns(i).column_name) := i;
@@ -2701,9 +2660,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END LOOP;
       util_debug_stop_one_step;
     END init_process_columns;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_process_pk_columns IS
       v_count PLS_INTEGER;
       v_idx   PLS_INTEGER;
@@ -2735,9 +2694,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END LOOP;
       util_debug_stop_one_step;
     END init_process_pk_columns;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_process_uk_columns IS
       v_count PLS_INTEGER;
       v_idx   PLS_INTEGER;
@@ -2756,9 +2715,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END IF;
       util_debug_stop_one_step;
     END init_process_uk_columns;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_process_fk_columns IS
       v_count PLS_INTEGER;
       v_idx   PLS_INTEGER;
@@ -2776,9 +2735,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END IF;
       util_debug_stop_one_step;
     END init_process_fk_columns;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_fetch_custom_defaults IS
       FUNCTION get_spec_custom_defaults RETURN xmltype IS
         v_return VARCHAR2(32767);
@@ -2802,7 +2761,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
         END LOOP;
         RETURN CASE WHEN v_return IS NULL THEN NULL ELSE xmltype(v_return) END;
       END;
-
+    
     BEGIN
       util_debug_start_one_step(p_action => 'init_fetch_custom_defaults');
       g_params.custom_default_values := CASE
@@ -2810,19 +2769,19 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                            CASE
                                              WHEN g_params_existing_api.p_custom_default_values IS NOT NULL THEN
                                              -- g_params_existing_api.p_custom_default_values contains only a
-                                             -- placeholder to signal that custom defaults exists, because the
-                                             -- defaults could be very large. We have to fetch the xml encoded
+                                             -- placeholder to signal that custom defaults exists, because the 
+                                             -- defaults could be very large. We have to fetch the xml encoded 
                                              -- custom defaults from the end of the package spec.
                                               get_spec_custom_defaults
                                            END
                                           ELSE
                                            p_custom_default_values
                                         END;
-
+    
       IF g_params.custom_default_values IS NOT NULL THEN
         g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
       END IF;
-
+    
       -- check for empty XML element
       IF g_params.custom_defaults_serialized = '<defaults/>' THEN
         g_params.custom_default_values      := NULL;
@@ -2830,9 +2789,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END IF;
       util_debug_stop_one_step;
     END init_fetch_custom_defaults;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE init_process_custom_defaults IS
       v_index INTEGER;
     BEGIN
@@ -2873,7 +2832,7 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
                                                                      p_column_name => g_columns(i).r_column_name,
                                                                      p_owner       => g_columns(i).r_owner)
                                                   WHEN g_columns(i).data_type IN ('NUMBER', 'INTEGER', 'FLOAT') THEN
-
+                                                  
                                                    'round(dbms_random.value(0,' ||
                                                    rpad('9',
                                                         nvl(g_columns(i).data_precision, 9) - nvl(g_columns(i).data_scale, 0),
@@ -2913,9 +2872,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
       END LOOP;
       util_debug_stop_one_step;
     END init_process_custom_defaults;
-
+  
     -----------------------------------------------------------------------------
-
+  
   BEGIN
     init_reset_globals;
     --
@@ -2968,9 +2927,9 @@ comment on column generic_change_log.gcl_timestamp is 'The time when the change 
   -----------------------------------------------------------------------------
 
   PROCEDURE main_generate_code IS
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_header IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_header');
@@ -3011,11 +2970,11 @@ CREATE OR REPLACE PACKAGE "{{ OWNER }}"."{{ API_NAME }}" IS
 
   This API provides DML functionality that can be easily called from APEX.
   Target of the table API is to encapsulate the table DML source code for
-  security (UI schema needs only the execute right for the API and the
-  read/write right for the {{ TABLE_NAME_MINUS_6 }}_DML_V, tables can be
-  hidden in extra data schema) and easy readability of the business logic
-  (all DML is then written in the same style). For APEX automatic row
-  processing like tabular forms you can optionally use the
+  security (UI schema needs only the execute right for the API and the 
+  read/write right for the {{ TABLE_NAME_MINUS_6 }}_DML_V, tables can be 
+  hidden in extra data schema) and easy readability of the business logic 
+  (all DML is then written in the same style). For APEX automatic row 
+  processing like tabular forms you can optionally use the 
   {{ TABLE_NAME_MINUS_6 }}_DML_V. The instead of trigger for this view
   is calling simply this "{{ API_NAME }}".
   */';
@@ -3079,13 +3038,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       coalesce(v(''APP_USER''),sys_context(''USERENV'',''OS_USER'')) );
   END;'
                                 END;
-
+    
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_header;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_row_exists_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_row_exists_fnc');
@@ -3119,9 +3078,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_row_exists_fnc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_row_exists_yn_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_row_exists_yn_fnc');
@@ -3146,9 +3105,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_row_exists_yn_fnc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_get_pk_by_unique_cols_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_get_pk_by_unique_cols_fnc');
@@ -3176,37 +3135,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       END IF;
       util_debug_stop_one_step;
     END gen_get_pk_by_unique_cols_fnc;
-
+  
     -----------------------------------------------------------------------------
-   PROCEDURE gen_get_default_row_fnc IS
-    BEGIN
-      util_debug_start_one_step(p_action => 'gen_get_default_row_fnc');
-      g_code_blocks.template := '
-
-  /**
-   * Helper Proc from OC/MMI to get a record with default filled with default values
-   * as defined in column-definition.
-   */
-  FUNCTION get_default_row
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE;
-
-  ';
-
-      util_template_replace('API SPEC');
-      g_code_blocks.template := '
-
-  FUNCTION get_default_row
-  RETURN "{{ TABLE_NAME }}"%ROWTYPE IS
-    v_row "{{ TABLE_NAME }}"%ROWTYPE;
-  BEGIN
-    {% LIST_ROWCOLS_W_DEFAULTS %}
-    return v_row;
-  END get_default_row;';
-      util_template_replace('API BODY');
-      util_debug_stop_one_step;
-    END gen_get_default_row_fnc;
-
-    -----------------------------------------------------------------------------
+  
     PROCEDURE gen_create_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_row_fnc');
@@ -3228,7 +3159,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
     VALUES (
       {% LIST_INSERT_PARAMS hide_identity_columns=true %} )
     RETURN
-      {% RETURN_CLAUSE %}' ||   CASE WHEN g_params.enable_generic_change_log AND
+      {% RETURN_CLAUSE %}' ||   CASE WHEN g_params.enable_generic_change_log AND 
                                           NOT g_status.pk_is_multi_column THEN '
     create_change_log_entry (
       p_table     => ''{{ TABLE_NAME }}'',
@@ -3239,13 +3170,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
                                 END || '
     RETURN v_return;
   END create_row;';
-
+    
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_row_fnc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_create_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_row_prc');
@@ -3267,9 +3198,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_row_prc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_create_rowtype_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_rowtype_fnc');
@@ -3293,9 +3224,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_rowtype_fnc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_create_rowtype_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_rowtype_prc');
@@ -3317,9 +3248,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_rowtype_prc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_createorupdate_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_row_fnc');
@@ -3349,9 +3280,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_createorupdate_row_fnc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_createorupdate_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_row_prc');
@@ -3373,9 +3304,9 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_createorupdate_row_prc;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_createorupdate_rowtype_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_fnc');
@@ -3399,7 +3330,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_createorupdate_rowtype_fnc;
-
+  
     PROCEDURE gen_createorupdate_rowtype_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_createorupdate_rowtype_prc');
@@ -3421,7 +3352,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_createorupdate_rowtype_prc;
-
+  
     PROCEDURE gen_read_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_row_fnc');
@@ -3450,7 +3381,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_read_row_fnc;
-
+  
     PROCEDURE gen_read_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_row_prc');
@@ -3474,7 +3405,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_read_row_prc;
-
+  
     PROCEDURE gen_read_row_by_uk_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_row_by_uk_fnc');
@@ -3508,7 +3439,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       END IF;
       util_debug_stop_one_step;
     END gen_read_row_by_uk_fnc;
-
+  
     PROCEDURE gen_update_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_update_row_prc');
@@ -3539,7 +3470,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_update_row_prc;
-
+  
     PROCEDURE gen_update_rowtype_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_update_rowtype_prc');
@@ -3560,7 +3491,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_update_rowtype_prc;
-
+  
     PROCEDURE gen_delete_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_delete_row_prc');
@@ -3587,11 +3518,11 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       p_new_value => ''ROW DELETED'' );'
                                 END || '
   END delete_row;';
-
+    
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_delete_row_prc;
-
+  
     PROCEDURE gen_getter_functions IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_getter_functions');
@@ -3620,7 +3551,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       END LOOP;
       util_debug_stop_one_step;
     END gen_getter_functions;
-
+  
     PROCEDURE gen_setter_procedures IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_setter_procedures');
@@ -3629,19 +3560,19 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
           g_iterator.column_name    := g_columns(i).column_name;
           g_iterator.method_name    := util_get_method_name(g_columns(i).column_name);
           g_iterator.parameter_name := util_get_parameter_name(g_columns(i).column_name, g_status.rpad_columns);
-
+        
           g_iterator.column_compare := util_get_attribute_compare(p_data_type         => g_columns(i).data_type,
                                                                   p_nullable          => util_string_to_bool(g_columns(i).is_nullable_yn),
                                                                   p_first_attribute   => 'v_row."' || g_columns(i).column_name || '"',
                                                                   p_second_attribute  => TRIM(g_iterator.parameter_name),
                                                                   p_compare_operation => '<>');
-
+        
           g_iterator.old_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
                                                               p_attribute_name => 'v_row."' || g_columns(i).column_name || '"');
-
+        
           g_iterator.new_value := util_get_vc2_4000_operation(p_data_type      => g_columns(i).data_type,
                                                               p_attribute_name => g_iterator.parameter_name);
-
+        
           g_code_blocks.template := '
 
   PROCEDURE set_{{ I_METHOD_NAME }}(
@@ -3675,13 +3606,13 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       END IF;
     END IF;
   END set_{{ I_METHOD_NAME }};';
-
+        
           util_template_replace('API BODY');
         END IF;
       END LOOP;
       util_debug_stop_one_step;
     END gen_setter_procedures;
-
+  
     PROCEDURE gen_get_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
@@ -3706,7 +3637,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_get_a_row_fnc;
-
+  
     PROCEDURE gen_create_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_a_row_fnc');
@@ -3734,7 +3665,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_a_row_fnc;
-
+  
     PROCEDURE gen_create_a_row_prc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_create_a_row_prc');
@@ -3760,7 +3691,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_create_a_row_prc;
-
+  
     PROCEDURE gen_read_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_read_a_row_fnc');
@@ -3789,7 +3720,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_read_a_row_fnc;
-
+  
     PROCEDURE gen_footer IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_footer');
@@ -3804,7 +3735,7 @@ CREATE OR REPLACE PACKAGE BODY "{{ OWNER }}"."{{ API_NAME }}" IS
   */'
                                 END || '
 END "{{ API_NAME }}";';
-
+    
       util_template_replace('API SPEC');
       g_code_blocks.template := '
 
@@ -3812,7 +3743,7 @@ END "{{ API_NAME }}";';
       util_template_replace('API BODY');
       util_debug_stop_one_step;
     END gen_footer;
-
+  
     PROCEDURE gen_dml_view IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_dml_view');
@@ -3826,14 +3757,14 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
    * generator_action="{{ GENERATOR_ACTION }}"
    * generated_at="{{ GENERATED_AT }}"
    * generated_by="{{ GENERATED_BY }}"
-   */
+   */    
     ';
       util_template_replace('VIEW');
       util_debug_stop_one_step;
     END gen_dml_view;
-
+  
     -----------------------------------------------------------------------------
-
+  
     PROCEDURE gen_dml_view_trigger IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_dml_view_trigger');
@@ -3848,7 +3779,7 @@ CREATE OR REPLACE TRIGGER "{{ OWNER }}"."{{ TABLE_NAME_MINUS_6 }}_IOIUD"
    * generator_action="{{ GENERATOR_ACTION }}"
    * generated_at="{{ GENERATED_AT }}"
    * generated_by="{{ GENERATED_BY }}"
-   */
+   */    
 BEGIN
   IF INSERTING THEN' || CASE
                                   WHEN g_params.enable_insertion_of_rows THEN
@@ -3882,11 +3813,11 @@ BEGIN
                                 END || '
   END IF;
 END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
-
+    
       util_template_replace('TRIGGER');
       util_debug_stop_one_step;
     END gen_dml_view_trigger;
-
+  
     PROCEDURE gen_finalize_clob_vc2_caching IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_finalize_clob_vc2_caching');
@@ -3894,18 +3825,18 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
                        p_clob_varchar_cache => g_code_blocks.api_spec_varchar_cache,
                        p_varchar_to_append  => NULL,
                        p_final_call         => TRUE);
-
+    
       util_clob_append(p_clob               => g_code_blocks.api_body,
                        p_clob_varchar_cache => g_code_blocks.api_body_varchar_cache,
                        p_varchar_to_append  => NULL,
                        p_final_call         => TRUE);
-
+    
       IF g_params.enable_dml_view THEN
         util_clob_append(p_clob               => g_code_blocks.dml_view,
                          p_clob_varchar_cache => g_code_blocks.dml_view_varchar_cache,
                          p_varchar_to_append  => NULL,
                          p_final_call         => TRUE);
-
+      
         util_clob_append(p_clob               => g_code_blocks.dml_view_trigger,
                          p_clob_varchar_cache => g_code_blocks.dml_view_trigger_varchar_cache,
                          p_varchar_to_append  => NULL,
@@ -3917,20 +3848,13 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
     gen_header;
     gen_row_exists_fnc;
     gen_row_exists_yn_fnc;
-
-
-    -- If defaults are allowed generate a function to get a predefined record
-    -- filled with default parameters based on column definitions
-    IF g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
-      gen_get_default_row_fnc;
-    END IF;
-
+  
     -- GET_PK_BY_UNIQUE_COLS functions only if no multi row pk is present
     -- use overloaded READ_ROW functions with unique paramams instead
     IF NOT g_status.pk_is_multi_column THEN
       gen_get_pk_by_unique_cols_fnc;
     END IF;
-
+  
     -- CREATE procedures/functions only if allowed
     IF g_params.enable_insertion_of_rows THEN
       gen_create_row_fnc;
@@ -3938,25 +3862,25 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       gen_create_rowtype_fnc;
       gen_create_rowtype_prc;
     END IF;
-
+  
     -- READ procedures
     gen_read_row_fnc;
     gen_read_row_by_uk_fnc;
     IF g_params.enable_proc_with_out_params THEN
       gen_read_row_prc;
     END IF;
-
+  
     -- UPDATE procedures/functions only if allowed
     IF g_params.enable_update_of_rows THEN
       gen_update_row_prc;
       gen_update_rowtype_prc;
     END IF;
-
+  
     -- DELETE procedures only if allowed
     IF g_params.enable_deletion_of_rows THEN
       gen_delete_row_prc;
     END IF;
-
+  
     -- CREATE or UPDATE procedures/functions only if both is allowed
     IF g_params.enable_insertion_of_rows AND g_params.enable_update_of_rows THEN
       gen_createorupdate_row_fnc;
@@ -3964,17 +3888,17 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       gen_createorupdate_rowtype_fnc;
       gen_createorupdate_rowtype_prc;
     END IF;
-
-    -- GETTER procedures/functions always
+  
+    -- GETTER procedures/functions always  
     IF g_params.enable_getter_and_setter THEN
       gen_getter_functions;
     END IF;
-
+  
     -- SETTER procedures/functions only if allowed
     IF g_params.enable_update_of_rows AND g_params.enable_getter_and_setter THEN
       gen_setter_procedures;
     END IF;
-
+  
     -- Some special stuff for the testing folks - thanks to Jacek Gębal ;-)
     IF g_params.enable_custom_defaults THEN
       gen_get_a_row_fnc;
@@ -3982,17 +3906,17 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
       gen_create_a_row_prc;
       gen_read_a_row_fnc;
     END IF;
-
+  
     gen_footer;
-
+  
     -- DML View and Trigger only if allowed
     IF g_params.enable_dml_view THEN
       gen_dml_view;
       gen_dml_view_trigger;
     END IF;
-
+  
     gen_finalize_clob_vc2_caching;
-
+  
   END main_generate_code;
 
   PROCEDURE main_compile_code IS
@@ -4006,7 +3930,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
         NULL;
     END;
     util_debug_stop_one_step;
-
+  
     -- compile package body
     util_debug_start_one_step(p_action => 'compile_body');
     BEGIN
@@ -4016,9 +3940,9 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
         NULL;
     END;
     util_debug_stop_one_step;
-
+  
     IF g_params.enable_dml_view THEN
-
+    
       -- compile DML view
       util_debug_start_one_step(p_action => 'compile_dml_view');
       BEGIN
@@ -4028,7 +3952,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
           NULL;
       END;
       util_debug_stop_one_step;
-
+    
       -- compile DML view trigger
       util_debug_start_one_step(p_action => 'compile_dml_view_trigger');
       BEGIN
@@ -4038,7 +3962,7 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
           NULL;
       END;
       util_debug_stop_one_step;
-
+    
     END IF;
   END main_compile_code;
 
@@ -4200,17 +4124,17 @@ END "{{ TABLE_NAME_MINUS_6 }}_IOIUD";';
 
   PROCEDURE recreate_existing_apis(p_owner IN all_users.username%TYPE DEFAULT USER) IS
     v_apis t_tab_existing_apis;
-
+  
     CURSOR v_cur IS
       SELECT * FROM TABLE(view_existing_apis(p_owner => p_owner));
   BEGIN
     OPEN v_cur;
-
+  
     FETCH v_cur BULK COLLECT
       INTO v_apis LIMIT c_bulk_collect_limit;
-
+  
     CLOSE v_cur;
-
+  
     IF v_apis.count > 0 THEN
       FOR i IN v_apis.first .. v_apis.last LOOP
         compile_api(p_table_name => v_apis(i).table_name, p_owner => v_apis(i).owner);
@@ -4243,7 +4167,7 @@ WITH api_names AS (
                              AND :spec_options_max_line
                 AND INSTR (text,''generator="OM_TAPIGEN"'') > 0
      ) -- select * from api_names;
-     , sources AS (
+     , sources AS (  
          SELECT owner,
                 package_name,
                 xmltype (
@@ -4323,7 +4247,7 @@ WITH api_names AS (
                            p_api_name                    VARCHAR2 (128 CHAR)  PATH ''@p_api_name'',
                            p_sequence_name               VARCHAR2 (128 CHAR)  PATH ''@p_sequence_name'',
                            p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH ''@p_exclude_column_list'',
-                           p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_custom_defaults'',
+                           p_enable_custom_defaults      VARCHAR2 (5 CHAR)    PATH ''@p_enable_custom_defaults'',                                                      
                            p_custom_default_values       VARCHAR2 (30 CHAR)   PATH ''@p_custom_default_values'') x
      ) -- select * from apis;
      , objects AS (
@@ -4404,7 +4328,7 @@ SELECT NULL AS errors,
                              c_lflf || SQLERRM || c_lflf || dbms_utility.format_error_backtrace,
                              1,
                              4000);
-
+    
       PIPE ROW(v_row);
   END view_existing_apis;
 
