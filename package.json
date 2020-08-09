@@ -9,9 +9,9 @@
   "scripts": {
     "prebuild": "npx ploc --in src/OM_TAPIGEN.pks --out README.md && node docs/build.js",
     "build": "node src/build.js",
-    "postbuild": "echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @om_tapigen_install.sql && echo tapigen was compiled > test/tapigen_compiled_trigger",
+    "postbuild": "echo exit | sqlplus -S %my_db_connect_string% @om_tapigen_install.sql && echo tapigen was compiled > test/tapigen_compiled_trigger",
     "watch-src": "chokidar src/* --initial -c \"npm run build\"",
-    "test": "cd test && echo exit | sqlplus -S tests/oracle@localhost/xepdb1 @compile_and_run_tests.sql && cd ..",
+    "test": "cd test && echo exit | sqlplus -S %my_db_connect_string% @compile_and_run_tests.sql && cd ..",
     "watch-test": "chokidar test/* --initial -c \"npm run test\""
   },
   "devDependencies": {
