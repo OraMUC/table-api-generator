@@ -1860,7 +1860,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           v_result(v_index).col2 := ' IN ' || util_double_quote(g_params.table_name) || '.' ||
             CASE
               WHEN g_params.enable_column_defaults AND g_template_options.use_column_defaults THEN
-                rpad( util_double_quote(g_columns(i).column_name) || '%TYPE', g_status.rpad_columns + 6)
+                rpad( util_double_quote(g_columns(i).column_name) || '%TYPE', g_status.rpad_columns + 7)
               ELSE
                 util_double_quote(g_columns(i).column_name) || '%TYPE'
             END ||

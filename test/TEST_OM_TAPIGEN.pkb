@@ -108,6 +108,32 @@ end test_all_tables_double_quote_names_false;
 
 --------------------------------------------------------------------------------
 
+procedure test_all_tables_enable_column_defaults_true is
+  ----------
+  function compile_apis_return_invalid_object_names return varchar2 is
+  begin
+    for i in cur_all_test_tables loop
+      test_om_tapigen_log_api.create_row (
+        p_test_name      => util_get_test_name,
+        p_table_name     => i.table_name,
+        p_generated_code => om_tapigen.compile_api_and_get_code(
+          p_table_name             => i.table_name,
+          p_enable_column_defaults => true
+        )
+      );
+    end loop;
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_apis_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_apis_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(11);
+end test_all_tables_enable_column_defaults_true;
+
+--------------------------------------------------------------------------------
+
 procedure test_users_roles_rights_audit_column_mappings_configured is
   ----------
   function compile_apis_return_invalid_object_names return varchar2 is
@@ -577,7 +603,7 @@ procedure util_create_test_table_objects is
   ----------
   procedure tag_map_users_roles is
   begin
-    execute immediate '
+    execute immediate q'[
       create table tag_map_users_roles (
         mur_id          integer        generated always as identity,
         mur_u_id        integer        not null  ,
@@ -590,12 +616,12 @@ procedure util_create_test_table_objects is
         foreign key (mur_u_id) references tag_users,
         foreign key (mur_ro_id) references tag_roles
       )
-    ';
+    ]';
   end tag_map_users_roles;
   ----------
   procedure tag_map_roles_rights is
   begin
-    execute immediate '
+    execute immediate q'[
       create table tag_map_roles_rights (
         mrr_ro_id       integer        not null  ,
         mrr_ri_id       integer        not null  ,
@@ -606,12 +632,12 @@ procedure util_create_test_table_objects is
         foreign key (mrr_ro_id) references tag_roles,
         foreign key (mrr_ri_id) references tag_rights
       )
-    ';
+    ]';
   end tag_map_roles_rights;
   ----------
   procedure tag_all_data_types_single_pk is
   begin
-    execute immediate '
+    execute immediate q'[
       create table tag_all_data_types_single_pk (
         adt1_id             integer            generated always as identity,
         adt1_varchar        varchar2(15 char)            ,
@@ -629,12 +655,12 @@ procedure util_create_test_table_objects is
         primary key (adt1_id),
         unique (adt1_varchar)
       )
-    ';
+    ]';
   end tag_all_data_types_single_pk;
   ----------
   procedure tag_all_data_types_multi_pk is
   begin
-    execute immediate '
+    execute immediate q'[
       create table tag_all_data_types_multi_pk (
         adt2_id             integer            generated always as identity,
         adt2_varchar        varchar2(15 char)            ,
@@ -651,12 +677,12 @@ procedure util_create_test_table_objects is
         --
         primary key (adt2_id, adt2_varchar)
       )
-    ';
+    ]';
   end tag_all_data_types_multi_pk;
   ----------
   procedure tag_short_column_names is
   begin
-    execute immediate '
+    execute immediate q'[
       create table tag_short_column_names (
         scn_id  integer            generated always as identity,
         scn_a   varchar2(15 char)  ,
@@ -665,21 +691,21 @@ procedure util_create_test_table_objects is
         --
         primary key (scn_id)
       )
-    ';
+    ]';
   end tag_short_column_names;
   ----------
   procedure tag_long_column_names is
   begin
-    execute immediate '
+    execute immediate q'[
       create table tag_long_column_names (
-        lcn_id  integer            generated always as identity,
-        lcn_a_very_very_very_very_very_long_column_name_to_test_how_far_we_can_go_with_a_descend_database_version  varchar2(15 char)  ,
-        lcn_another_long_column_name_although_not_as_long_as_the_first_one_but_long_enough_for_our_tests           integer            ,
-        lcn_a_short_one_just_for_fun                                                                               number             ,
+        lcn_id                                                                                                     integer            generated always as identity,
+        lcn_a_very_very_very_very_very_long_column_name_to_test_how_far_we_can_go_with_a_descend_database_version  varchar2(15 char)  default 'testus'            ,
+        lcn_another_long_column_name_although_not_as_long_as_the_first_one_but_long_enough_for_our_tests           integer            default 1         not null  ,
+        lcn_a_short_one_just_for_fun                                                                               number                               not null  ,
         --
         primary key (lcn_id)
       )
-    ';
+    ]';
   end tag_long_column_names;
   ----------
   procedure tag_tenant_visible is

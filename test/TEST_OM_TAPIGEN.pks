@@ -27,6 +27,9 @@ procedure test_all_tables_return_row_instead_of_pk_true;
 procedure test_all_tables_double_quote_names_false;
 
 --%test
+procedure test_all_tables_enable_column_defaults_true;
+
+--%test
 procedure test_users_roles_rights_audit_column_mappings_configured;
 
 --%test
