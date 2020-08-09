@@ -38,6 +38,7 @@
 - [p_audit_column_mappings (since v0.6.0)](#p_audit_column_mappings-since-v060)
 - [p_audit_user_expression (since v0.6.0)](#p_audit_user_expression-since-v060)
 - [p_row_version_column_mapping (since v0.6.0)](#p_row_version_column_mapping-since-v060)
+- [p_tenant_column_mapping](#p_tenant_column_mapping)
 - [p_enable_custom_defaults (since v0.5.0)](#p_enable_custom_defaults-since-v050)
 - [p_custom_default_values (since v0.5.0)](#p_custom_default_values-since-v050)
 - [Removed Parameters](#removed-parameters)
