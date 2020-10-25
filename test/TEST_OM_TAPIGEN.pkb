@@ -134,6 +134,32 @@ end test_all_tables_enable_column_defaults_true;
 
 --------------------------------------------------------------------------------
 
+procedure test_all_tables_enable_custom_defaults_true is
+  ----------
+  function compile_apis_return_invalid_object_names return varchar2 is
+  begin
+    for i in cur_all_test_tables loop
+      test_om_tapigen_log_api.create_row (
+        p_test_name      => util_get_test_name,
+        p_table_name     => i.table_name,
+        p_generated_code => om_tapigen.compile_api_and_get_code(
+          p_table_name             => i.table_name,
+          p_enable_custom_defaults => true
+        )
+      );
+    end loop;
+    commit;
+    return util_get_list_of_invalid_generated_objects;
+  end compile_apis_return_invalid_object_names;
+  ----------
+begin
+  ut.expect(util_count_generated_objects).to_equal(0);
+  ut.expect(compile_apis_return_invalid_object_names).to_be_null;
+  ut.expect(util_count_generated_objects).to_equal(11);
+end test_all_tables_enable_custom_defaults_true;
+
+--------------------------------------------------------------------------------
+
 procedure test_users_roles_rights_audit_column_mappings_configured is
   ----------
   function compile_apis_return_invalid_object_names return varchar2 is
@@ -639,18 +665,22 @@ procedure util_create_test_table_objects is
   begin
     execute immediate q'[
       create table tag_all_data_types_single_pk (
-        adt1_id             integer            generated always as identity,
-        adt1_varchar        varchar2(15 char)            ,
-        adt1_char           char(1 char)       not null  ,
-        adt1_integer        integer                      ,
-        adt1_number         number                       ,
-        adt1_number_x_5     number(*,5)                  ,
-        adt1_number_20_5    number(20,5)                 ,
-        adt1_float          float                        ,
-        adt1_float_size_30  float(30)                    ,
-        adt1_xmltype        xmltype                      ,
-        adt1_clob           clob                         ,
-        adt1_blob           blob                         ,
+        adt1_id             integer                         generated always as identity,
+        adt1_varchar        varchar2(15 char)                         ,
+        adt1_char           char(1 char)                    not null  ,
+        adt1_integer        integer                                   ,
+        adt1_number         number                                    ,
+        adt1_number_x_5     number(*,5)                               ,
+        adt1_number_20_5    number(20,5)                              ,
+        adt1_float          float                                     ,
+        adt1_float_size_30  float(30)                                 ,
+        adt1_xmltype        xmltype                                   ,
+        adt1_clob           clob                                      ,
+        adt1_blob           blob                                      ,
+        adt1_date           date                                      ,
+        adt1_timestamp      timestamp                                 ,
+        adt1_timestamp_tz   timestamp with time zone                  ,
+        adt1_timestamp_ltz  timestamp with local time zone            ,
         --
         primary key (adt1_id),
         unique (adt1_varchar)
@@ -662,18 +692,22 @@ procedure util_create_test_table_objects is
   begin
     execute immediate q'[
       create table tag_all_data_types_multi_pk (
-        adt2_id             integer            generated always as identity,
-        adt2_varchar        varchar2(15 char)            ,
-        adt2_char           char(1 char)       not null  ,
-        adt2_integer        integer                      ,
-        adt2_number         number                       ,
-        adt2_number_x_5     number(*,5)                  ,
-        adt2_number_20_5    number(20,5)                 ,
-        adt2_float          float                        ,
-        adt2_float_size_30  float(30)                    ,
-        adt2_xmltype        xmltype                      ,
-        adt2_clob           clob                         ,
-        adt2_blob           blob                         ,
+        adt2_id             integer                         generated always as identity,
+        adt2_varchar        varchar2(15 char)                         ,
+        adt2_char           char(1 char)                    not null  ,
+        adt2_integer        integer                                   ,
+        adt2_number         number                                    ,
+        adt2_number_x_5     number(*,5)                               ,
+        adt2_number_20_5    number(20,5)                              ,
+        adt2_float          float                                     ,
+        adt2_float_size_30  float(30)                                 ,
+        adt2_xmltype        xmltype                                   ,
+        adt2_clob           clob                                      ,
+        adt2_blob           blob                                      ,
+        adt2_date           date                                      ,
+        adt2_timestamp      timestamp                                 ,
+        adt2_timestamp_tz   timestamp with time zone                  ,
+        adt2_timestamp_ltz  timestamp with local time zone            ,
         --
         primary key (adt2_id, adt2_varchar)
       )
@@ -698,7 +732,7 @@ procedure util_create_test_table_objects is
   begin
     execute immediate q'[
       create table tag_long_column_names (
-        lcn_id                                                                                                     integer            generated always as identity,
+        lcn_id                                                                                                     integer                              generated always as identity,
         lcn_a_very_very_very_very_very_long_column_name_to_test_how_far_we_can_go_with_a_descend_database_version  varchar2(15 char)  default 'testus'            ,
         lcn_another_long_column_name_although_not_as_long_as_the_first_one_but_long_enough_for_our_tests           integer            default 1         not null  ,
         lcn_a_short_one_just_for_fun                                                                               number                               not null  ,

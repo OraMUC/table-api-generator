@@ -36,7 +36,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.36';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.37';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -808,7 +808,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         LEFT JOIN identity_columns ON all_tab_cols.column_name = identity_columns.column_name_identity
        WHERE owner = g_params.owner
          AND table_name = g_params.table_name
-         --AND hidden_column = 'NO'
+         AND user_generated = 'YES'
        ORDER BY column_id)
     SELECT column_name,
            data_type,
@@ -2620,7 +2620,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_list_padding := get_list_padding(4);
       v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).data_custom_default IS NOT NULL THEN
+        IF g_columns(i).data_custom_default IS NOT NULL AND g_columns(i).is_hidden_yn = 'N' THEN
           v_index := v_result.count + 1;
           v_result(v_index).col1 := v_list_padding || 'v_row.' ||
             util_double_quote(g_columns(i).column_name);
@@ -3814,7 +3814,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                 WHEN g_columns(i).data_type = 'CLOB' THEN
                   q'[to_clob('Dummy clob for API method get_a_row: ' || sys.dbms_random.string('A', round(sys.dbms_random.value(30, 100))))]'
                 WHEN g_columns(i).data_type = 'BLOB' THEN
-                  q'[to_blob(utl_raw.cast_to_raw('Dummy clob for API method get_a_row: ' || sys.dbms_random.string('A', round(sys.dbms_random.value(30, 100)))))]'
+                  q'[to_blob(utl_raw.cast_to_raw('Dummy blob for API method get_a_row: ' || sys.dbms_random.string('A', round(sys.dbms_random.value(30, 100)))))]'
                 WHEN g_columns(i).data_type = 'XMLTYPE' THEN
                   q'[xmltype('<dummy>Dummy XML for API method get_a_row: ' || sys.dbms_random.string('A', round(sys.dbms_random.value(30, 100))) || '</dummy>')]'
                 ELSE

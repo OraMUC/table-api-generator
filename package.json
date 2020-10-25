@@ -9,15 +9,15 @@
   "scripts": {
     "prebuild": "npx ploc --in src/OM_TAPIGEN.pks --out README.md && node docs/build.js",
     "build": "node src/build.js",
-    "postbuild": "echo exit | sqlplus -S /@om_tapigen @om_tapigen_install.sql && echo tapigen was compiled > test/tapigen_compiled_trigger",
+    "postbuild": "echo exit | sqlplus -S /@playground @om_tapigen_install.sql && echo tapigen was compiled > test/tapigen_compiled_trigger",
     "watch-src": "chokidar src/* --initial -c \"npm run build\"",
-    "test": "cd test && echo exit | sqlplus -S /@om_tapigen @compile_and_run_tests.sql && cd ..",
+    "test": "cd test && echo exit | sqlplus -S /@playground @compile_and_run_tests.sql && cd ..",
     "watch-test": "chokidar test/* --initial -c \"npm run test\""
   },
   "devDependencies": {
     "chokidar-cli": "^2.1.0",
-    "markdown-toc": "^1.2.0",
     "glob": "^7.1.6",
-    "ploc": "^0.6.1"
+    "markdown-toc": "^1.2.0",
+    "ploc": "^0.6.2"
   }
 }

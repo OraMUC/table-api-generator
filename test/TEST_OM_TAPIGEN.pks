@@ -62,6 +62,9 @@ procedure test_table_with_tenant_id_invisible;
 --%test
 procedure test_table_with_tenant_id_visible;
 
+--%test
+procedure test_all_tables_enable_custom_defaults_true;
+
 --------------------------------------------------------------------------------
 
 subtype t_name is varchar2(128);

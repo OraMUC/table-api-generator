@@ -48,4 +48,4 @@ BEGIN
   dbms_output.put_line('- sum:' || to_char(v_sum, v_fmt) || ' seconds');
 END;
 /
--- SELECT * FROM TABLE ( om_tapigen.utiv_view_columns_array );
+-- SELECT * FROM TABLE ( om_tapigen.util_view_columns_array );

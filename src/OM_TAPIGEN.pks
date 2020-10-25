@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.36';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.37';
 /**
 Oracle PL/SQL Table API Generator
 =================================
