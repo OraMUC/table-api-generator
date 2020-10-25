@@ -26,17 +26,19 @@ FEATURES
 - Generates small wrappers around your tables
 - Highly configurable
 - You can enable or disable separately insert, update and delete functionality
-- Standard CRUD methods (column and row type based) and an additional create
-  or update method
+- Standard CRUD methods (column and row type based) and an additional create or update method
 - Set based methods for high performance DML processing
 - For each unique constraint a read method and a getter to fetch the primary key
-- Functions to check if a row exists (primary key based, returning boolean or
-  varchar2)
+- Functions to check if a row exists (primary key based, returning boolean or varchar2)
 - Support for audit columns
 - Support for a row version column
 - Optional getter and setter for each column
 - Optional 1:1 view to support the separation of concerns (also known as ThickDB/SmartDB/PinkDB paradigm)
 - Optional DML view with an instead of trigger to support low code tools like APEX
+
+PREREQUISITES
+
+- Oracle 12.1 or higher
 
 LICENSE
 

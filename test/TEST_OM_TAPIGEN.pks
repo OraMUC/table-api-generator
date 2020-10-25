@@ -30,6 +30,9 @@ procedure test_all_tables_double_quote_names_false;
 procedure test_all_tables_enable_column_defaults_true;
 
 --%test
+procedure test_all_tables_enable_custom_defaults_true;
+
+--%test
 procedure test_users_roles_rights_audit_column_mappings_configured;
 
 --%test
@@ -61,9 +64,6 @@ procedure test_table_with_tenant_id_invisible;
 
 --%test
 procedure test_table_with_tenant_id_visible;
-
---%test
-procedure test_all_tables_enable_custom_defaults_true;
 
 --------------------------------------------------------------------------------
 

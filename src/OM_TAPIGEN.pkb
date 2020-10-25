@@ -2625,7 +2625,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_params.row_version_column_mapping  := p_row_version_column_mapping;
       g_params.tenant_column_mapping       := p_tenant_column_mapping;
       g_params.enable_custom_defaults      := p_enable_custom_defaults;
-      g_params.custom_default_values       :=  p_custom_default_values;
+      g_params.custom_default_values       := p_custom_default_values;
       IF g_params.custom_default_values IS NOT NULL THEN
         g_params.custom_defaults_serialized := util_serialize_xml(g_params.custom_default_values);
       END IF;
