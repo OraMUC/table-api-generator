@@ -38,7 +38,7 @@
 - [p_audit_column_mappings (since v0.6.0)](#p_audit_column_mappings-since-v060)
 - [p_audit_user_expression (since v0.6.0)](#p_audit_user_expression-since-v060)
 - [p_row_version_column_mapping (since v0.6.0)](#p_row_version_column_mapping-since-v060)
-- [p_tenant_column_mapping](#p_tenant_column_mapping)
+- [p_tenant_column_mapping (since v0.6.0)](#p_tenant_column_mapping-since-v060)
 - [p_enable_custom_defaults (since v0.5.0)](#p_enable_custom_defaults-since-v050)
 - [p_custom_default_values (since v0.5.0)](#p_custom_default_values-since-v050)
 - [Removed Parameters](#removed-parameters)
@@ -224,7 +224,7 @@
 - Supports column prefix placeholders to be able to reuse the same mappings in multiple tables with different column_prefixes
 - Example with a global version sequence: `#PREFIX#_VERSION_ID=tag_global_version_sequence.nextval`
 
-## p_tenant_column_mapping
+## p_tenant_column_mapping (since v0.6.0)
 - String (varchar2), default: null
 - If not null, the provided column name is excluded from the parameters and appended to all primary key where clauses with the provided SQL expression
 - If you have unique keys in your tables you should make sure the tenant column is part of it, otherwise the unique key based read_row methods are not filtering correct
