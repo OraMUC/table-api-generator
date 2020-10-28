@@ -376,10 +376,10 @@ begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_api_return_invalid_object_names).to_be_null;
   ut.expect(util_count_generated_objects).to_equal(4);
-  ut.expect(util_check_if_package_exists('TAG_USERS_API')).to_be_true;
-  ut.expect(util_check_if_view_exists('TAG_USERS_DML_V')).to_be_true;
-  ut.expect(util_check_if_trigger_exists('TAG_USERS_IOIUD')).to_be_true;
-  ut.expect(util_check_if_view_exists('TAG_USERS_V')).to_be_true;
+  ut.expect(util_check_if_object_exists('PACKAGE', 'TAG_USERS_API')).to_be_true;
+  ut.expect(util_check_if_object_exists('VIEW', 'TAG_USERS_DML_V')).to_be_true;
+  ut.expect(util_check_if_object_exists('TRIGGER', 'TAG_USERS_IOIUD')).to_be_true;
+  ut.expect(util_check_if_object_exists('VIEW', 'TAG_USERS_V')).to_be_true;
 end test_table_users_default_api_object_names;
 
 --------------------------------------------------------------------------------
@@ -415,10 +415,10 @@ begin
   ut.expect(util_count_generated_objects).to_equal(0);
   ut.expect(compile_api_return_invalid_object_names).to_be_null;
   ut.expect(util_count_generated_objects).to_equal(4);
-  ut.expect(util_check_if_package_exists('TAG_USERS_TAPI')).to_be_true;
-  ut.expect(util_check_if_view_exists('TAG_USERS_DMLV')).to_be_true;
-  ut.expect(util_check_if_trigger_exists('TAG_USERS_DMLT')).to_be_true;
-  ut.expect(util_check_if_view_exists('TAG_USERS_121V')).to_be_true;
+  ut.expect(util_check_if_object_exists('PACKAGE', 'TAG_USERS_TAPI')).to_be_true;
+  ut.expect(util_check_if_object_exists('VIEW', 'TAG_USERS_DMLV')).to_be_true;
+  ut.expect(util_check_if_object_exists('TRIGGER', 'TAG_USERS_DMLT')).to_be_true;
+  ut.expect(util_check_if_object_exists('VIEW', 'TAG_USERS_121V')).to_be_true;
 end test_table_users_different_api_object_names;
 
 --------------------------------------------------------------------------------
@@ -849,42 +849,21 @@ end util_count_generated_objects;
 
 --------------------------------------------------------------------------------
 
-function  util_check_if_package_exists (p_name varchar2) return boolean is
+function  util_check_if_object_exists (
+  p_object_type varchar2,
+  p_object_name varchar2
+) return boolean is
   l_return boolean := false;
 begin
   for i in (select object_name
               from user_objects
-             where object_name = p_name
-               and object_type = 'PACKAGE')
+             where object_type = p_object_type
+               and object_name = p_object_name)
   loop
     l_return := true;
   end loop;
 return l_return;
-end util_check_if_package_exists;
-
---------------------------------------------------------------------------------
-
-function  util_check_if_view_exists (p_name varchar2) return boolean is
-  l_return boolean := false;
-begin
-  for i in (select view_name from user_views where view_name = p_name)
-  loop
-    l_return := true;
-  end loop;
-return l_return;
-end util_check_if_view_exists;
-
---------------------------------------------------------------------------------
-
-function  util_check_if_trigger_exists (p_name varchar2) return boolean is
-  l_return boolean := false;
-begin
-  for i in (select trigger_name from user_triggers where trigger_name = p_name)
-  loop
-    l_return := true;
-  end loop;
-return l_return;
-end util_check_if_trigger_exists;
+end util_check_if_object_exists;
 
 --------------------------------------------------------------------------------
 

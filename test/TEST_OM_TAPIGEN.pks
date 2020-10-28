@@ -115,11 +115,10 @@ function util_get_regex_substr_count (
   p_regex_count  varchar2
 ) return integer;
 
-function  util_check_if_package_exists (p_name varchar2) return boolean;
-
-function  util_check_if_view_exists (p_name varchar2) return boolean;
-
-function  util_check_if_trigger_exists (p_name varchar2) return boolean;
+function  util_check_if_object_exists (
+  p_object_type varchar2,
+  p_object_name varchar2
+) return boolean;
 
 --------------------------------------------------------------------------------
 
