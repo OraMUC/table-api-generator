@@ -36,7 +36,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.38';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.39';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -3784,25 +3784,25 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                   END || ')'
                 WHEN g_columns(i).data_type LIKE '%CHAR%' THEN
                   CASE
-                    WHEN lower(g_columns(i).column_name) LIKE '%mail%' THEN
+                    WHEN upper(g_columns(i).column_name) LIKE '%MAIL%' THEN
                       q'[sys.dbms_random.string('L', round(sys.dbms_random.value(6, ]' || to_char(least(g_columns(i).char_length - 18, 24)) || ')))' ||
                       q'[ || '@' || ]' ||
                       q'[sys.dbms_random.string('L', round(sys.dbms_random.value(6, 12)))]' ||
                       q'[ || '.' || ]' ||
                       q'[sys.dbms_random.string('L', round(sys.dbms_random.value(2, 4)))]'
-                    WHEN lower(g_columns(i).column_name) LIKE '%phone%' THEN
+                    WHEN upper(g_columns(i).column_name) LIKE '%PHONE%' THEN
                       q'[substr('+' || ]' ||
                       q'[to_char(round(sys.dbms_random.value(1, 99))) || ' ' || ]' ||
                       q'[to_char(round(sys.dbms_random.value(10, 9999))) || ' ' || ]' ||
                       q'[to_char(round(sys.dbms_random.value(100, 999))) || ' ' || ]' ||
                       q'[to_char(round(sys.dbms_random.value(100, 9999))), 1, ]' ||
                       to_char(g_columns(i).char_length) || ')'
-                    WHEN lower(g_columns(i).column_name) LIKE '%name%'
-                      OR lower(g_columns(i).column_name) LIKE '%city%'
-                      OR lower(g_columns(i).column_name) LIKE '%country%'
+                    WHEN upper(g_columns(i).column_name) LIKE '%NAME%'
+                      OR upper(g_columns(i).column_name) LIKE '%CITY%'
+                      OR upper(g_columns(i).column_name) LIKE '%COUNTRY%'
                     THEN
                       q'[initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, ]' || to_char(g_columns(i).char_length) || '))))'
-                    WHEN lower(g_columns(i).column_name) LIKE '%street%' THEN
+                    WHEN upper(g_columns(i).column_name) LIKE '%STREET%' THEN
                       q'[initcap(sys.dbms_random.string('L', round(sys.dbms_random.value(3, ]' || to_char(g_columns(i).char_length - 4) || '))))' ||
                       q'[ || ' ' || ]' ||
                       q'[to_char(round(sys.dbms_random.value(1, 200)))]'
@@ -3811,6 +3811,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                   END
                 WHEN g_columns(i).data_type = 'DATE' THEN
                   q'[to_date(round(sys.dbms_random.value(to_char(date '1900-01-01', 'j'), to_char(date '2099-12-31', 'j'))), 'j')]'
+                WHEN g_columns(i).data_type LIKE 'INTERVAL DAY%' THEN
+                  q'[to_dsinterval(to_char(round(sys.dbms_random.value(0, ]' || rpad('9', g_columns(i).data_precision, '9') || q'[))) || ' ' ]' ||
+                  q'[|| to_char(round(sys.dbms_random.value(0, 23))) || ':' ]' ||
+                  q'[|| to_char(round(sys.dbms_random.value(0, 59))) || ':' ]' ||
+                  q'[|| to_char(round(sys.dbms_random.value(0, 59))) )]'
+                WHEN g_columns(i).data_type LIKE 'INTERVAL YEAR%' THEN
+                  q'[to_yminterval(to_char(round(sys.dbms_random.value(0, ]' || rpad('9', g_columns(i).data_precision, '9') || q'[))) || '-' ]' ||
+                  q'[|| to_char(round(sys.dbms_random.value(0, 11))) )]'
                 WHEN g_columns(i).data_type LIKE 'TIMESTAMP%' THEN
                   'systimestamp'
                 WHEN g_columns(i).data_type = 'CLOB' THEN
@@ -4969,7 +4977,7 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
     v_row {{ TABLE_NAME }}%ROWTYPE;
   BEGIN
     {% LIST_ROWCOLS_W_CUST_DEFAULTS %}
-    return v_row;
+    RETURN v_row;
   END get_a_row;';
       util_template_replace('API BODY');
 
