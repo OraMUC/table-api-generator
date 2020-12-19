@@ -2050,10 +2050,39 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     v_row.col1 := <custom_default_value>;
     v_row.col2 := <custom_default_value>;
     */
+    FUNCTION list_rowcols_w_dict_defaults RETURN t_tab_list IS
+      v_result           t_tab_list;
+      v_list_padding     t_vc2_30;
+      v_index            pls_integer;
+      v_operator_padding pls_integer;
+    BEGIN
+      v_list_padding := get_list_padding(4);
+      v_operator_padding := get_operator_padding;
+      FOR i IN 1 .. g_columns.count LOOP
+        IF g_columns(i).data_default IS NOT NULL AND g_columns(i).is_hidden_yn = 'N' THEN
+          v_index := v_result.count + 1;
+          v_result(v_index).col1 := v_list_padding || 'v_row.' ||
+            util_double_quote(g_columns(i).column_name);
+          v_result(v_index).col2 :=
+            ' := ' || g_columns(i).data_default ||
+            get_column_comment(i) || ';' ||
+            c_lf;
+        END IF;
+      END LOOP;
+      align_list_col1(v_result);
+      trim_list(v_result);
+      RETURN v_result;
+    END list_rowcols_w_dict_defaults;
+
+    -----------------------------------------------------------------------------
+    /*
+    v_row.col1 := <custom_default_value>;
+    v_row.col2 := <custom_default_value>;
+    */
     FUNCTION list_rowcols_w_cust_defaults RETURN t_tab_list IS
-      v_result       t_tab_list;
-      v_list_padding t_vc2_30;
-      v_index        pls_integer;
+      v_result           t_tab_list;
+      v_list_padding     t_vc2_30;
+      v_index            pls_integer;
       v_operator_padding pls_integer;
     BEGIN
       v_list_padding := get_list_padding(4);
@@ -2121,6 +2150,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_insert_columns;
       WHEN 'LIST_COLUMNS_W_PK_FULL' THEN
         RETURN list_columns_w_pk_full;
+      WHEN 'LIST_ROWCOLS_W_DICT_DEFAULTS' THEN
+        RETURN list_rowcols_w_dict_defaults;
       WHEN 'LIST_ROWCOLS_W_CUST_DEFAULTS' THEN
         RETURN list_rowcols_w_cust_defaults;
       WHEN 'LIST_MAP_PAR_EQ_NEWCOL_W_PK' THEN
@@ -4394,6 +4425,34 @@ CREATE OR REPLACE PACKAGE BODY {{ OWNER }}.{{ API_NAME }} IS
 
     -----------------------------------------------------------------------------
 
+    PROCEDURE gen_get_default_row_fnc IS
+    BEGIN
+      util_debug_start_one_step(p_action => 'gen_get_default_row_fnc');
+
+      g_code_blocks.template := '
+  FUNCTION get_default_row
+  RETURN {{ TABLE_NAME }}%ROWTYPE;
+  /*
+  Helper to get a prepopulated row with the table defaults from the dictionary.
+  */';
+      util_template_replace('API SPEC');
+
+      g_code_blocks.template := '
+  FUNCTION get_default_row
+  RETURN {{ TABLE_NAME }}%ROWTYPE
+  IS
+    v_row {{ TABLE_NAME }}%ROWTYPE;
+  BEGIN
+    {% LIST_ROWCOLS_W_DICT_DEFAULTS %}
+    RETURN v_row;
+  END get_default_row;';
+      util_template_replace('API BODY');
+
+      util_debug_stop_one_step;
+    END gen_get_default_row_fnc;
+
+    -----------------------------------------------------------------------------
+
     PROCEDURE gen_get_a_row_fnc IS
     BEGIN
       util_debug_start_one_step(p_action => 'gen_get_a_row_fnc');
@@ -4733,6 +4792,11 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     -- SETTER methods
     IF g_params.enable_update_of_rows AND g_params.enable_getter_and_setter THEN
       gen_setter_procedures;
+    END IF;
+
+    -- Helper to get a prepopulated row with the table defaults from the dictionary
+    IF g_params.enable_column_defaults THEN
+      gen_get_default_row_fnc;
     END IF;
 
     -- Some special stuff for the testing folks - thanks to Jacek Gębal ;-)
