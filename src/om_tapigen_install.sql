@@ -13,6 +13,9 @@ begin
     into v_db_version
     from product_component_version
    where product like 'Oracle Database%';
+  if to_number(v_db_version) < 121 then
+    raise_application_error (-20000, 'Unsupported DB version detected: Sorry, you need to have 12.1 or higher for our table API generator :-(');
+  end if;
   if to_number(v_db_version) >= 180 then
     execute immediate q'[
       select replace(regexp_substr(version_full, '\d+\.\d+'), '.', null) as db_version

@@ -1,25 +1,16 @@
 --https://stackoverflow.com/questions/27543873/sqlplus-conditional-execution-with-variable-from-query
-set define on feedback off serveroutput on
+set define on verify off feedback off serveroutput on
 whenever sqlerror exit sql.sqlcode rollback
 
 prompt
 prompt Test github.com/OraMUC/table-api-generator
 prompt ============================================================
-
-prompt Create log table
 @create_log_table.sql
-
-prompt Compile package test_om_tapigen (spec)
 @TEST_OM_TAPIGEN.pks
-show errors
-
-prompt Compile package test_om_tapigen (body)
 @TEST_OM_TAPIGEN.pkb
-show errors
-
-prompt RUN TESTS
-execute ut.run('test_om_tapigen');
-
+@run_unit_tests.sql
+--@run_performance_tests.sql TAG_TENANT_VISIBLE 10
+--@view_columns_array.sql
 prompt ============================================================
 prompt Tests Done
 prompt

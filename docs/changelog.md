@@ -43,6 +43,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - added: double quoting of table and column names can now be configured (parameter p_double_quote_names, default true)
 - added: update function with return clause (mainly for use in create_or_update_row to prevent read row after update)
 - added: unit tests with utPLSQL (it will be a permanent task to improve the tests with every new feature or bugfix)
+- removed: support for database versions < 12.1 - if this is a problem for you then use the generator version 0.5.2 (without all the new features, sorry...)
 - removed: support for a generic change log (parameter p_enable_generic_change_log - makes no sense anymore with bulk processing and multi column primary keys)
 - removed: prevent updates if columns do not differ (remove was needed to support all possible column types and for performance reasons)
 - removed: parameter p_reuse_existing_api_params (usage was was not logic, simply provide always your needed parameters and create scripts or a wrapper)

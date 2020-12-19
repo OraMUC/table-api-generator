@@ -1,3 +1,5 @@
+prompt Create log table
+
 --drop table, if it exists
 begin
   for i in (select table_name from user_tables where table_name = 'TEST_OM_TAPIGEN_LOG') loop

@@ -1,12 +1,13 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.34';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.5.2.39';
 /**
 Oracle PL/SQL Table API Generator
 =================================
 
-_This table API generator can be integrated in the Oracle SQL-Developer with an
-additional wrapper package for the [SQL Developer extension oddgen](https://www.oddgen.org/)._
+_This table API generator needs an Oracle DB version 12.1 or higher and can be
+integrated in the Oracle SQL-Developer with an additional wrapper package
+for the [SQL Developer extension oddgen](https://www.oddgen.org/)._
 
 The effort of generated API's is to reduce your PL/SQL code by calling standard
 procedures and functions for usual DML operations on tables. So the generated
@@ -25,17 +26,19 @@ FEATURES
 - Generates small wrappers around your tables
 - Highly configurable
 - You can enable or disable separately insert, update and delete functionality
-- Standard CRUD methods (column and row type based) and an additional create
-  or update method
+- Standard CRUD methods (column and row type based) and an additional create or update method
 - Set based methods for high performance DML processing
 - For each unique constraint a read method and a getter to fetch the primary key
-- Functions to check if a row exists (primary key based, returning boolean or
-  varchar2)
+- Functions to check if a row exists (primary key based, returning boolean or varchar2)
 - Support for audit columns
 - Support for a row version column
 - Optional getter and setter for each column
 - Optional 1:1 view to support the separation of concerns (also known as ThickDB/SmartDB/PinkDB paradigm)
 - Optional DML view with an instead of trigger to support low code tools like APEX
+
+PREREQUISITES
+
+- Oracle 12.1 or higher
 
 LICENSE
 
@@ -132,6 +135,7 @@ TYPE t_rec_existing_apis IS RECORD(
   p_audit_column_mappings       t_vc2_4k,
   p_audit_user_expression       t_vc2_4k,
   p_row_version_column_mapping  t_vc2_4k,
+  p_tenant_column_mapping       t_vc2_4k,
   p_enable_custom_defaults      t_vc2_5,
   p_custom_default_values       t_vc2_30);
 
@@ -180,9 +184,12 @@ TYPE t_rec_columns IS RECORD(
   is_uk_yn               t_vc2_1,
   is_fk_yn               t_vc2_1,
   is_nullable_yn         t_vc2_1,
+  is_hidden_yn           t_vc2_1,
+  is_virtual_yn          t_vc2_1,
   is_excluded_yn         t_vc2_1,
   audit_type             t_vc2_20,
   row_version_expression t_vc2_4k,
+  tenant_expression      t_vc2_4k,
   r_owner                all_users.username%TYPE,
   r_table_name           all_objects.object_name%TYPE,
   r_column_name          all_tab_cols.column_name%TYPE);
@@ -244,6 +251,7 @@ PROCEDURE compile_api
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
   p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
+  p_tenant_column_mapping       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is hidden inside the API, populated with the provided SQL expression and used as a tenant_id in all relevant API methods.
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
   p_custom_default_values       IN XMLTYPE  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 );
@@ -286,6 +294,7 @@ FUNCTION compile_api_and_get_code
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
   p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
+  p_tenant_column_mapping       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is hidden inside the API, populated with the provided SQL expression and used as a tenant_id in all relevant API methods.
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
   p_custom_default_values       IN XMLTYPE  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 ) RETURN CLOB;
@@ -332,6 +341,7 @@ FUNCTION get_code
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
   p_row_version_column_mapping  IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is excluded and populated by the API with the provided SQL expression (you don't need a trigger to provide a row version identifier).
+  p_tenant_column_mapping       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided column name is hidden inside the API, populated with the provided SQL expression and used as a tenant_id in all relevant API methods.
   p_enable_custom_defaults      IN BOOLEAN  DEFAULT FALSE, -- If true, additional methods are created (mainly for testing and dummy data creation, see full parameter descriptions).
   p_custom_default_values       IN XMLTYPE  DEFAULT NULL   -- Custom values in XML format for the previous option, if the generator provided defaults are not ok.
 ) RETURN CLOB;

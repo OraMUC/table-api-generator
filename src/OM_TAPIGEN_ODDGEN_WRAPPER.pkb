@@ -23,6 +23,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_audit_column_mappings       CONSTANT param_type := 'Audit column mappings (comma separated)';
   c_audit_user_expression       CONSTANT param_type := 'Audit user expression';
   c_row_version_column_mapping  CONSTANT param_type := 'Row version column mapping';
+  c_tenant_column_mapping       CONSTANT param_type := 'Tenant column mapping';
   c_enable_custom_defaults      CONSTANT param_type := 'Enable custom defaults (additional methods)';
   c_custom_default_values       CONSTANT param_type := 'Custom default values (XMLTYPE)';
 
@@ -77,6 +78,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_audit_column_mappings)       := NULL;
     v_params(c_audit_user_expression)       := om_tapigen.c_audit_user_expression;
     v_params(c_row_version_column_mapping)  := NULL;
+    v_params(c_tenant_column_mapping)       := NULL;
     v_params(c_enable_custom_defaults)      := 'false';
     v_params(c_custom_default_values)       := NULL;
     RETURN v_params;
@@ -108,6 +110,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       c_audit_column_mappings,
       c_audit_user_expression,
       c_row_version_column_mapping,
+      c_tenant_column_mapping,
       c_enable_custom_defaults,
       c_custom_default_values);
   END get_ordered_params;
@@ -162,6 +165,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       p_audit_column_mappings       => in_params(c_audit_column_mappings),
       p_audit_user_expression       => in_params(c_audit_user_expression),
       p_row_version_column_mapping  => in_params(c_row_version_column_mapping),
+      p_tenant_column_mapping       => in_params(c_tenant_column_mapping),
       p_enable_custom_defaults      => util_string_to_bool(in_params(c_enable_custom_defaults)),
       p_custom_default_values       => CASE
                                         WHEN in_params(c_custom_default_values) IS NOT NULL THEN
