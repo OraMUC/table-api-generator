@@ -3,9 +3,8 @@ whenever sqlerror exit sql.sqlcode rollback
 whenever oserror exit 1 rollback
 
 prompt
-prompt
 prompt Uninstall github.com/OraMUC/table-api-generator
-prompt ======================================================
+prompt ============================================================
 prompt Drop packages OM_TAPIGEN and OM_TAPIGEN_ODDGEN_WRAPPER
 BEGIN
   FOR i IN (
@@ -24,11 +23,10 @@ BEGIN
   END LOOP;
 END;
 /
-prompt ======================================================
-prompt Done :-)
+prompt ============================================================
+prompt Uninstallation Done
 prompt
 prompt Don't forget to delete private or public synonyms, 
 prompt if you installed in a central tools schema. Also see
 prompt https://github.com/OraMUC/table-api-generator/blob/master/docs/getting-started.md
-prompt
 prompt

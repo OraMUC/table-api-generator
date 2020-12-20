@@ -1,3 +1,15 @@
+<!-- nav -->
+
+[Index](README.md)
+| [Changelog](changelog.md)
+| [Getting Started](getting-started.md)
+| [Parameters](parameters.md)
+| [Bulk Processing](bulk-processing.md)
+| [Example API](example-api.md)
+| [SQL Developer Integration](sql-developer-integration.md)
+
+<!-- navstop -->
+
 # Changelog
 
 This project uses [semantic versioning][semver].
@@ -9,6 +21,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
+- [0.6.0 (2020-12-20)](#060-2020-12-20)
 - [0.5.2 (2020-05-09)](#052-2020-05-09)
 - [0.5.1 (2020-04-19)](#051-2020-04-19)
 - [0.5.0 (2018-12-23)](#050-2018-12-23)
@@ -19,6 +32,24 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - [0.1.0 (not published)](#010-not-published)
 
 <!-- tocstop -->
+
+## 0.6.0 (2020-12-20)
+
+- added: support for bulk processing (generated per default as core functionality)
+- added: support for audit columns (parameters p_audit_column_mappings and p_audit_user_expression)
+- added: support for a row version column (parameter p_row_version_column_mapping)
+- added: support for a 1:1 view with read only (parameter p_enable_one_to_one_view)
+- added: support for naming all generated objects (parameters p_dml_view_name, p_dml_view_trigger_name and p_one_to_one_view_name)
+- added: double quoting of table and column names can now be configured (parameter p_double_quote_names, default true)
+- added: update function with return clause (mainly for use in create_or_update_row to prevent read row after update)
+- added: helper function get_default_row when p_enable_column_defaults is set to true (to support the row based create_row function)
+- added: unit tests with utPLSQL (it will be a permanent task to improve the tests with every new feature or bugfix)
+- removed: support for database versions < 12.1 - if this is a problem for you then use the generator version 0.5.2 (without all the new features, sorry...)
+- removed: support for a generic change log (parameter p_enable_generic_change_log - makes no sense anymore with bulk processing and multi column primary keys, sorry...)
+- removed: prevent updates if columns do not differ (remove was needed to support all possible column types and for performance reasons)
+- removed: parameter p_reuse_existing_api_params (usage was was not logic, simply provide always your needed parameters and create scripts or a wrapper)
+- removed: procedure recreate_existing_apis (this was a parameterless procedure which reused the existing API parameters, you can still do this with the help of the pipelined function view_existing_apis)
+- fixed: identity columns are always hidden on create methods (is now handled correct and in the sense of a table API)
 
 ## 0.5.2 (2020-05-09)
 

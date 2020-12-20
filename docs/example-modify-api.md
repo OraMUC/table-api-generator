@@ -1,12 +1,37 @@
+<!-- nav -->
+
+[Index](README.md)
+| [Changelog](changelog.md)
+| [Getting Started](getting-started.md)
+| [Parameters](parameters.md)
+| [Bulk Processing](bulk-processing.md)
+| [Example API](example-api.md)
+| [SQL Developer Integration](sql-developer-integration.md)
+
+<!-- navstop -->
+
+# How to modify an API without programming
+
+We have been asked for this, so this shows only how you can technically modify an API without programming - align the shown replacements to you needs. Consider to [create a feature request (issue)](https://github.com/OraMUC/table-api-generator/issues/new), if you think your modification is helpful for other users too.
+
+<!-- toc -->
+
+- [Generate the API](#generate-the-api)
+- [Modify with PL/SQL](#modify-with-plsql)
+
+<!-- tocstop -->
+
+## Generate the API
+
 --> Generate API
 BEGIN
   om_tapigen.compile_api(p_table_name => 'EMPLOYEES');
 END;
 /
 
--- Modify API to own needs - consider to create a feature request(issue) if you think this is helpful for other users too.
--- https://github.com/OraMUC/table-api-generator/issues/new
+## Modify with PL/SQL
 
+```sql
 DECLARE
   v_clob        CLOB;
   v_cursor      NUMBER;
@@ -37,7 +62,7 @@ BEGIN
                             'INSERT INTO EMPLOYEES ( '),
                     'VALUES ( v_pk, ',
                     'VALUES ( ');
-                    
+
   --dbms_output.put_line(v_clob);
   util_execute_sql(v_clob);
 
@@ -46,3 +71,4 @@ EXCEPTION
     NULL;
 END;
 /
+```
