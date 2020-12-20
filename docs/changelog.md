@@ -21,7 +21,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
-- [0.6.0 (2020-xx-xx)](#060-2020-xx-xx)
+- [0.6.0 (2020-12-20)](#060-2020-12-20)
 - [0.5.2 (2020-05-09)](#052-2020-05-09)
 - [0.5.1 (2020-04-19)](#051-2020-04-19)
 - [0.5.0 (2018-12-23)](#050-2018-12-23)
@@ -33,7 +33,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- tocstop -->
 
-## 0.6.0 (2020-xx-xx)
+## 0.6.0 (2020-12-20)
 
 - added: support for bulk processing (generated per default as core functionality)
 - added: support for audit columns (parameters p_audit_column_mappings and p_audit_user_expression)

@@ -67,7 +67,7 @@
 ## p_enable_column_defaults (since v0.5.0)
 
 - Boolean, default: false
-- If true, the data dictionary defaults of the columns are used for the create methods; for the row based create methods you can use the helper function named `get_default_row`
+- If true, the data dictionary defaults of the columns are used for the create methods; for the row based create methods you can use the generated helper function named `get_default_row`
 
 ## p_enable_update_of_rows (since v0.4.0)
 
