@@ -15,7 +15,7 @@
     "watch-test": "chokidar test/* --initial -c \"npm run test\""
   },
   "devDependencies": {
-    "chokidar-cli": "^2.1.0",
+    "chokidar-cli": "^3.0.0",
     "glob": "^7.1.6",
     "markdown-toc": "^1.2.0",
     "ploc": "^0.6.2"
