@@ -345,6 +345,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                    'TO_CLOB(''@@@@@@@@@@@@@@@'')'
                   WHEN p_data_type = 'BLOB' THEN
                    'TO_BLOB(UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@''))'
+                  WHEN p_data_type = 'RAW' THEN
+                   'UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@'')' 
                   WHEN p_data_type = 'XMLTYPE' THEN
                    'XMLTYPE(''<NULL/>'')'
                   ELSE

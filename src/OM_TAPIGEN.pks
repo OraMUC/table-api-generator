@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.6.0';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.6.1';
 /**
 Oracle PL/SQL Table API Generator
 =================================
@@ -129,6 +129,7 @@ TYPE t_rec_existing_apis IS RECORD(
   p_dml_view_name               all_objects.object_name%TYPE,
   p_dml_view_trigger_name       all_objects.object_name%TYPE,
   p_enable_one_to_one_view      t_vc2_5,
+  p_one_to_one_view_name        all_objects.object_name%TYPE,
   p_api_name                    all_objects.object_name%TYPE,
   p_sequence_name               all_objects.object_name%TYPE,
   p_exclude_column_list         t_vc2_4k,

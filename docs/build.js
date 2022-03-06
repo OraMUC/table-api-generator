@@ -29,10 +29,12 @@ const renderNavigation = function (type) {
     return '<!-- nav -->\n\n' + menu + '\n<!-- navstop -->';
 };
 
+console.log('BUILD DOCS NAVIGATION');
 glob('docs/*.md', function (err, files) {
     if (err) throw err;
     files.forEach(function (file) {
         var content = fs.readFileSync(file, 'utf8');
+        console.log('- process file ' + file);
         if (file === 'docs/README.md') {
             content = content.replace(navRegex, renderNavigation('index'));
         }
