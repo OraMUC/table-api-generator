@@ -21,6 +21,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
+- [0.6.1 (2022-03-06)](#061-2022-03-06)
 - [0.6.0 (2020-12-20)](#060-2020-12-20)
 - [0.5.2 (2020-05-09)](#052-2020-05-09)
 - [0.5.1 (2020-04-19)](#051-2020-04-19)
@@ -32,6 +33,11 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - [0.1.0 (not published)](#010-not-published)
 
 <!-- tocstop -->
+
+## 0.6.1 (2022-03-06)
+
+- Fixed: Pipelinded table function view_existing_apis fails because of missing column in record definition
+- Fixed: Column compare not working correctly with RAW type columns - Thanks to Benjamin Stein (github.com/Asgarmagol) for the fix
 
 ## 0.6.0 (2020-12-20)
 
