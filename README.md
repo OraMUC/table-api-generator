@@ -124,6 +124,7 @@ PROCEDURE compile_api
   p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the 1:1 view - you can use substitutions like #TABLE_NAME#, #TABLE_NAME_26# or #TABLE_NAME_4_20# (treated as substr(table_name, 4, 20)).
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitutions like #TABLE_NAME#, #TABLE_NAME_26# or #TABLE_NAME_4_20# (treated as substr(table_name, 4, 20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
+  p_id_function_call            IN VARCHAR2 DEFAULT NULL,  -- If not null, the given function call is used for the create_row methods, when p_sequence_name is not used
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
@@ -175,6 +176,7 @@ FUNCTION compile_api_and_get_code
   p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the 1:1 view - you can use substitutions like #TABLE_NAME#, #TABLE_NAME_26# or #TABLE_NAME_4_20# (treated as substr(table_name, 4, 20)).
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitutions like #TABLE_NAME#, #TABLE_NAME_26# or #TABLE_NAME_4_20# (treated as substr(table_name, 4, 20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
+  p_id_function_call            IN VARCHAR2 DEFAULT NULL,  -- If not null, the given function call is used for the create_row methods, when p_sequence_name is not used
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).
@@ -228,6 +230,7 @@ FUNCTION get_code
   p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the 1:1 view - you can use substitutions like #TABLE_NAME#, #TABLE_NAME_26# or #TABLE_NAME_4_20# (treated as substr(table_name, 4, 20)).
   p_api_name                    IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the API - you can use substitutions like #TABLE_NAME#, #TABLE_NAME_26# or #TABLE_NAME_4_20# (treated as substr(table_name, 4, 20)).
   p_sequence_name               IN VARCHAR2 DEFAULT NULL,  -- If not null, the given name is used for the create_row methods - same substitutions like with API name possible.
+  p_id_function_call            IN VARCHAR2 DEFAULT NULL,  -- If not null, the given function call is used for the create_row methods, when p_sequence_name is not used
   p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded on inserts and updates (virtual columns are implicitly excluded).
   p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,  -- If not null, the provided comma separated column names are excluded and populated by the API (you don't need a trigger for update_by, update_on...).
   p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression, -- You can overwrite here the expression to determine the user which created or updated the row (see also the parameter docs...).

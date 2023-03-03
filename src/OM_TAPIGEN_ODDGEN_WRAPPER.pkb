@@ -19,6 +19,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
   c_one_to_one_view_name        CONSTANT param_type := '1:1 view name (e.g. #TABLE_NAME_28#_V)';
   c_api_name                    CONSTANT param_type := 'API name (e.g. #TABLE_NAME_26#_API)';
   c_sequence_name               CONSTANT param_type := 'Sequence name (e.g. #COLUMN_PREFIX#_SEQ)';
+  c_id_function_call            CONSTANT param_type := 'Function call (e.g. to_number(sys_guid(), ''XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX''))';
   c_exclude_column_list         CONSTANT param_type := 'Exclude column list (comma separated)';
   c_audit_column_mappings       CONSTANT param_type := 'Audit column mappings (comma separated)';
   c_audit_user_expression       CONSTANT param_type := 'Audit user expression';
@@ -74,6 +75,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
     v_params(c_one_to_one_view_name)        := NULL;
     v_params(c_api_name)                    := NULL;
     v_params(c_sequence_name)               := NULL;
+    v_params(c_id_function_call)            := NULL;
     v_params(c_exclude_column_list)         := NULL;
     v_params(c_audit_column_mappings)       := NULL;
     v_params(c_audit_user_expression)       := om_tapigen.c_audit_user_expression;
@@ -106,6 +108,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       c_one_to_one_view_name,
       c_api_name,
       c_sequence_name,
+      c_id_function_call,
       c_exclude_column_list,
       c_audit_column_mappings,
       c_audit_user_expression,
@@ -161,6 +164,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen_oddgen_wrapper IS
       p_one_to_one_view_name        => in_params(c_one_to_one_view_name),
       p_api_name                    => in_params(c_api_name),
       p_sequence_name               => in_params(c_sequence_name),
+      p_id_function_call               => in_params(c_id_function_call),
       p_exclude_column_list         => in_params(c_exclude_column_list),
       p_audit_column_mappings       => in_params(c_audit_column_mappings),
       p_audit_user_expression       => in_params(c_audit_user_expression),

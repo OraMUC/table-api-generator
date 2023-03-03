@@ -36,6 +36,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     one_to_one_view_name        all_objects.object_name%TYPE,
     api_name                    all_objects.object_name%TYPE,
     sequence_name               all_sequences.sequence_name%TYPE,
+    id_function_call            t_vc2_4k,
     exclude_column_list         t_vc2_4k,
     audit_column_mappings       t_vc2_4k,
     audit_user_expression       t_vc2_4k,
@@ -346,7 +347,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                   WHEN p_data_type = 'BLOB' THEN
                    'TO_BLOB(UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@''))'
                   WHEN p_data_type = 'RAW' THEN
-                   'UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@'')' 
+                   'UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@'')'
                   WHEN p_data_type = 'XMLTYPE' THEN
                    'XMLTYPE(''<NULL/>'')'
                   ELSE
@@ -1190,6 +1191,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                 'COALESCE( ' ||
                 util_get_parameter_name(g_columns(i).column_name) || ', ' ||
                 util_double_quote(g_params.sequence_name) || '.nextval )'
+              WHEN g_columns(i).is_pk_yn = 'Y'
+                AND NOT g_status.pk_is_multi_column
+                AND g_params.id_function_call IS NOT NULL
+              THEN
+                'COALESCE( ' ||
+                util_get_parameter_name(g_columns(i).column_name) || ', ' ||
+                g_params.id_function_call || ')'
               WHEN g_columns(i).audit_type IS NOT NULL THEN
                 get_audit_value(i)
               WHEN g_columns(i).row_version_expression IS NOT NULL THEN
@@ -1234,6 +1242,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                 'coalesce( p_rows_tab(i).' ||
                 util_double_quote(g_columns(i).column_name) || ', ' ||
                 util_double_quote(g_params.sequence_name) || '.nextval )'
+              WHEN g_columns(i).is_pk_yn = 'Y'
+                AND NOT g_status.pk_is_multi_column
+                AND g_params.id_function_call IS NOT NULL
+              THEN
+                'coalesce( p_rows_tab(i).' ||
+                util_double_quote(g_columns(i).column_name) || ', ' ||
+                g_params.id_function_call || ')'
               WHEN g_columns(i).audit_type IS NOT NULL THEN
                 get_audit_value(i)
               WHEN g_columns(i).row_version_expression IS NOT NULL THEN
@@ -2351,6 +2366,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
           code_append(util_double_quote(g_params.sequence_name));
         WHEN 'SEQUENCE_NAME_XML' THEN
           code_append(g_params.sequence_name);
+        WHEN 'ID_FUNCTION_CALL' THEN
+          code_append(util_double_quote(g_params.id_function_call));
+        WHEN 'ID_FUNCTION_CALL_XML' THEN
+          code_append(g_params.id_function_call);
         WHEN 'API_NAME' THEN
           code_append(util_double_quote(g_params.api_name));
         WHEN 'API_NAME_XML' THEN
@@ -2599,6 +2618,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
     p_one_to_one_view_name        IN VARCHAR2,
     p_api_name                    IN VARCHAR2,
     p_sequence_name               IN VARCHAR2,
+    p_id_function_call            IN VARCHAR2,
     p_exclude_column_list         IN VARCHAR2,
     p_audit_column_mappings       IN VARCHAR2,
     p_audit_user_expression       IN VARCHAR2,
@@ -2652,6 +2672,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       g_params.one_to_one_view_name        := util_get_substituted_name(coalesce(p_one_to_one_view_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 2) || '#_V'));
       g_params.api_name                    := util_get_substituted_name(coalesce(p_api_name,'#TABLE_NAME_1_' || to_char(c_ora_max_name_len - 4) || '#_API'));
       g_params.sequence_name               := CASE WHEN p_sequence_name IS NOT NULL THEN util_get_substituted_name(p_sequence_name) ELSE NULL END;
+      g_params.id_function_call            := p_id_function_call;
       g_params.exclude_column_list         := p_exclude_column_list;
       g_params.audit_column_mappings       := p_audit_column_mappings;
       g_params.audit_user_expression       := p_audit_user_expression;
@@ -3233,6 +3254,9 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                 WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND
                       g_params.sequence_name IS NOT NULL THEN
                   '"' || g_params.sequence_name || '"' || '.nextval'
+                WHEN g_columns(i).is_pk_yn = 'Y' AND NOT g_status.pk_is_multi_column AND
+                      g_params.id_function_call IS NOT NULL THEN
+                  g_params.id_function_call
                 WHEN g_columns(i).is_fk_yn = 'Y' THEN
                   util_get_fk_value(p_table_name  => g_columns(i).r_table_name,
                                     p_column_name => g_columns(i).r_column_name,
@@ -3389,6 +3413,7 @@ CREATE OR REPLACE PACKAGE {{ OWNER }}.{{ API_NAME }} IS
     p_one_to_one_view_name="{{ ONE_TO_ONE_VIEW_NAME_XML }}"
     p_api_name="{{ API_NAME_XML }}"
     p_sequence_name="{{ SEQUENCE_NAME_XML }}"
+    p_id_function_call="{{ ID_FUNCTION_CALL_XML }}"
     p_exclude_column_list="{{ EXCLUDE_COLUMN_LIST }}"
     p_audit_column_mappings="{{ AUDIT_COLUMN_MAPPINGS }}"
     p_audit_user_expression="{{ AUDIT_USER_EXPRESSION }}"
@@ -4933,6 +4958,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
+    p_id_function_call            IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
@@ -4964,6 +4990,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
+              p_id_function_call            => p_id_function_call,
               p_exclude_column_list         => p_exclude_column_list,
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
@@ -5000,6 +5027,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
+    p_id_function_call            IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
@@ -5034,6 +5062,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
+              p_id_function_call            => p_id_function_call,
               p_exclude_column_list         => p_exclude_column_list,
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
@@ -5071,6 +5100,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
     p_one_to_one_view_name        IN VARCHAR2 DEFAULT NULL,
     p_api_name                    IN VARCHAR2 DEFAULT NULL,
     p_sequence_name               IN VARCHAR2 DEFAULT NULL,
+    p_id_function_call            IN VARCHAR2 DEFAULT NULL,
     p_exclude_column_list         IN VARCHAR2 DEFAULT NULL,
     p_audit_column_mappings       IN VARCHAR2 DEFAULT NULL,
     p_audit_user_expression       IN VARCHAR2 DEFAULT c_audit_user_expression,
@@ -5102,6 +5132,7 @@ SELECT {% LIST_COLUMNS_W_PK_FULL %}
               p_one_to_one_view_name        => p_one_to_one_view_name,
               p_api_name                    => p_api_name,
               p_sequence_name               => p_sequence_name,
+              p_id_function_call            => p_id_function_call,
               p_exclude_column_list         => p_exclude_column_list,
               p_audit_column_mappings       => p_audit_column_mappings,
               p_audit_user_expression       => p_audit_user_expression,
@@ -5140,7 +5171,7 @@ WITH api_names AS (
                 AND TYPE = 'PACKAGE'
                 AND line BETWEEN :spec_options_min_line
                              AND :spec_options_max_line
-                AND INSTR (text,'generator="OM_TAPIGEN"') > 0
+                AND INSTR (text,'generator="om_tapigen"') > 0
      ) -- select * from api_names;
      , sources AS (
          SELECT owner,
@@ -5196,6 +5227,7 @@ WITH api_names AS (
                 x.p_one_to_one_view_name,
                 x.p_api_name,
                 x.p_sequence_name,
+                x.p_id_function_call,
                 x.p_exclude_column_list,
                 x.p_audit_column_mappings,
                 x.p_audit_user_expression,
@@ -5233,6 +5265,7 @@ WITH api_names AS (
                            p_one_to_one_view_name        VARCHAR2 (128 CHAR)  PATH '@p_one_to_one_view_name',
                            p_api_name                    VARCHAR2 (128 CHAR)  PATH '@p_api_name',
                            p_sequence_name               VARCHAR2 (128 CHAR)  PATH '@p_sequence_name',
+                           p_id_function_call            VARCHAR2 (4000 CHAR) PATH '@p_id_function_call',
                            p_exclude_column_list         VARCHAR2 (4000 CHAR) PATH '@p_exclude_column_list',
                            p_audit_column_mappings       VARCHAR2 (4000 CHAR) PATH '@p_audit_column_mappings',
                            p_audit_user_expression       VARCHAR2 (4000 CHAR) PATH '@p_audit_user_expression',
@@ -5302,6 +5335,7 @@ SELECT NULL AS errors,
        apis.p_one_to_one_view_name,
        apis.p_api_name,
        apis.p_sequence_name,
+       apis.p_id_function_call,
        apis.p_exclude_column_list,
        apis.p_audit_column_mappings,
        apis.p_audit_user_expression,
