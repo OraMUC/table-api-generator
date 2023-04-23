@@ -28,7 +28,7 @@
 We recommend to install the package `om_tapigen` in a central tools schema. Because the package runs with invokers rights you need to create a private or public synonym for SQL functions inside the package.
 
 1. Download the [latest version](https://github.com/OraMUC/table-api-generator/releases/latest) and unzip the source code
-1. Run the SQL script `install.sql` in the root folder
+1. Run the SQL script `om_tapigen_install.sql` in the root folder
 1. If installed in a central tools schema
     - grant execute rights: `GRANT EXECUTE ON om_tapigen TO PUBLIC;`
     - create synonym - public in tools schema: `CREATE PUBLIC SYNONYM om_tapigen FOR om_tapigen;`

@@ -9,7 +9,7 @@ prompt Set compiler flags
 declare
   v_db_version varchar2(10);
 begin
-  select replace(regexp_substr(version, '\d+\.\d+'), '.', null) as db_version
+  select replace(regexp_substr(min(version), '\d+\.\d+'), '.', null) as db_version
     into v_db_version
     from product_component_version
    where product like 'Oracle Database%';
@@ -36,7 +36,7 @@ end;
 prompt Compile package om_tapigen (spec)
 CREATE OR REPLACE PACKAGE om_tapigen AUTHID CURRENT_USER IS
 c_generator         CONSTANT VARCHAR2(10 CHAR) := 'OM_TAPIGEN';
-c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.6.1';
+c_generator_version CONSTANT VARCHAR2(10 CHAR) := '0.6.2';
 /**
 Oracle PL/SQL Table API Generator
 =================================

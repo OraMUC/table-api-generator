@@ -9,7 +9,7 @@ prompt Set compiler flags
 declare
   v_db_version varchar2(10);
 begin
-  select replace(regexp_substr(version, '\d+\.\d+'), '.', null) as db_version
+  select replace(regexp_substr(min(version), '\d+\.\d+'), '.', null) as db_version
     into v_db_version
     from product_component_version
    where product like 'Oracle Database%';
