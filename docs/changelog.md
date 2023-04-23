@@ -21,6 +21,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
+- [0.6.2 (2023-04-23)](#062-2023-04-23)
 - [0.6.1 (2022-03-06)](#061-2022-03-06)
 - [0.6.0 (2020-12-20)](#060-2020-12-20)
 - [0.5.2 (2020-05-09)](#052-2020-05-09)
@@ -33,6 +34,10 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 - [0.1.0 (not published)](#010-not-published)
 
 <!-- tocstop -->
+
+## 0.6.2 (2023-04-23)
+
+- Fixed: Install issue with database 23c free - Thanks to Steffen Clauß (github.com/scl-4711) for reporting the issue
 
 ## 0.6.1 (2022-03-06)
 
