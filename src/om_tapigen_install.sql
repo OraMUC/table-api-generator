@@ -18,7 +18,7 @@ begin
   end if;
   if to_number(v_db_version) >= 180 then
     execute immediate q'[
-      select replace(regexp_substr(version_full, '\d+\.\d+'), '.', null) as db_version
+      select replace(regexp_substr(min(version_full), '\d+\.\d+'), '.', null) as db_version
         from product_component_version
        where product like 'Oracle Database%' ]'
       into v_db_version;

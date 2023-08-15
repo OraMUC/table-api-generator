@@ -60,10 +60,22 @@ procedure test_table_users_default_api_object_names;
 procedure test_table_users_different_api_object_names;
 
 --%test
-procedure test_table_with_tenant_id_invisible;
+--%throws(-20000)
+procedure test_wrong_audit_column_mapping;
+
+--%test
+--%throws(-20000)
+procedure test_wrong_row_version_column_mapping;
+
+--%test
+--%throws(-20000)
+procedure test_wrong_tenant_column_mapping;
 
 --%test
 procedure test_table_with_tenant_id_visible;
+
+--%test
+procedure test_table_with_tenant_id_invisible;
 
 --------------------------------------------------------------------------------
 
@@ -74,51 +86,41 @@ cursor cur_all_test_tables is
     from user_tables
    where table_name like 'TAG\_%' escape '\';
 
-cursor cur_user_roles_rights is
-  select table_name
-    from user_tables
-   where table_name like 'TAG%USERS%'
-      or table_name like 'TAG%ROLES%'
-      or table_name like 'TAG%RIGHTS%';
-
-cursor cur_all_test_table_objects is
-  select *
-    from user_objects
-   where object_type in ('TABLE', 'SEQUENCE')
-     and object_name like 'TAG\_%' escape '\';
-
-cursor cur_all_generated_objects is
-  select *
-    from user_objects
-   where object_type in ('VIEW', 'PACKAGE')
-     and object_name like 'TAG\_%' escape '\';
-
 --------------------------------------------------------------------------------
 
 procedure util_create_test_table_objects;
 
 procedure util_drop_test_table_objects;
 
+procedure util_log_generated_objects (
+  p_test_name  in varchar2,
+  p_table_name in varchar2 );
+
 function util_count_generated_objects return integer;
+
+function util_check_if_object_exists (
+  p_object_type varchar2,
+  p_object_name varchar2 )
+  return boolean;
 
 function util_get_list_of_invalid_generated_objects return varchar2;
 
 function util_get_test_name return varchar2;
+
 function util_get_spec_regex_count (
   p_code        clob,
-  p_regex_count varchar2
-) return integer;
+  p_regex_count varchar2 )
+  return integer;
 
 function util_get_regex_substr_count (
   p_code         clob,
   p_regex_substr varchar2,
-  p_regex_count  varchar2
-) return integer;
+  p_regex_count  varchar2 )
+  return integer;
 
-function  util_check_if_object_exists (
-  p_object_type varchar2,
-  p_object_name varchar2
-) return boolean;
+function util_get_view_code (
+  p_view_name in varchar2 )
+  return clob;
 
 --------------------------------------------------------------------------------
 

@@ -346,7 +346,7 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
                   WHEN p_data_type = 'BLOB' THEN
                    'TO_BLOB(UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@''))'
                   WHEN p_data_type = 'RAW' THEN
-                   'UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@'')' 
+                   'UTL_RAW.cast_to_raw(''@@@@@@@@@@@@@@@'')'
                   WHEN p_data_type = 'XMLTYPE' THEN
                    'XMLTYPE(''<NULL/>'')'
                   ELSE
@@ -533,14 +533,14 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
         -- 1. Possible substitutions: #TABLE_NAME#, #COLUMN_PREFIX# and #PK_COLUMN# (the first column on multicolumn primary keys)
         -- 2. To be backward compatible we have to support things like this #TABLE_NAME_26# (this is like substr(table_name, 1, 26))
-        -- 3. If someone want to use the substr version he has always to provide position and length.
+        -- 3. If someone want to use the substr version  - please always provide position and length.
         -- 4. Negative position is supported like this #TABLE_NAME_-15_15# (the second number can not be omitted like in substr, see 2.)
         IF v_position IS NULL AND v_length IS NULL THEN
           v_position := 1;
           v_length   := 200;
         ELSIF v_position IS NOT NULL AND v_length IS NULL THEN
-          v_position := 1;
           v_length   := v_position; -- see point 2. above
+          v_position := 1;
         END IF;
 
         v_return := replace(p_name_template,
@@ -1275,6 +1275,32 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       RETURN v_result;
     END list_columns_w_pk_full;
 
+    -----------------------------------------------------------------------------
+    /*
+    col1,
+    col2,
+    */
+    FUNCTION list_columns_w_pk_view RETURN t_tab_list IS
+      v_result       t_tab_list;
+      v_list_padding t_vc2_30;
+      v_index        pls_integer;
+    BEGIN
+      v_list_padding := get_list_padding(6);
+      FOR i IN 1 .. g_columns.count LOOP
+        IF     g_columns(i).is_hidden_yn = 'N'
+           AND g_columns(i).tenant_expression is null
+        THEN
+          v_index := v_result.count + 1;
+          v_result(v_index).col1 := v_list_padding;
+          v_result(v_index).col2 :=
+            util_double_quote(g_columns(i).column_name) ||
+            get_column_comment(i) ||
+            c_list_delimiter;
+        END IF;
+      END LOOP;
+      trim_list(v_result);
+      RETURN v_result;
+    END list_columns_w_pk_view;
 
     -----------------------------------------------------------------------------
     /*
@@ -2061,7 +2087,10 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
       v_list_padding := get_list_padding(4);
       v_operator_padding := get_operator_padding;
       FOR i IN 1 .. g_columns.count LOOP
-        IF g_columns(i).data_default IS NOT NULL AND g_columns(i).is_hidden_yn = 'N' THEN
+        IF     g_columns(i).data_default IS NOT NULL
+           AND g_columns(i).is_hidden_yn  = 'N'
+           AND g_columns(i).is_virtual_yn = 'N'
+        THEN
           v_index := v_result.count + 1;
           v_result(v_index).col1 := v_list_padding || 'v_row.' ||
             util_double_quote(g_columns(i).column_name);
@@ -2146,12 +2175,36 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
 
     -----------------------------------------------------------------------------
 
+    FUNCTION list_where_clause_tenant_id RETURN t_tab_list IS
+      v_result           t_tab_list;
+      v_index            pls_integer;
+    BEGIN
+      FOR i IN 1 .. g_columns.count LOOP
+        IF g_columns(i).tenant_expression IS NOT NULL THEN
+          v_index := v_result.count + 1;
+          v_result(v_index).col1 := 'WHERE ';
+          v_result(v_index).col2 :=
+            util_get_attribute_compare (
+              p_data_type         => g_columns(i).data_type,
+              p_nullable          => util_string_to_bool(g_columns(i).is_nullable_yn),
+              p_first_attribute   => util_double_quote(g_columns(i).column_name),
+              p_second_attribute  => g_columns(i).tenant_expression,
+              p_compare_operation => '=' );
+        END IF;
+      END LOOP;
+      RETURN v_result;
+    END list_where_clause_tenant_id;
+
+    -----------------------------------------------------------------------------
+
   BEGIN
     CASE p_list_name
       WHEN 'LIST_INSERT_COLUMNS' THEN
         RETURN list_insert_columns;
       WHEN 'LIST_COLUMNS_W_PK_FULL' THEN
         RETURN list_columns_w_pk_full;
+      WHEN 'LIST_COLUMNS_W_PK_VIEW' THEN
+        RETURN list_columns_w_pk_view;
       WHEN 'LIST_ROWCOLS_W_DICT_DEFAULTS' THEN
         RETURN list_rowcols_w_dict_defaults;
       WHEN 'LIST_ROWCOLS_W_CUST_DEFAULTS' THEN
@@ -2210,6 +2263,8 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
         RETURN list_uk_map_param_eq_param;
       WHEN 'LIST_SPEC_CUSTOM_DEFAULTS' THEN
         RETURN list_spec_custom_defaults;
+      WHEN 'LIST_WHERE_CLAUSE_TENANT_ID' THEN
+        RETURN list_where_clause_tenant_id;
       ELSE
         raise_application_error(c_generator_error_number, 'FIXME: Bug - list ' || p_list_name || ' not defined');
     END CASE;
@@ -3041,7 +3096,11 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             v_idx := g_columns_reverse_index(v_column_name);
             g_columns(v_idx).audit_type := p_audit_type;
           EXCEPTION
-            WHEN no_data_found THEN NULL;
+            WHEN no_data_found THEN
+              raise_application_error(c_generator_error_number,
+                'Invalid column name ' || v_column_name || c_lf ||
+                'provided for the parameter p_audit_column_mappings' || c_lf ||
+                'and audit type ' || p_audit_type );
             WHEN others THEN raise;
           END;
         END IF;
@@ -3097,15 +3156,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             v_idx := g_columns_reverse_index(v_column_name);
             g_columns(v_idx).row_version_expression := v_expression;
           EXCEPTION
-            WHEN no_data_found THEN NULL;
+            WHEN no_data_found THEN
+              raise_application_error(c_generator_error_number,
+                'Invalid column name ' || v_column_name || c_lf ||
+                'provided for the parameter p_row_version_column_mapping.' || c_lf ||
+                'Example Usage: #PREFIX#_MY_COLUMN_NAME=my_version_sequence.nextval');
             WHEN others THEN raise;
           END;
-          IF v_idx IS NULL THEN
-            raise_application_error(c_generator_error_number,
-              'Invalid column name provided in the parameter' || c_lf ||
-              'p_row_version_column_mapping.' || c_lf ||
-              'Example Usage: #PREFIX#_MY_COLUMN_NAME=my_version_sequence.nextval');
-          END IF;
           util_debug_stop_one_step;
         END IF;
       END IF;
@@ -3143,15 +3200,13 @@ CREATE OR REPLACE PACKAGE BODY om_tapigen IS
             v_idx := g_columns_reverse_index(v_column_name);
             g_columns(v_idx).tenant_expression := v_expression;
           EXCEPTION
-            WHEN no_data_found THEN NULL;
+            WHEN no_data_found THEN
+              raise_application_error(c_generator_error_number,
+                'Invalid column name ' || v_column_name || c_lf ||
+                'provided for the parameter p_tenant_column_mapping.' || c_lf ||
+                q'[Example Usage: #PREFIX#_MY_COLUMN_NAME=to_number(sys_context('my_sec_ctx','my_tenant_id'))]');
             WHEN others THEN raise;
           END;
-          IF v_idx IS NULL THEN
-            raise_application_error(c_generator_error_number,
-              'Invalid column name provided in the parameter' || c_lf ||
-              'p_tenant_column_mapping.' || c_lf ||
-              q'[Example Usage: #PREFIX#_MY_COLUMN_NAME=to_number(sys_context('my_sec_ctx','my_tenant_id'))]');
-          END IF;
           util_debug_stop_one_step;
         END IF;
       END IF;
@@ -4605,8 +4660,9 @@ END {{ API_NAME }};';
 
       g_code_blocks.template := '
 CREATE OR REPLACE VIEW {{ OWNER }}.{{ DML_VIEW_NAME }} AS
-SELECT {% LIST_COLUMNS_W_PK_FULL %}
+SELECT {% LIST_COLUMNS_W_PK_VIEW %}
   FROM {{ TABLE_NAME }}
+ {% LIST_WHERE_CLAUSE_TENANT_ID %}
   /*
   This is the DML view for the table {{ TABLE_NAME }}.
   - Generator:         {{ GENERATOR }}
@@ -4674,8 +4730,9 @@ END {{ DML_VIEW_TRIGGER_NAME }};';
 
       g_code_blocks.template := '
 CREATE OR REPLACE VIEW {{ OWNER }}.{{ ONE_TO_ONE_VIEW_NAME }} AS
-SELECT {% LIST_COLUMNS_W_PK_FULL %}
+SELECT {% LIST_COLUMNS_W_PK_VIEW %}
   FROM {{ TABLE_NAME }}
+ {% LIST_WHERE_CLAUSE_TENANT_ID %}
   WITH READ ONLY
   /*
   This is the 1:1 view for the table {{ TABLE_NAME }}.
