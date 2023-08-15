@@ -21,6 +21,7 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- toc -->
 
+- [0.6.3 (2023-08-15)](#063-2023-08-15)
 - [0.6.2 (2023-04-23)](#062-2023-04-23)
 - [0.6.1 (2022-03-06)](#061-2022-03-06)
 - [0.6.0 (2020-12-20)](#060-2020-12-20)
@@ -35,9 +36,17 @@ Please use for all comments, discussions, feature requests or bug reports the Gi
 
 <!-- tocstop -->
 
+## 0.6.3 (2023-08-15)
+
+- Fixed #53: Generating default values for virtual columns - Thanks to Leon (https://github.com/ljvankempen) for reporting the issue
+- Fixed #52: Error installing on oracle 23c free - Thanks to Leon (https://github.com/ljvankempen) for reporting the issue
+- Fixed #51: P%COLUMN_MAPPING parameters are case sensitive- Thanks to Paolo (https://github.com/softinn72) for reporting the issue
+- Fixed #50: Specifying shorter table name substitution variables in p_one_to_one_view_name generates corrupted view name - Thanks to Paolo (https://github.com/softinn72) for reporting the issue
+- Fixed #49: Tenant column filter is missing from generated views - Thanks to Paolo (https://github.com/softinn72) for reporting the issue
+
 ## 0.6.2 (2023-04-23)
 
-- Fixed: Install issue with database 23c free - Thanks to Steffen Clauß (github.com/scl-4711) for reporting the issue
+- Fixed #47: Oracle 23c Free - Install-Script returns ORA-01422 - Thanks to Steffen Clauß (github.com/scl-4711) for reporting the issue
 
 ## 0.6.1 (2022-03-06)
 
